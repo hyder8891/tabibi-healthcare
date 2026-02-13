@@ -504,10 +504,10 @@ const styles = StyleSheet.create({
   },
   stepsRow: {
     flexDirection: "row",
-    flex: 1,
+    width: SCREEN_WIDTH * 3,
   },
   stepContainer: {
-    flex: 1,
+    width: SCREEN_WIDTH,
   },
   stepScroll: {
     paddingHorizontal: 24,
