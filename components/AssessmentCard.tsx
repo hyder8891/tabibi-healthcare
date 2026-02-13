@@ -9,12 +9,14 @@ import { useSettings } from "@/contexts/SettingsContext";
 interface AssessmentCardProps {
   assessment: Assessment;
   onPress: () => void;
+  onContinue?: () => void;
   onDelete?: () => void;
 }
 
 export function AssessmentCard({
   assessment,
   onPress,
+  onContinue,
   onDelete,
 }: AssessmentCardProps) {
   const { t, isRTL } = useSettings();
@@ -112,6 +114,24 @@ export function AssessmentCard({
           </Text>
         </View>
       )}
+      {onContinue && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.continueButton,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={(e) => {
+            e.stopPropagation();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onContinue();
+          }}
+        >
+          <Ionicons name="chatbubble-outline" size={14} color={Colors.light.primary} />
+          <Text style={styles.continueText}>
+            {t("Continue Chat", "متابعة المحادثة")}
+          </Text>
+        </Pressable>
+      )}
     </Pressable>
   );
 }
@@ -189,5 +209,20 @@ const styles = StyleSheet.create({
     color: Colors.light.emergency,
     fontWeight: "500" as const,
     flex: 1,
+  },
+  continueButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.light.primarySurface,
+  },
+  continueText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.light.primary,
   },
 });

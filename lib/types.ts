@@ -27,6 +27,9 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  imageUri?: string;
+  imageData?: string;
+  mimeType?: string;
 }
 
 export interface MedicineRecommendation {
@@ -100,4 +103,7 @@ export interface NearbyFacility {
   capabilities: string[];
   phone?: string;
   openHours?: string;
+  placeId?: string;
+  totalRatings?: number;
+  photos?: string[];
 }

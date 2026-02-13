@@ -118,10 +118,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const chatMessages = messages.map((m: { role: string; content: string }) => ({
-        role: m.role === "user" ? "user" : "model",
-        parts: [{ text: m.content }],
-      }));
+      const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
+        const parts: any[] = [];
+        if (m.imageData) {
+          parts.push({
+            inlineData: {
+              data: m.imageData,
+              mimeType: m.mimeType || "image/jpeg",
+            },
+          });
+        }
+        if (m.content) {
+          parts.push({ text: m.content });
+        }
+        return {
+          role: m.role === "user" ? "user" : "model",
+          parts,
+        };
+      });
 
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
@@ -280,6 +294,98 @@ Respond ONLY with JSON:
     } catch (error) {
       console.error("Interaction check error:", error);
       res.status(500).json({ error: "Failed to check interactions" });
+    }
+  });
+
+  app.get("/api/nearby-facilities", async (req: Request, res: Response) => {
+    try {
+      const { latitude, longitude, type, pagetoken } = req.query;
+
+      if (!latitude || !longitude) {
+        return res.status(400).json({ error: "Latitude and longitude are required" });
+      }
+
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Google Maps API key not configured" });
+      }
+
+      const typeMap: Record<string, string> = {
+        pharmacy: "pharmacy",
+        lab: "laboratory",
+        clinic: "doctor",
+        hospital: "hospital",
+      };
+
+      const googleType = typeMap[type as string] || "pharmacy";
+      
+      let url: string;
+      if (pagetoken) {
+        url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${pagetoken}&key=${apiKey}`;
+      } else {
+        url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=10000&type=${googleType}&key=${apiKey}`;
+      }
+
+      const response = await globalThis.fetch(url);
+      const data = await response.json();
+
+      if (data.status === "ZERO_RESULTS") {
+        return res.json({ facilities: [], nextPageToken: null });
+      }
+
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        console.error("Google Places API error:", data.status, data.error_message);
+        return res.status(500).json({ error: `Google Places API error: ${data.status}` });
+      }
+
+      const lat = parseFloat(latitude as string);
+      const lng = parseFloat(longitude as string);
+
+      const facilities = (data.results || []).map((place: any, index: number) => {
+        const placeLat = place.geometry?.location?.lat || lat;
+        const placeLng = place.geometry?.location?.lng || lng;
+        
+        const R = 6371;
+        const dLat = ((placeLat - lat) * Math.PI) / 180;
+        const dLon = ((placeLng - lng) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((lat * Math.PI) / 180) * Math.cos((placeLat * Math.PI) / 180) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const distance = parseFloat((R * c).toFixed(1));
+
+        return {
+          id: place.place_id || `facility-${index}`,
+          name: place.name || "Unknown",
+          type: type || "pharmacy",
+          distance,
+          rating: place.rating || 0,
+          isOpen: place.opening_hours?.open_now ?? true,
+          address: place.vicinity || place.formatted_address || "",
+          latitude: placeLat,
+          longitude: placeLng,
+          capabilities: (place.types || []).filter((t: string) => 
+            !["point_of_interest", "establishment", "health", "store"].includes(t)
+          ).slice(0, 4),
+          phone: "",
+          openHours: place.opening_hours?.open_now ? "Open" : "Closed",
+          placeId: place.place_id,
+          totalRatings: place.user_ratings_total || 0,
+          photos: place.photos ? place.photos.slice(0, 1).map((p: any) => 
+            `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${p.photo_reference}&key=${apiKey}`
+          ) : [],
+        };
+      });
+
+      facilities.sort((a: any, b: any) => a.distance - b.distance);
+
+      res.json({
+        facilities,
+        nextPageToken: data.next_page_token || null,
+      });
+    } catch (error) {
+      console.error("Nearby facilities error:", error);
+      res.status(500).json({ error: "Failed to fetch nearby facilities" });
     }
   });
 

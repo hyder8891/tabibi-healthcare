@@ -82,6 +82,12 @@ export default function HistoryScreen() {
                 params: { assessmentId: item.id },
               })
             }
+            onContinue={() =>
+              router.push({
+                pathname: "/assessment",
+                params: { assessmentId: item.id },
+              })
+            }
             onDelete={() => handleDelete(item.id)}
           />
         )}

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,19 +9,24 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
+  ActionSheetIOS,
+  Alert,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as Crypto from "expo-crypto";
+import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { fetch } from "expo/fetch";
 import Colors from "@/constants/colors";
 import { MessageBubble, TypingIndicator } from "@/components/MessageBubble";
 import { EmergencyOverlay } from "@/components/EmergencyOverlay";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { getApiUrl } from "@/lib/query-client";
-import { saveAssessment, getProfile } from "@/lib/storage";
+import { saveAssessment, getProfile, getAssessment, updateAssessment } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment } from "@/lib/types";
 
@@ -32,45 +37,162 @@ function AnimatedTypingIndicator() {
 export default function AssessmentScreen() {
   const insets = useSafeAreaInsets();
   const { settings, t, isRTL } = useSettings();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "welcome",
-      role: "assistant",
-      content: settings.language === "ar"
-        ? "\u0645\u0631\u062d\u0628\u0627\u064b! \u0623\u0646\u0627 \u0637\u0628\u064a\u0628\u064a\u060c \u0645\u0633\u0627\u0639\u062f\u0643 \u0627\u0644\u0635\u062d\u064a. \u0635\u0641 \u0644\u064a \u0623\u0639\u0631\u0627\u0636\u0643 \u0648\u0633\u0623\u0633\u0627\u0639\u062f\u0643 \u0641\u064a \u062a\u0642\u064a\u064a\u0645 \u062d\u0627\u0644\u062a\u0643."
-        : "Hello! I'm Tabibi, your healthcare assistant. Please describe your symptoms and I'll help guide you through a health assessment.",
-      timestamp: Date.now(),
-    },
-  ]);
+  const { assessmentId } = useLocalSearchParams<{ assessmentId?: string }>();
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [emergency, setEmergency] = useState<EmergencyAlert | null>(null);
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null);
+  const [pendingImage, setPendingImage] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
+  const [existingAssessmentId, setExistingAssessmentId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
+    if (assessmentId) {
+      loadExistingAssessment(assessmentId);
+    } else {
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: settings.language === "ar"
+            ? "\u0645\u0631\u062d\u0628\u0627\u064b! \u0623\u0646\u0627 \u0637\u0628\u064a\u0628\u064a\u060c \u0645\u0633\u0627\u0639\u062f\u0643 \u0627\u0644\u0635\u062d\u064a. \u0635\u0641 \u0644\u064a \u0623\u0639\u0631\u0627\u0636\u0643 \u0648\u0633\u0623\u0633\u0627\u0639\u062f\u0643 \u0641\u064a \u062a\u0642\u064a\u064a\u0645 \u062d\u0627\u0644\u062a\u0643."
+            : "Hello! I'm Tabibi, your healthcare assistant. Please describe your symptoms and I'll help guide you through a health assessment.",
+          timestamp: Date.now(),
+        },
+      ]);
+    }
+  }, []);
+
+  const loadExistingAssessment = async (id: string) => {
+    const assessment = await getAssessment(id);
+    if (assessment) {
+      setExistingAssessmentId(id);
+      chiefComplaintRef.current = assessment.chiefComplaint;
+      if (assessment.result) setAssessmentResult(assessment.result);
+      if (assessment.emergency) setEmergency(assessment.emergency);
+      
+      const continueMsg: ChatMessage = {
+        id: Crypto.randomUUID(),
+        role: "assistant",
+        content: t(
+          "Welcome back! You can continue describing your symptoms or share any updates.",
+          "\u0645\u0631\u062d\u0628\u0627\u064b \u0645\u062c\u062f\u062f\u0627\u064b! \u064a\u0645\u0643\u0646\u0643 \u0645\u062a\u0627\u0628\u0639\u0629 \u0648\u0635\u0641 \u0623\u0639\u0631\u0627\u0636\u0643 \u0623\u0648 \u0645\u0634\u0627\u0631\u0643\u0629 \u0623\u064a \u062a\u062d\u062f\u064a\u062b\u0627\u062a.",
+        ),
+        timestamp: Date.now(),
+      };
+      setMessages([...assessment.messages, continueMsg]);
+    }
+  };
+
+  const pickImage = async (source: "camera" | "gallery") => {
+    try {
+      let result: ImagePicker.ImagePickerResult;
+      
+      if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(t("Permission needed", "\u0625\u0630\u0646 \u0645\u0637\u0644\u0648\u0628"), t("Camera access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627"));
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ["images"],
+          quality: 0.7,
+          base64: true,
+        });
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(t("Permission needed", "\u0625\u0630\u0646 \u0645\u0637\u0644\u0648\u0628"), t("Photo access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0648\u0631"));
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          quality: 0.7,
+          base64: true,
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        let base64Data = asset.base64 || "";
+        
+        if (!base64Data && asset.uri && Platform.OS !== "web") {
+          base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+            encoding: "base64",
+          });
+        }
+
+        if (base64Data) {
+          const mimeType = asset.uri.toLowerCase().includes(".png") ? "image/png" : "image/jpeg";
+          setPendingImage({ uri: asset.uri, base64: base64Data, mimeType });
+        }
+      }
+    } catch (err) {
+      console.error("Image pick error:", err);
+    }
+  };
+
+  const showAttachMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [
+            t("Cancel", "\u0625\u0644\u063a\u0627\u0621"),
+            t("Take Photo", "\u0627\u0644\u062a\u0642\u0627\u0637 \u0635\u0648\u0631\u0629"),
+            t("Choose from Gallery", "\u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0646 \u0627\u0644\u0645\u0639\u0631\u0636"),
+          ],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) pickImage("camera");
+          if (buttonIndex === 2) pickImage("gallery");
+        },
+      );
+    } else {
+      Alert.alert(
+        t("Attach Image", "\u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629"),
+        t("Choose source", "\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0635\u062f\u0631"),
+        [
+          { text: t("Cancel", "\u0625\u0644\u063a\u0627\u0621"), style: "cancel" },
+          { text: t("Camera", "\u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627"), onPress: () => pickImage("camera") },
+          { text: t("Gallery", "\u0627\u0644\u0645\u0639\u0631\u0636"), onPress: () => pickImage("gallery") },
+        ],
+      );
+    }
+  };
 
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
-    if (!text || isLoading) return;
+    const imageAttachment = pendingImage;
+    if ((!text && !imageAttachment) || isLoading) return;
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (!chiefComplaintRef.current) {
+    if (!chiefComplaintRef.current && text) {
       chiefComplaintRef.current = text;
     }
 
     const userMessage: ChatMessage = {
       id: Crypto.randomUUID(),
       role: "user",
-      content: text,
+      content: text || t("Attached an image for analysis", "\u062a\u0645 \u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629 \u0644\u0644\u062a\u062d\u0644\u064a\u0644"),
       timestamp: Date.now(),
+      imageUri: imageAttachment?.uri,
     };
 
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
     setInputText("");
+    setPendingImage(null);
     setIsLoading(true);
     setStreamingMessage("");
 
@@ -79,16 +201,22 @@ export default function AssessmentScreen() {
       const apiUrl = getApiUrl();
       const url = new URL("/api/assess", apiUrl);
 
+      const apiMessages = updatedMessages
+        .filter((m) => m.id !== "welcome" && !m.content.includes(t("Welcome back!", "\u0645\u0631\u062d\u0628\u0627\u064b \u0645\u062c\u062f\u062f\u0627\u064b!")))
+        .map((m) => {
+          const msg: any = { role: m.role, content: m.content };
+          if (m === userMessage && imageAttachment) {
+            msg.imageData = imageAttachment.base64;
+            msg.mimeType = imageAttachment.mimeType;
+          }
+          return msg;
+        });
+
       const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: updatedMessages
-            .filter((m) => m.id !== "welcome")
-            .map((m) => ({
-              role: m.role,
-              content: m.content,
-            })),
+          messages: apiMessages,
           patientProfile: {
             ...profile,
             isPediatric: settings.pediatricMode,
@@ -185,21 +313,34 @@ export default function AssessmentScreen() {
       setMessages((prev) => [...prev, aiMessage]);
       setStreamingMessage("");
 
-      if (parsedResult || parsedEmergency) {
+      const profile2 = await getProfile();
+      const allMsgs = [...updatedMessages, aiMessage];
+      
+      if (existingAssessmentId) {
+        const existingAssessment = await getAssessment(existingAssessmentId);
+        if (existingAssessment) {
+          existingAssessment.messages = allMsgs;
+          existingAssessment.result = parsedResult || existingAssessment.result;
+          existingAssessment.emergency = parsedEmergency || existingAssessment.emergency;
+          await updateAssessment(existingAssessment);
+        }
+      } else if (parsedResult || parsedEmergency) {
+        const newId = Crypto.randomUUID();
         const assessment: Assessment = {
-          id: Crypto.randomUUID(),
+          id: newId,
           date: Date.now(),
           chiefComplaint: chiefComplaintRef.current,
-          messages: [...updatedMessages, aiMessage],
+          messages: allMsgs,
           result: parsedResult || undefined,
           emergency: parsedEmergency || undefined,
           medications: [],
           patientProfile: {
-            ...profile,
+            ...profile2,
             isPediatric: settings.pediatricMode,
           },
         };
         await saveAssessment(assessment);
+        setExistingAssessmentId(newId);
       }
     } catch (error) {
       const errorMessage: ChatMessage = {
@@ -216,11 +357,31 @@ export default function AssessmentScreen() {
     } finally {
       setIsLoading(false);
     }
-  }, [inputText, messages, isLoading, settings]);
+  }, [inputText, messages, isLoading, settings, pendingImage, existingAssessmentId]);
 
   const finishAssessment = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const profile = await getProfile();
+    
+    if (existingAssessmentId) {
+      const existing = await getAssessment(existingAssessmentId);
+      if (existing) {
+        existing.messages = messages;
+        existing.result = assessmentResult || existing.result;
+        existing.emergency = emergency || existing.emergency;
+        await updateAssessment(existing);
+        if (assessmentResult) {
+          router.replace({
+            pathname: "/results",
+            params: { assessmentId: existingAssessmentId },
+          });
+        } else {
+          router.back();
+        }
+        return;
+      }
+    }
+    
     const assessment: Assessment = {
       id: Crypto.randomUUID(),
       date: Date.now(),
@@ -339,6 +500,18 @@ export default function AssessmentScreen() {
           }
         />
 
+        {pendingImage && (
+          <View style={styles.imagePreviewContainer}>
+            <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} />
+            <Pressable
+              style={styles.removeImageButton}
+              onPress={() => setPendingImage(null)}
+            >
+              <Ionicons name="close-circle" size={22} color={Colors.light.emergency} />
+            </Pressable>
+          </View>
+        )}
+
         <View style={styles.scanBanner}>
           <Pressable
             style={({ pressed }) => [
@@ -361,6 +534,13 @@ export default function AssessmentScreen() {
           style={[styles.inputContainer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}
         >
           <View style={styles.inputWrapper}>
+            <Pressable
+              style={styles.attachButton}
+              onPress={showAttachMenu}
+              hitSlop={8}
+            >
+              <Ionicons name="attach" size={22} color={Colors.light.textSecondary} />
+            </Pressable>
             <TextInput
               style={[styles.input, isRTL && { textAlign: "right" }]}
               value={inputText}
@@ -379,10 +559,10 @@ export default function AssessmentScreen() {
             <Pressable
               style={[
                 styles.sendButton,
-                (!inputText.trim() || isLoading) && styles.sendButtonDisabled,
+                ((!inputText.trim() && !pendingImage) || isLoading) && styles.sendButtonDisabled,
               ]}
               onPress={sendMessage}
-              disabled={!inputText.trim() || isLoading}
+              disabled={(!inputText.trim() && !pendingImage) || isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -440,6 +620,22 @@ const styles = StyleSheet.create({
   messagesList: {
     paddingVertical: 16,
   },
+  imagePreviewContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  imagePreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 10,
+    backgroundColor: Colors.light.borderLight,
+  },
+  removeImageButton: {
+    marginLeft: -10,
+    marginTop: -26,
+  },
   scanBanner: {
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -470,13 +666,19 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 8,
+    gap: 6,
     backgroundColor: Colors.light.background,
     borderRadius: 24,
-    paddingLeft: 16,
+    paddingLeft: 10,
     paddingRight: 6,
     paddingVertical: 6,
     minHeight: 48,
+  },
+  attachButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
   },
   input: {
     flex: 1,

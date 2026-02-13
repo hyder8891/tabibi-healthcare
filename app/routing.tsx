@@ -10,11 +10,12 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { FacilityCard } from "@/components/FacilityCard";
 import { useSettings } from "@/contexts/SettingsContext";
+import { getApiUrl } from "@/lib/query-client";
 import type { NearbyFacility } from "@/lib/types";
 
 export default function RoutingScreen() {
@@ -26,208 +27,111 @@ export default function RoutingScreen() {
   const { t, isRTL } = useSettings();
   const [facilities, setFacilities] = useState<NearbyFacility[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState(type);
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
-
-  function generateNearbyFacilities(
-    latitude: number,
-    longitude: number,
-    type: string,
-    capabilities?: string,
-  ): NearbyFacility[] {
-    const facilities: NearbyFacility[] = [];
-    const now = new Date();
-    const currentHour = now.getHours();
-
-    const pharmacyNames = [
-      t("Al Manara Pharmacy", "صيدلية المنارة"),
-      t("Health First Pharmacy", "صيدلية هيلث فيرست"),
-      t("Aster Pharmacy", "صيدلية أستر"),
-      t("Life Pharmacy", "صيدلية لايف"),
-      t("Bin Sina Pharmacy", "صيدلية ابن سينا"),
-      t("MedPlus Pharmacy", "صيدلية ميدبلس"),
-    ];
-
-    const labNames = [
-      t("Al Borg Diagnostics", "مختبرات البرج"),
-      t("MedLab Middle East", "مختبرات ميدلاب"),
-      t("PathCare Diagnostics", "مختبرات باثكير"),
-      t("BioLab Medical Center", "مركز بايولاب الطبي"),
-      t("Premier Diagnostics", "مختبرات بريمير"),
-    ];
-
-    const clinicNames = [
-      t("Dubai Medical Center", "مركز دبي الطبي"),
-      t("Al Noor Clinic", "عيادة النور"),
-      t("Medcare Medical Centre", "مركز ميدكير الطبي"),
-      t("Saudi German Hospital Clinic", "عيادة المستشفى السعودي الألماني"),
-      t("Mediclinic City Hospital", "مستشفى ميديكلينك"),
-    ];
-
-    const hospitalNames = [
-      t("Rashid Hospital", "مستشفى راشد"),
-      t("Dubai Hospital", "مستشفى دبي"),
-      t("King Faisal Hospital", "مستشفى الملك فيصل"),
-      t("Cleveland Clinic Abu Dhabi", "كليفلاند كلينك أبوظبي"),
-    ];
-
-    const names =
-      type === "pharmacy"
-        ? pharmacyNames
-        : type === "lab"
-          ? labNames
-          : type === "hospital"
-            ? hospitalNames
-            : clinicNames;
-
-    const capSets: Record<string, string[][]> = {
-      pharmacy: [
-        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("24/7", "٢٤/٧")],
-        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Cosmetics", "مستحضرات تجميل")],
-        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Delivery", "توصيل")],
-        [t("OTC", "أدوية بدون وصفة"), t("Pediatric", "أطفال"), t("Diabetes", "سكري")],
-        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Herbal", "أعشاب")],
-        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("24/7", "٢٤/٧"), t("Delivery", "توصيل")],
-      ],
-      lab: [
-        [t("Blood Tests", "تحاليل دم"), t("Urinalysis", "تحليل بول"), t("Microbiology", "أحياء دقيقة")],
-        [t("Blood Tests", "تحاليل دم"), t("X-Ray", "أشعة سينية"), t("Ultrasound", "موجات فوق صوتية")],
-        [t("MRI", "رنين مغناطيسي"), t("CT Scan", "أشعة مقطعية"), t("X-Ray", "أشعة سينية"), t("Ultrasound", "موجات فوق صوتية")],
-        [t("Blood Tests", "تحاليل دم"), t("Urinalysis", "تحليل بول"), t("Hormones", "هرمونات")],
-        [t("MRI", "رنين مغناطيسي"), t("Blood Tests", "تحاليل دم"), t("ECG", "تخطيط قلب"), t("Ultrasound", "موجات فوق صوتية")],
-      ],
-      clinic: [
-        [t("General Practice", "طب عام"), t("Pediatrics", "طب أطفال")],
-        [t("Orthopedics", "عظام"), t("X-Ray", "أشعة سينية"), t("Physiotherapy", "علاج طبيعي")],
-        [t("Dermatology", "جلدية"), t("General Practice", "طب عام")],
-        [t("Cardiology", "قلب"), t("ECG", "تخطيط قلب"), t("Echo", "إيكو")],
-        [t("ENT", "أنف وأذن وحنجرة"), t("General Practice", "طب عام"), t("Pediatrics", "طب أطفال")],
-      ],
-      hospital: [
-        [t("ER 24/7", "طوارئ ٢٤/٧"), t("ICU", "عناية مركزة"), t("Surgery", "جراحة"), t("MRI", "رنين مغناطيسي"), t("CT Scan", "أشعة مقطعية")],
-        [t("ER 24/7", "طوارئ ٢٤/٧"), t("ICU", "عناية مركزة"), t("Trauma", "إصابات"), t("X-Ray", "أشعة سينية"), t("Lab", "مختبر")],
-        [t("ER 24/7", "طوارئ ٢٤/٧"), t("Pediatrics", "طب أطفال"), t("NICU", "حضانة"), t("Surgery", "جراحة")],
-        [t("ER 24/7", "طوارئ ٢٤/٧"), t("Cardiology", "قلب"), t("Neurology", "أعصاب"), t("ICU", "عناية مركزة")],
-      ],
-    };
-
-    for (let i = 0; i < names.length; i++) {
-      const angle = (i / names.length) * 2 * Math.PI + Math.random() * 0.5;
-      const dist = 0.3 + Math.random() * 2.7;
-      const lat = latitude + (dist / 111) * Math.cos(angle);
-      const lng =
-        longitude +
-        (dist / (111 * Math.cos((latitude * Math.PI) / 180))) * Math.sin(angle);
-
-      const caps = capSets[type]?.[i % (capSets[type]?.length || 1)] || [];
-
-      const isOpen24 = caps.includes(t("24/7", "٢٤/٧")) || caps.includes(t("ER 24/7", "طوارئ ٢٤/٧"));
-      const opensAt = 8;
-      const closesAt = type === "pharmacy" ? 22 : 18;
-      const isOpen = isOpen24 || (currentHour >= opensAt && currentHour < closesAt);
-
-      const facility: NearbyFacility = {
-        id: `${type}-${i}`,
-        name: names[i],
-        type: type as NearbyFacility["type"],
-        distance: parseFloat(dist.toFixed(1)),
-        rating: parseFloat((3.5 + Math.random() * 1.5).toFixed(1)),
-        isOpen,
-        address: t(`Street ${Math.floor(Math.random() * 50) + 1}, District ${Math.floor(Math.random() * 10) + 1}`, `شارع ${Math.floor(Math.random() * 50) + 1}، حي ${Math.floor(Math.random() * 10) + 1}`),
-        latitude: lat,
-        longitude: lng,
-        capabilities: caps,
-        phone: `+971${Math.floor(Math.random() * 900000000 + 100000000)}`,
-        openHours: isOpen24 ? t("24/7", "٢٤/٧") : `${opensAt}:00 - ${closesAt}:00`,
-      };
-
-      facilities.push(facility);
-    }
-
-    if (capabilities) {
-      const required = capabilities
-        .split("|")
-        .flatMap((c) => c.split(","))
-        .filter(Boolean)
-        .map((c) => c.toLowerCase().trim());
-
-      if (required.length > 0) {
-        const filtered = facilities.filter((f) =>
-          required.some((req) =>
-            f.capabilities.some((cap) => cap.toLowerCase().includes(req)),
-          ),
-        );
-        if (filtered.length > 0) {
-          return filtered.sort((a, b) => a.distance - b.distance);
-        }
-      }
-    }
-
-    return facilities.sort((a, b) => a.distance - b.distance);
-  }
 
   useEffect(() => {
     loadFacilities();
   }, [selectedType]);
 
+  const getLocation = async (): Promise<{ lat: number; lng: number }> => {
+    if (userLocation) return userLocation;
+
+    let latitude = 25.2048;
+    let longitude = 55.2708;
+
+    if (Platform.OS === "web") {
+      try {
+        const position = await new Promise<GeolocationPosition>(
+          (resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+              timeout: 5000,
+            });
+          },
+        );
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+      } catch {}
+    } else {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        try {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          latitude = location.coords.latitude;
+          longitude = location.coords.longitude;
+        } catch {}
+      }
+    }
+
+    const loc = { lat: latitude, lng: longitude };
+    setUserLocation(loc);
+    return loc;
+  };
+
   const loadFacilities = async () => {
     setLoading(true);
     setLocationError(null);
+    setNextPageToken(null);
 
     try {
-      let latitude = 25.2048;
-      let longitude = 55.2708;
+      const loc = await getLocation();
+      const apiUrl = getApiUrl();
+      const url = new URL("/api/nearby-facilities", apiUrl);
+      url.searchParams.set("latitude", loc.lat.toString());
+      url.searchParams.set("longitude", loc.lng.toString());
+      url.searchParams.set("type", selectedType);
 
-      if (Platform.OS === "web") {
-        try {
-          const position = await new Promise<GeolocationPosition>(
-            (resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, {
-                timeout: 5000,
-              });
-            },
-          );
-          latitude = position.coords.latitude;
-          longitude = position.coords.longitude;
-        } catch {}
+      const response = await fetch(url.toString());
+      const data = await response.json();
+
+      if (data.error) {
+        setLocationError(data.error);
+        setFacilities([]);
       } else {
-        const { status } =
-          await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          try {
-            const location = await Location.getCurrentPositionAsync({
-              accuracy: Location.Accuracy.Balanced,
-            });
-            latitude = location.coords.latitude;
-            longitude = location.coords.longitude;
-          } catch {}
-        }
+        setFacilities(data.facilities || []);
+        setNextPageToken(data.nextPageToken || null);
       }
-
-      const nearbyFacilities = generateNearbyFacilities(
-        latitude,
-        longitude,
-        selectedType,
-        capabilities,
-      );
-      setFacilities(nearbyFacilities);
     } catch (err) {
       setLocationError(
         t(
-          "Could not get location. Showing default results.",
-          "\u062a\u0639\u0630\u0631 \u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0627\u0644\u0645\u0648\u0642\u0639. \u064a\u062a\u0645 \u0639\u0631\u0636 \u0627\u0644\u0646\u062a\u0627\u0626\u062c \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a\u0629.",
+          "Could not fetch facilities. Please try again.",
+          "\u062a\u0639\u0630\u0631 \u062c\u0644\u0628 \u0627\u0644\u0645\u0631\u0627\u0641\u0642. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
         ),
       );
-      const defaultFacilities = generateNearbyFacilities(
-        25.2048,
-        55.2708,
-        selectedType,
-        capabilities,
-      );
-      setFacilities(defaultFacilities);
+      setFacilities([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!nextPageToken || loadingMore) return;
+    setLoadingMore(true);
+
+    try {
+      const apiUrl = getApiUrl();
+      const loc = userLocation || { lat: 25.2048, lng: 55.2708 };
+      const url = new URL("/api/nearby-facilities", apiUrl);
+      url.searchParams.set("latitude", loc.lat.toString());
+      url.searchParams.set("longitude", loc.lng.toString());
+      url.searchParams.set("type", selectedType);
+      url.searchParams.set("pagetoken", nextPageToken);
+
+      const response = await fetch(url.toString());
+      const data = await response.json();
+
+      if (!data.error) {
+        setFacilities((prev) => [...prev, ...(data.facilities || [])]);
+        setNextPageToken(data.nextPageToken || null);
+      }
+    } catch {} finally {
+      setLoadingMore(false);
     }
   };
 
@@ -332,6 +236,29 @@ export default function RoutingScreen() {
               {facilities.length}{" "}
               {t("facilities found", "\u0645\u0631\u0627\u0641\u0642 \u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u064a\u0647\u0627")}
             </Text>
+          }
+          ListFooterComponent={
+            nextPageToken ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.loadMoreButton,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={loadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color={Colors.light.primary} />
+                ) : (
+                  <>
+                    <Ionicons name="add-circle-outline" size={18} color={Colors.light.primary} />
+                    <Text style={styles.loadMoreText}>
+                      {t("Load More", "\u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0645\u0632\u064a\u062f")}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
@@ -440,6 +367,21 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textTertiary,
     marginBottom: 12,
+  },
+  loadMoreButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    marginTop: 4,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primarySurface,
+  },
+  loadMoreText: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.primary,
   },
   emptyState: {
     alignItems: "center",

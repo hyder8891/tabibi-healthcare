@@ -29,6 +29,17 @@ export async function deleteAssessment(id: string): Promise<void> {
   await AsyncStorage.setItem(ASSESSMENTS_KEY, JSON.stringify(filtered));
 }
 
+export async function updateAssessment(assessment: Assessment): Promise<void> {
+  const assessments = await getAssessments();
+  const index = assessments.findIndex((a) => a.id === assessment.id);
+  if (index >= 0) {
+    assessments[index] = assessment;
+  } else {
+    assessments.unshift(assessment);
+  }
+  await AsyncStorage.setItem(ASSESSMENTS_KEY, JSON.stringify(assessments));
+}
+
 export async function saveProfile(profile: PatientProfile): Promise<void> {
   await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
 }

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -33,6 +33,13 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
           isRTL && !isUser && { borderBottomLeftRadius: 20, borderBottomRightRadius: 6 },
         ]}
       >
+        {message.imageUri && (
+          <Image
+            source={{ uri: message.imageUri }}
+            style={styles.messageImage}
+            resizeMode="cover"
+          />
+        )}
         <Text
           style={[styles.text, isUser ? styles.userText : styles.aiText, isRTL && { textAlign: "right" }]}
           selectable
@@ -113,6 +120,13 @@ const styles = StyleSheet.create({
   },
   aiText: {
     color: Colors.light.text,
+  },
+  messageImage: {
+    width: 180,
+    height: 140,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: Colors.light.borderLight,
   },
   cursor: {
     color: Colors.light.primary,
