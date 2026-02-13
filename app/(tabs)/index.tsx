@@ -14,23 +14,39 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import { getAssessments } from "@/lib/storage";
-import type { Assessment } from "@/lib/types";
+import { getAssessments, getProfile } from "@/lib/storage";
+import type { Assessment, PatientProfile } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [recentAssessments, setRecentAssessments] = useState<Assessment[]>([]);
+  const [profile, setProfile] = useState<PatientProfile | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const { t, isRTL } = useSettings();
 
   useEffect(() => {
     loadRecent();
+    loadProfile();
   }, []);
 
   const loadRecent = async () => {
     const assessments = await getAssessments();
     setRecentAssessments(assessments.slice(0, 3));
+  };
+
+  const loadProfile = async () => {
+    const p = await getProfile();
+    setProfile(p);
+  };
+
+  const getInitials = () => {
+    if (profile?.name) {
+      const parts = profile.name.trim().split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return parts[0][0].toUpperCase();
+    }
+    return null;
   };
 
   const startAssessment = () => {
@@ -54,13 +70,30 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.greetingRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <View>
-            <Text style={[styles.greeting, isRTL && { textAlign: "right" }]}>{t("Welcome to", "مرحباً بك في")}</Text>
-            <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
+          <View style={{ flex: 1 }}>
+            <View style={[styles.brandRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <Image source={require("@/assets/images/logo.png")} style={styles.logoImage} />
+              <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
+            </View>
+            <Text style={[styles.greeting, isRTL && { textAlign: "right" }]}>
+              {profile?.name
+                ? t(`Hello, ${profile.name}`, `مرحباً، ${profile.name}`)
+                : t("Welcome back", "مرحباً بك")}
+            </Text>
           </View>
-          <View style={styles.logoCircle}>
-            <Image source={require("@/assets/images/logo.png")} style={styles.logoImage} />
-          </View>
+          <Pressable
+            style={styles.profileCircle}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/settings" as any);
+            }}
+          >
+            {getInitials() ? (
+              <Text style={styles.profileInitials}>{getInitials()}</Text>
+            ) : (
+              <Ionicons name="person" size={22} color="#fff" />
+            )}
+          </Pressable>
         </View>
 
         <Text style={[styles.tagline, isRTL && { textAlign: "right" }]}>
@@ -286,30 +319,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 2,
+  },
+  logoImage: {
+    width: 32,
+    height: 32,
+    resizeMode: "contain" as const,
+  },
   greeting: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
+    marginTop: 2,
   },
   appName: {
-    fontSize: 34,
+    fontSize: 28,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: Colors.light.primary,
     letterSpacing: -0.5,
   },
-  logoCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  profileCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden" as const,
   },
-  logoImage: {
-    width: 36,
-    height: 36,
-    resizeMode: "contain" as const,
+  profileInitials: {
+    fontSize: 17,
+    fontFamily: "DMSans_700Bold",
+    color: "#fff",
+    letterSpacing: 0.5,
   },
   tagline: {
     fontSize: 15,

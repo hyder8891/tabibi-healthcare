@@ -1,4 +1,5 @@
 export interface PatientProfile {
+  name?: string;
   age?: number;
   weight?: number;
   gender?: string;

@@ -68,6 +68,16 @@ export default function SettingsScreen() {
         </Text>
         <View style={styles.card}>
           <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>{t("Name", "\u0627\u0644\u0627\u0633\u0645")}</Text>
+            <TextInput
+              style={[styles.fieldInput, { flex: 1, textAlign: isRTL ? "right" : "left" }]}
+              value={profile.name || ""}
+              onChangeText={(v) => updateProfile({ name: v || undefined })}
+              placeholder={t("Your name", "\u0627\u0633\u0645\u0643")}
+              placeholderTextColor={Colors.light.textTertiary}
+            />
+          </View>
+          <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>{t("Age", "\u0627\u0644\u0639\u0645\u0631")}</Text>
             <TextInput
               style={styles.fieldInput}
