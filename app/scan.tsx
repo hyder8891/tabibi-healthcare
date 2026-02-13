@@ -134,7 +134,7 @@ export default function ScanScreen() {
                 color={Colors.light.primary}
               />
             </View>
-            <Text style={styles.emptyTitle}>
+            <Text style={[styles.emptyTitle, isRTL && { textAlign: "right" }]}>
               {t("Scan Your Medications", "\u0627\u0645\u0633\u062d \u0623\u062f\u0648\u064a\u062a\u0643")}
             </Text>
             <Text style={styles.emptyDesc}>
@@ -165,7 +165,7 @@ export default function ScanScreen() {
         )}
 
         {error && (
-          <View style={styles.errorCard}>
+          <View style={[styles.errorCard, isRTL && { flexDirection: "row-reverse" }]}>
             <Ionicons name="alert-circle" size={20} color={Colors.light.accent} />
             <Text style={styles.errorText}>{error}</Text>
           </View>
@@ -173,49 +173,49 @@ export default function ScanScreen() {
 
         {medications.map((med, i) => (
           <View key={i} style={styles.medCard}>
-            <View style={styles.medHeader}>
+            <View style={[styles.medHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
                 name="pill"
                 size={22}
                 color={Colors.light.primary}
               />
               <View style={styles.medHeaderText}>
-                <Text style={styles.medName}>{med.name}</Text>
+                <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
                 {med.genericName && (
-                  <Text style={styles.medGeneric}>{med.genericName}</Text>
+                  <Text style={[styles.medGeneric, isRTL && { textAlign: "right" }]}>{med.genericName}</Text>
                 )}
               </View>
             </View>
 
             {med.dosage && (
-              <View style={styles.medRow}>
-                <Text style={styles.medLabel}>
+              <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
                   {t("Dosage", "\u0627\u0644\u062c\u0631\u0639\u0629")}
                 </Text>
-                <Text style={styles.medValue}>
+                <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>
                   {med.dosage} {med.form ? `(${med.form})` : ""}
                 </Text>
               </View>
             )}
 
             {med.drugClass && (
-              <View style={styles.medRow}>
-                <Text style={styles.medLabel}>
+              <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
                   {t("Class", "\u0627\u0644\u0641\u0626\u0629")}
                 </Text>
-                <Text style={styles.medValue}>{med.drugClass}</Text>
+                <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>{med.drugClass}</Text>
               </View>
             )}
 
             {med.commonUses && med.commonUses.length > 0 && (
               <View style={styles.medSection}>
-                <Text style={styles.medSectionTitle}>
+                <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
                   {t("Common Uses", "\u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\u0627\u062a")}
                 </Text>
                 {med.commonUses.map((use, j) => (
-                  <View key={j} style={styles.bulletRow}>
+                  <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <View style={styles.bullet} />
-                    <Text style={styles.bulletText}>{use}</Text>
+                    <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{use}</Text>
                   </View>
                 ))}
               </View>
@@ -223,18 +223,18 @@ export default function ScanScreen() {
 
             {med.commonSideEffects && med.commonSideEffects.length > 0 && (
               <View style={styles.medSection}>
-                <Text style={styles.medSectionTitle}>
+                <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
                   {t("Side Effects", "\u0627\u0644\u0622\u062b\u0627\u0631 \u0627\u0644\u062c\u0627\u0646\u0628\u064a\u0629")}
                 </Text>
                 {med.commonSideEffects.map((effect, j) => (
-                  <View key={j} style={styles.bulletRow}>
+                  <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <View
                       style={[
                         styles.bullet,
                         { backgroundColor: Colors.light.warning },
                       ]}
                     />
-                    <Text style={styles.bulletText}>{effect}</Text>
+                    <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{effect}</Text>
                   </View>
                 ))}
               </View>
@@ -243,13 +243,13 @@ export default function ScanScreen() {
             {med.warnings && med.warnings.length > 0 && (
               <View style={styles.warningSection}>
                 {med.warnings.map((w, j) => (
-                  <View key={j} style={styles.warningRow}>
+                  <View key={j} style={[styles.warningRow, isRTL && { flexDirection: "row-reverse" }]}>
                     <Ionicons
                       name="warning"
                       size={14}
                       color={Colors.light.accent}
                     />
-                    <Text style={styles.warningText}>{w}</Text>
+                    <Text style={[styles.warningText, isRTL && { textAlign: "right" }]}>{w}</Text>
                   </View>
                 ))}
               </View>

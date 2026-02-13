@@ -16,7 +16,7 @@ export function RecommendationCard({
   onFindPharmacy,
   onFindLab,
 }: RecommendationCardProps) {
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
 
   const severityColor =
     result.assessment.severity === "severe"
@@ -34,11 +34,13 @@ export function RecommendationCard({
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
         <View style={[styles.severityBadge, { backgroundColor: severityBg }]}>
           <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
           <Text style={[styles.severityText, { color: severityColor }]}>
-            {result.assessment.severity.toUpperCase()}
+            {isRTL
+              ? (result.assessment.severity === "severe" ? "شديد" : result.assessment.severity === "moderate" ? "متوسط" : "خفيف")
+              : result.assessment.severity.toUpperCase()}
           </Text>
         </View>
         <Text style={styles.confidence}>
@@ -46,19 +48,19 @@ export function RecommendationCard({
         </Text>
       </View>
 
-      <Text style={styles.condition}>{result.assessment.condition}</Text>
-      <Text style={styles.description}>{result.assessment.description}</Text>
+      <Text style={[styles.condition, isRTL && { textAlign: "right" }]}>{result.assessment.condition}</Text>
+      <Text style={[styles.description, isRTL && { textAlign: "right" }]}>{result.assessment.description}</Text>
 
       {result.warnings.length > 0 && (
         <View style={styles.warningsContainer}>
           {result.warnings.map((warning, i) => (
-            <View key={i} style={styles.warningRow}>
+            <View key={i} style={[styles.warningRow, isRTL && { flexDirection: "row-reverse" }]}>
               <Ionicons
                 name="alert-circle"
                 size={16}
                 color={Colors.light.accent}
               />
-              <Text style={styles.warningText}>{warning}</Text>
+              <Text style={[styles.warningText, isRTL && { textAlign: "right" }]}>{warning}</Text>
             </View>
           ))}
         </View>
@@ -67,21 +69,21 @@ export function RecommendationCard({
       {result.recommendations.pathwayA?.active &&
         result.recommendations.pathwayA.medicines.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
+            <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
                 name="pill"
                 size={20}
                 color={Colors.light.primary}
               />
-              <Text style={styles.sectionTitle}>{t("Recommended Medicines", "الأدوية الموصى بها")}</Text>
+              <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Recommended Medicines", "الأدوية الموصى بها")}</Text>
             </View>
             {result.recommendations.pathwayA.medicines.map((med, i) => (
               <View key={i} style={styles.medCard}>
-                <Text style={styles.medName}>{med.name}</Text>
-                <Text style={styles.medDetail}>
+                <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
+                <Text style={[styles.medDetail, isRTL && { textAlign: "right" }]}>
                   {med.activeIngredient} - {med.class}
                 </Text>
-                <View style={styles.medInfo}>
+                <View style={[styles.medInfo, isRTL && { flexDirection: "row-reverse" }]}>
                   <Text style={styles.medDosage}>
                     {med.dosage} | {med.frequency}
                   </Text>
@@ -99,6 +101,7 @@ export function RecommendationCard({
                 style={({ pressed }) => [
                   styles.actionButton,
                   styles.pharmacyButton,
+                  isRTL && { flexDirection: "row-reverse" },
                   pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
                 ]}
                 onPress={onFindPharmacy}
@@ -113,18 +116,18 @@ export function RecommendationCard({
       {result.recommendations.pathwayB?.active &&
         result.recommendations.pathwayB.tests.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
+            <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
                 name="flask"
                 size={20}
                 color={Colors.light.primary}
               />
-              <Text style={styles.sectionTitle}>{t("Required Tests", "الفحوصات المطلوبة")}</Text>
+              <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Required Tests", "الفحوصات المطلوبة")}</Text>
             </View>
             {result.recommendations.pathwayB.tests.map((test, i) => (
               <View key={i} style={styles.testCard}>
-                <View style={styles.testHeader}>
-                  <Text style={styles.testName}>{test.name}</Text>
+                <View style={[styles.testHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={[styles.testName, isRTL && { textAlign: "right" }]}>{test.name}</Text>
                   <View
                     style={[
                       styles.urgencyBadge,
@@ -151,14 +154,16 @@ export function RecommendationCard({
                         },
                       ]}
                     >
-                      {test.urgency.toUpperCase()}
+                      {isRTL
+                        ? (test.urgency === "emergency" ? "طوارئ" : test.urgency === "urgent" ? "عاجل" : "روتيني")
+                        : test.urgency.toUpperCase()}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.testType}>
                   {test.type === "lab" ? t("Laboratory Test", "فحص مخبري") : t("Medical Imaging", "تصوير طبي")}
                 </Text>
-                <Text style={styles.testReason}>{test.reason}</Text>
+                <Text style={[styles.testReason, isRTL && { textAlign: "right" }]}>{test.reason}</Text>
               </View>
             ))}
             {onFindLab && (
@@ -166,6 +171,7 @@ export function RecommendationCard({
                 style={({ pressed }) => [
                   styles.actionButton,
                   styles.labButton,
+                  isRTL && { flexDirection: "row-reverse" },
                   pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
                 ]}
                 onPress={onFindLab}
@@ -179,9 +185,9 @@ export function RecommendationCard({
           </View>
         )}
 
-      <View style={styles.followUpContainer}>
+      <View style={[styles.followUpContainer, isRTL && { flexDirection: "row-reverse" }]}>
         <Ionicons name="time" size={16} color={Colors.light.textSecondary} />
-        <Text style={styles.followUpText}>{result.followUp}</Text>
+        <Text style={[styles.followUpText, isRTL && { textAlign: "right" }]}>{result.followUp}</Text>
       </View>
     </View>
   );

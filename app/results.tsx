@@ -21,7 +21,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const { assessmentId } = useLocalSearchParams<{ assessmentId: string }>();
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
@@ -50,7 +50,7 @@ export default function ResultsScreen() {
     return (
       <View style={[styles.container, styles.centered, { paddingTop: topInset }]}>
         <Ionicons name="document-text-outline" size={48} color={Colors.light.textTertiary} />
-        <Text style={styles.notFoundText}>
+        <Text style={[styles.notFoundText, isRTL && { textAlign: "right" }]}>
           {t("Assessment not found", "\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u0649 \u0627\u0644\u062a\u0642\u064a\u064a\u0645")}
         </Text>
         <Pressable
@@ -67,7 +67,7 @@ export default function ResultsScreen() {
     <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
+          <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={Colors.light.text} />
         </Pressable>
         <Text style={styles.headerTitle}>
           {t("Assessment Results", "\u0646\u062a\u0627\u0626\u062c \u0627\u0644\u062a\u0642\u064a\u064a\u0645")}
@@ -80,14 +80,14 @@ export default function ResultsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.summaryHeader}>
-          <Text style={styles.complaintLabel}>
+          <Text style={[styles.complaintLabel, isRTL && { textAlign: "right" }]}>
             {t("Chief Complaint", "\u0627\u0644\u0634\u0643\u0648\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629")}
           </Text>
-          <Text style={styles.complaint}>
+          <Text style={[styles.complaint, isRTL && { textAlign: "right" }]}>
             {assessment.chiefComplaint || t("Health Assessment", "\u062a\u0642\u064a\u064a\u0645 \u0635\u062d\u064a")}
           </Text>
-          <Text style={styles.dateText}>
-            {new Date(assessment.date).toLocaleDateString("en-US", {
+          <Text style={[styles.dateText, isRTL && { textAlign: "right" }]}>
+            {new Date(assessment.date).toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
               weekday: "long",
               month: "long",
               day: "numeric",
@@ -99,7 +99,7 @@ export default function ResultsScreen() {
         </View>
 
         {assessment.emergency && (
-          <View style={styles.emergencyBanner}>
+          <View style={[styles.emergencyBanner, isRTL && { flexDirection: "row-reverse" }]}>
             <Ionicons name="warning" size={20} color="#fff" />
             <View style={styles.emergencyContent}>
               <Text style={styles.emergencyTitle}>
@@ -136,13 +136,13 @@ export default function ResultsScreen() {
         )}
 
         {!assessment.result && !assessment.emergency && (
-          <View style={styles.noResultCard}>
+          <View style={[styles.noResultCard, isRTL && { flexDirection: "row-reverse" }]}>
             <Ionicons
               name="information-circle"
               size={24}
               color={Colors.light.textTertiary}
             />
-            <Text style={styles.noResultText}>
+            <Text style={[styles.noResultText, isRTL && { textAlign: "right" }]}>
               {t(
                 "This assessment was incomplete. Start a new assessment for a full evaluation.",
                 "\u0647\u0630\u0627 \u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u063a\u064a\u0631 \u0645\u0643\u062a\u0645\u0644. \u0627\u0628\u062f\u0623 \u062a\u0642\u064a\u064a\u0645\u0627\u064b \u062c\u062f\u064a\u062f\u0627\u064b.",
@@ -152,7 +152,7 @@ export default function ResultsScreen() {
         )}
 
         <Pressable
-          style={styles.chatToggle}
+          style={[styles.chatToggle, isRTL && { flexDirection: "row-reverse" }]}
           onPress={() => setShowChat(!showChat)}
         >
           <Ionicons

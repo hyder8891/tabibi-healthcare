@@ -17,155 +17,155 @@ import { FacilityCard } from "@/components/FacilityCard";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { NearbyFacility } from "@/lib/types";
 
-function generateNearbyFacilities(
-  latitude: number,
-  longitude: number,
-  type: string,
-  capabilities?: string,
-): NearbyFacility[] {
-  const facilities: NearbyFacility[] = [];
-  const now = new Date();
-  const currentHour = now.getHours();
-
-  const pharmacyNames = [
-    "Al Manara Pharmacy",
-    "Health First Pharmacy",
-    "Aster Pharmacy",
-    "Life Pharmacy",
-    "Bin Sina Pharmacy",
-    "MedPlus Pharmacy",
-  ];
-
-  const labNames = [
-    "Al Borg Diagnostics",
-    "MedLab Middle East",
-    "PathCare Diagnostics",
-    "BioLab Medical Center",
-    "Premier Diagnostics",
-  ];
-
-  const clinicNames = [
-    "Dubai Medical Center",
-    "Al Noor Clinic",
-    "Medcare Medical Centre",
-    "Saudi German Hospital Clinic",
-    "Mediclinic City Hospital",
-  ];
-
-  const hospitalNames = [
-    "Rashid Hospital",
-    "Dubai Hospital",
-    "King Faisal Hospital",
-    "Cleveland Clinic Abu Dhabi",
-  ];
-
-  const names =
-    type === "pharmacy"
-      ? pharmacyNames
-      : type === "lab"
-        ? labNames
-        : type === "hospital"
-          ? hospitalNames
-          : clinicNames;
-
-  const capSets: Record<string, string[][]> = {
-    pharmacy: [
-      ["OTC", "Prescription", "24/7"],
-      ["OTC", "Prescription", "Cosmetics"],
-      ["OTC", "Prescription", "Delivery"],
-      ["OTC", "Pediatric", "Diabetes"],
-      ["OTC", "Prescription", "Herbal"],
-      ["OTC", "Prescription", "24/7", "Delivery"],
-    ],
-    lab: [
-      ["Blood Tests", "Urinalysis", "Microbiology"],
-      ["Blood Tests", "X-Ray", "Ultrasound"],
-      ["MRI", "CT Scan", "X-Ray", "Ultrasound"],
-      ["Blood Tests", "Urinalysis", "Hormones"],
-      ["MRI", "Blood Tests", "ECG", "Ultrasound"],
-    ],
-    clinic: [
-      ["General Practice", "Pediatrics"],
-      ["Orthopedics", "X-Ray", "Physiotherapy"],
-      ["Dermatology", "General Practice"],
-      ["Cardiology", "ECG", "Echo"],
-      ["ENT", "General Practice", "Pediatrics"],
-    ],
-    hospital: [
-      ["ER 24/7", "ICU", "Surgery", "MRI", "CT Scan"],
-      ["ER 24/7", "ICU", "Trauma", "X-Ray", "Lab"],
-      ["ER 24/7", "Pediatrics", "NICU", "Surgery"],
-      ["ER 24/7", "Cardiology", "Neurology", "ICU"],
-    ],
-  };
-
-  for (let i = 0; i < names.length; i++) {
-    const angle = (i / names.length) * 2 * Math.PI + Math.random() * 0.5;
-    const dist = 0.3 + Math.random() * 2.7;
-    const lat = latitude + (dist / 111) * Math.cos(angle);
-    const lng =
-      longitude +
-      (dist / (111 * Math.cos((latitude * Math.PI) / 180))) * Math.sin(angle);
-
-    const caps = capSets[type]?.[i % (capSets[type]?.length || 1)] || [];
-
-    const isOpen24 = caps.includes("24/7") || caps.includes("ER 24/7");
-    const opensAt = 8;
-    const closesAt = type === "pharmacy" ? 22 : 18;
-    const isOpen = isOpen24 || (currentHour >= opensAt && currentHour < closesAt);
-
-    const facility: NearbyFacility = {
-      id: `${type}-${i}`,
-      name: names[i],
-      type: type as NearbyFacility["type"],
-      distance: parseFloat(dist.toFixed(1)),
-      rating: parseFloat((3.5 + Math.random() * 1.5).toFixed(1)),
-      isOpen,
-      address: `Street ${Math.floor(Math.random() * 50) + 1}, District ${Math.floor(Math.random() * 10) + 1}`,
-      latitude: lat,
-      longitude: lng,
-      capabilities: caps,
-      phone: `+971${Math.floor(Math.random() * 900000000 + 100000000)}`,
-      openHours: isOpen24 ? "24/7" : `${opensAt}:00 - ${closesAt}:00`,
-    };
-
-    facilities.push(facility);
-  }
-
-  if (capabilities) {
-    const required = capabilities
-      .split("|")
-      .flatMap((c) => c.split(","))
-      .filter(Boolean)
-      .map((c) => c.toLowerCase().trim());
-
-    if (required.length > 0) {
-      const filtered = facilities.filter((f) =>
-        required.some((req) =>
-          f.capabilities.some((cap) => cap.toLowerCase().includes(req)),
-        ),
-      );
-      if (filtered.length > 0) {
-        return filtered.sort((a, b) => a.distance - b.distance);
-      }
-    }
-  }
-
-  return facilities.sort((a, b) => a.distance - b.distance);
-}
-
 export default function RoutingScreen() {
   const insets = useSafeAreaInsets();
   const { type = "pharmacy", capabilities } = useLocalSearchParams<{
     type: string;
     capabilities?: string;
   }>();
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
   const [facilities, setFacilities] = useState<NearbyFacility[]>([]);
   const [loading, setLoading] = useState(true);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState(type);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  function generateNearbyFacilities(
+    latitude: number,
+    longitude: number,
+    type: string,
+    capabilities?: string,
+  ): NearbyFacility[] {
+    const facilities: NearbyFacility[] = [];
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    const pharmacyNames = [
+      t("Al Manara Pharmacy", "صيدلية المنارة"),
+      t("Health First Pharmacy", "صيدلية هيلث فيرست"),
+      t("Aster Pharmacy", "صيدلية أستر"),
+      t("Life Pharmacy", "صيدلية لايف"),
+      t("Bin Sina Pharmacy", "صيدلية ابن سينا"),
+      t("MedPlus Pharmacy", "صيدلية ميدبلس"),
+    ];
+
+    const labNames = [
+      t("Al Borg Diagnostics", "مختبرات البرج"),
+      t("MedLab Middle East", "مختبرات ميدلاب"),
+      t("PathCare Diagnostics", "مختبرات باثكير"),
+      t("BioLab Medical Center", "مركز بايولاب الطبي"),
+      t("Premier Diagnostics", "مختبرات بريمير"),
+    ];
+
+    const clinicNames = [
+      t("Dubai Medical Center", "مركز دبي الطبي"),
+      t("Al Noor Clinic", "عيادة النور"),
+      t("Medcare Medical Centre", "مركز ميدكير الطبي"),
+      t("Saudi German Hospital Clinic", "عيادة المستشفى السعودي الألماني"),
+      t("Mediclinic City Hospital", "مستشفى ميديكلينك"),
+    ];
+
+    const hospitalNames = [
+      t("Rashid Hospital", "مستشفى راشد"),
+      t("Dubai Hospital", "مستشفى دبي"),
+      t("King Faisal Hospital", "مستشفى الملك فيصل"),
+      t("Cleveland Clinic Abu Dhabi", "كليفلاند كلينك أبوظبي"),
+    ];
+
+    const names =
+      type === "pharmacy"
+        ? pharmacyNames
+        : type === "lab"
+          ? labNames
+          : type === "hospital"
+            ? hospitalNames
+            : clinicNames;
+
+    const capSets: Record<string, string[][]> = {
+      pharmacy: [
+        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("24/7", "٢٤/٧")],
+        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Cosmetics", "مستحضرات تجميل")],
+        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Delivery", "توصيل")],
+        [t("OTC", "أدوية بدون وصفة"), t("Pediatric", "أطفال"), t("Diabetes", "سكري")],
+        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("Herbal", "أعشاب")],
+        [t("OTC", "أدوية بدون وصفة"), t("Prescription", "أدوية بوصفة"), t("24/7", "٢٤/٧"), t("Delivery", "توصيل")],
+      ],
+      lab: [
+        [t("Blood Tests", "تحاليل دم"), t("Urinalysis", "تحليل بول"), t("Microbiology", "أحياء دقيقة")],
+        [t("Blood Tests", "تحاليل دم"), t("X-Ray", "أشعة سينية"), t("Ultrasound", "موجات فوق صوتية")],
+        [t("MRI", "رنين مغناطيسي"), t("CT Scan", "أشعة مقطعية"), t("X-Ray", "أشعة سينية"), t("Ultrasound", "موجات فوق صوتية")],
+        [t("Blood Tests", "تحاليل دم"), t("Urinalysis", "تحليل بول"), t("Hormones", "هرمونات")],
+        [t("MRI", "رنين مغناطيسي"), t("Blood Tests", "تحاليل دم"), t("ECG", "تخطيط قلب"), t("Ultrasound", "موجات فوق صوتية")],
+      ],
+      clinic: [
+        [t("General Practice", "طب عام"), t("Pediatrics", "طب أطفال")],
+        [t("Orthopedics", "عظام"), t("X-Ray", "أشعة سينية"), t("Physiotherapy", "علاج طبيعي")],
+        [t("Dermatology", "جلدية"), t("General Practice", "طب عام")],
+        [t("Cardiology", "قلب"), t("ECG", "تخطيط قلب"), t("Echo", "إيكو")],
+        [t("ENT", "أنف وأذن وحنجرة"), t("General Practice", "طب عام"), t("Pediatrics", "طب أطفال")],
+      ],
+      hospital: [
+        [t("ER 24/7", "طوارئ ٢٤/٧"), t("ICU", "عناية مركزة"), t("Surgery", "جراحة"), t("MRI", "رنين مغناطيسي"), t("CT Scan", "أشعة مقطعية")],
+        [t("ER 24/7", "طوارئ ٢٤/٧"), t("ICU", "عناية مركزة"), t("Trauma", "إصابات"), t("X-Ray", "أشعة سينية"), t("Lab", "مختبر")],
+        [t("ER 24/7", "طوارئ ٢٤/٧"), t("Pediatrics", "طب أطفال"), t("NICU", "حضانة"), t("Surgery", "جراحة")],
+        [t("ER 24/7", "طوارئ ٢٤/٧"), t("Cardiology", "قلب"), t("Neurology", "أعصاب"), t("ICU", "عناية مركزة")],
+      ],
+    };
+
+    for (let i = 0; i < names.length; i++) {
+      const angle = (i / names.length) * 2 * Math.PI + Math.random() * 0.5;
+      const dist = 0.3 + Math.random() * 2.7;
+      const lat = latitude + (dist / 111) * Math.cos(angle);
+      const lng =
+        longitude +
+        (dist / (111 * Math.cos((latitude * Math.PI) / 180))) * Math.sin(angle);
+
+      const caps = capSets[type]?.[i % (capSets[type]?.length || 1)] || [];
+
+      const isOpen24 = caps.includes(t("24/7", "٢٤/٧")) || caps.includes(t("ER 24/7", "طوارئ ٢٤/٧"));
+      const opensAt = 8;
+      const closesAt = type === "pharmacy" ? 22 : 18;
+      const isOpen = isOpen24 || (currentHour >= opensAt && currentHour < closesAt);
+
+      const facility: NearbyFacility = {
+        id: `${type}-${i}`,
+        name: names[i],
+        type: type as NearbyFacility["type"],
+        distance: parseFloat(dist.toFixed(1)),
+        rating: parseFloat((3.5 + Math.random() * 1.5).toFixed(1)),
+        isOpen,
+        address: t(`Street ${Math.floor(Math.random() * 50) + 1}, District ${Math.floor(Math.random() * 10) + 1}`, `شارع ${Math.floor(Math.random() * 50) + 1}، حي ${Math.floor(Math.random() * 10) + 1}`),
+        latitude: lat,
+        longitude: lng,
+        capabilities: caps,
+        phone: `+971${Math.floor(Math.random() * 900000000 + 100000000)}`,
+        openHours: isOpen24 ? t("24/7", "٢٤/٧") : `${opensAt}:00 - ${closesAt}:00`,
+      };
+
+      facilities.push(facility);
+    }
+
+    if (capabilities) {
+      const required = capabilities
+        .split("|")
+        .flatMap((c) => c.split(","))
+        .filter(Boolean)
+        .map((c) => c.toLowerCase().trim());
+
+      if (required.length > 0) {
+        const filtered = facilities.filter((f) =>
+          required.some((req) =>
+            f.capabilities.some((cap) => cap.toLowerCase().includes(req)),
+          ),
+        );
+        if (filtered.length > 0) {
+          return filtered.sort((a, b) => a.distance - b.distance);
+        }
+      }
+    }
+
+    return facilities.sort((a, b) => a.distance - b.distance);
+  }
 
   useEffect(() => {
     loadFacilities();
@@ -307,16 +307,16 @@ export default function RoutingScreen() {
       </View>
 
       {locationError && (
-        <View style={styles.errorBanner}>
+        <View style={[styles.errorBanner, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="location-outline" size={16} color={Colors.light.accent} />
-          <Text style={styles.errorText}>{locationError}</Text>
+          <Text style={[styles.errorText, isRTL && { textAlign: "right" as const }]}>{locationError}</Text>
         </View>
       )}
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={styles.loadingText}>
+          <Text style={[styles.loadingText, isRTL && { textAlign: "right" as const }]}>
             {t("Finding nearby facilities...", "\u062c\u0627\u0631\u064a \u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0631\u0627\u0641\u0642 \u0627\u0644\u0642\u0631\u064a\u0628\u0629...")}
           </Text>
         </View>
@@ -328,7 +328,7 @@ export default function RoutingScreen() {
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
-            <Text style={styles.resultCount}>
+            <Text style={[styles.resultCount, isRTL && { textAlign: "right" as const }]}>
               {facilities.length}{" "}
               {t("facilities found", "\u0645\u0631\u0627\u0641\u0642 \u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u064a\u0647\u0627")}
             </Text>
