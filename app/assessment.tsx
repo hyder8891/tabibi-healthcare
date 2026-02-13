@@ -581,24 +581,6 @@ export default function AssessmentScreen() {
           </View>
         )}
 
-        <View style={styles.scanBanner}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.scanButton,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/scan");
-            }}
-          >
-            <Ionicons name="camera" size={16} color={Colors.light.primary} />
-            <Text style={styles.scanButtonText}>
-              {t("Scan Medication", "\u0645\u0633\u062d \u0627\u0644\u062f\u0648\u0627\u0621")}
-            </Text>
-          </Pressable>
-        </View>
-
         <View
           style={[styles.inputContainer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}
         >
@@ -720,28 +702,6 @@ const styles = StyleSheet.create({
   removeImageButton: {
     marginLeft: -10,
     marginTop: -26,
-  },
-  scanBanner: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  scanButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
-    borderRadius: 22,
-    backgroundColor: Colors.light.primarySurface,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    alignSelf: "center",
-  },
-  scanButtonText: {
-    fontSize: 13,
-    fontFamily: "DMSans_500Medium",
-    color: Colors.light.primary,
   },
   inputContainer: {
     paddingHorizontal: 16,
