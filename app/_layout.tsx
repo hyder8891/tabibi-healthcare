@@ -35,6 +35,8 @@ function RootLayoutNav() {
     getProfile().then((profile) => {
       if (!profile.onboardingComplete) {
         router.replace("/onboarding");
+      } else {
+        router.replace("/(tabs)");
       }
       setCheckedOnboarding(true);
     });

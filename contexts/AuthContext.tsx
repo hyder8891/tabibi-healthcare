@@ -1,6 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
+
+const AUTH_USER_KEY = "@tabibi_auth_user";
 
 interface AuthUser {
   id: string;
@@ -26,6 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+  const persistUser = async (userData: AuthUser | null) => {
+    try {
+      if (userData) {
+        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
+      } else {
+        await AsyncStorage.removeItem(AUTH_USER_KEY);
+      }
+    } catch {}
+  };
+
   const checkAuth = async () => {
     try {
       const baseUrl = getApiUrl();
@@ -34,33 +47,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data);
+        await persistUser(data);
+        setIsLoading(false);
+        return;
       }
-    } catch {
-    } finally {
-      setIsLoading(false);
-    }
+    } catch {}
+    try {
+      const stored = await AsyncStorage.getItem(AUTH_USER_KEY);
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {}
+    setIsLoading(false);
   };
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     const res = await apiRequest("POST", "/api/auth/login", { email, password });
     const data = await res.json();
     setUser(data);
-  };
+    await persistUser(data);
+  }, []);
 
-  const signup = async (email: string, password: string, name?: string) => {
+  const signup = useCallback(async (email: string, password: string, name?: string) => {
     const res = await apiRequest("POST", "/api/auth/signup", { email, password, name });
     const data = await res.json();
     setUser(data);
-  };
+    await persistUser(data);
+  }, []);
 
-  const logout = async () => {
-    await apiRequest("POST", "/api/auth/logout");
+  const logout = useCallback(async () => {
+    try {
+      await apiRequest("POST", "/api/auth/logout");
+    } catch {}
     setUser(null);
-  };
+    await persistUser(null);
+  }, []);
 
   const value = useMemo(
     () => ({ user, isLoading, login, signup, logout }),
-    [user, isLoading],
+    [user, isLoading, login, signup, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
