@@ -18,17 +18,19 @@ export function RecommendationCard({
 }: RecommendationCardProps) {
   const { t, isRTL } = useSettings();
 
+  const severity = result?.assessment?.severity || "mild";
+
   const severityColor =
-    result.assessment.severity === "severe"
+    severity === "severe"
       ? Colors.light.emergency
-      : result.assessment.severity === "moderate"
+      : severity === "moderate"
         ? Colors.light.warning
         : Colors.light.success;
 
   const severityBg =
-    result.assessment.severity === "severe"
+    severity === "severe"
       ? Colors.light.emergencyLight
-      : result.assessment.severity === "moderate"
+      : severity === "moderate"
         ? Colors.light.warningLight
         : Colors.light.successLight;
 
@@ -39,19 +41,19 @@ export function RecommendationCard({
           <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
           <Text style={[styles.severityText, { color: severityColor }]}>
             {isRTL
-              ? (result.assessment.severity === "severe" ? "شديد" : result.assessment.severity === "moderate" ? "متوسط" : "خفيف")
-              : result.assessment.severity.toUpperCase()}
+              ? (severity === "severe" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
+              : severity.toUpperCase()}
           </Text>
         </View>
         <Text style={styles.confidence}>
-          {result.assessment.confidence} {t("confidence", "الثقة")}
+          {result?.assessment?.confidence || "—"} {t("confidence", "الثقة")}
         </Text>
       </View>
 
-      <Text style={[styles.condition, isRTL && { textAlign: "right" }]}>{result.assessment.condition}</Text>
-      <Text style={[styles.description, isRTL && { textAlign: "right" }]}>{result.assessment.description}</Text>
+      <Text style={[styles.condition, isRTL && { textAlign: "right" }]}>{result?.assessment?.condition || t("Assessment", "تقييم")}</Text>
+      <Text style={[styles.description, isRTL && { textAlign: "right" }]}>{result?.assessment?.description || ""}</Text>
 
-      {result.warnings.length > 0 && (
+      {result?.warnings && result.warnings.length > 0 && (
         <View style={styles.warningsContainer}>
           {result.warnings.map((warning, i) => (
             <View key={i} style={[styles.warningRow, isRTL && { flexDirection: "row-reverse" }]}>
@@ -66,8 +68,8 @@ export function RecommendationCard({
         </View>
       )}
 
-      {result.recommendations.pathwayA?.active &&
-        result.recommendations.pathwayA.medicines.length > 0 && (
+      {result?.recommendations?.pathwayA?.active &&
+        result.recommendations.pathwayA.medicines?.length > 0 && (
           <View style={styles.section}>
             <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
@@ -113,8 +115,8 @@ export function RecommendationCard({
           </View>
         )}
 
-      {result.recommendations.pathwayB?.active &&
-        result.recommendations.pathwayB.tests.length > 0 && (
+      {result?.recommendations?.pathwayB?.active &&
+        result.recommendations.pathwayB.tests?.length > 0 && (
           <View style={styles.section}>
             <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
@@ -187,7 +189,7 @@ export function RecommendationCard({
 
       <View style={[styles.followUpContainer, isRTL && { flexDirection: "row-reverse" }]}>
         <Ionicons name="time" size={16} color={Colors.light.textSecondary} />
-        <Text style={[styles.followUpText, isRTL && { textAlign: "right" }]}>{result.followUp}</Text>
+        <Text style={[styles.followUpText, isRTL && { textAlign: "right" }]}>{result?.followUp || ""}</Text>
       </View>
     </View>
   );
