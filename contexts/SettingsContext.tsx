@@ -13,7 +13,7 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>({
-    language: "en",
+    language: "ar",
     pediatricMode: false,
   });
 

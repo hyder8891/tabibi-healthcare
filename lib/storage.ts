@@ -64,5 +64,5 @@ export async function getSettings(): Promise<AppSettings> {
   const data = await AsyncStorage.getItem(SETTINGS_KEY);
   return data
     ? JSON.parse(data)
-    : { language: "en", pediatricMode: false };
+    : { language: "ar", pediatricMode: false };
 }
