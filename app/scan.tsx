@@ -12,6 +12,7 @@ import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import Colors from "@/constants/colors";
@@ -19,6 +20,24 @@ import { getApiUrl } from "@/lib/query-client";
 import { getMedications, saveMedications, getProfile, saveProfile } from "@/lib/storage";
 import type { ScannedMedication } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+
+async function uriToBase64(uri: string): Promise<string> {
+  if (Platform.OS !== "web") {
+    return FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  }
+  const response = await fetch(uri);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1] || "";
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
@@ -59,7 +78,24 @@ export default function ScanScreen() {
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       setImageUri(asset.uri);
-      analyzeImage(asset.base64!, asset.mimeType || "image/jpeg");
+
+      let base64Data = asset.base64 || "";
+      if (!base64Data && asset.uri) {
+        try {
+          base64Data = await uriToBase64(asset.uri);
+        } catch (e) {
+          console.error("Failed to convert image to base64:", e);
+          setError(t("Failed to process image. Please try again.", "\u0641\u0634\u0644 \u0641\u064a \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0635\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+          return;
+        }
+      }
+
+      if (!base64Data) {
+        setError(t("Could not read image data. Please try again.", "\u0644\u0645 \u0623\u062a\u0645\u0643\u0646 \u0645\u0646 \u0642\u0631\u0627\u0621\u0629 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0635\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+        return;
+      }
+
+      analyzeImage(base64Data, asset.mimeType || "image/jpeg");
     }
   };
 
