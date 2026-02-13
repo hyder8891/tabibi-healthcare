@@ -49,7 +49,7 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: topInset + 16, paddingBottom: 120 },
+          { paddingTop: topInset + 24, paddingBottom: 120 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -73,11 +73,13 @@ export default function HomeScreen() {
           onPress={startAssessment}
         >
           <LinearGradient
-            colors={[Colors.light.primary, Colors.light.primaryLight]}
+            colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
+            <View style={styles.ctaDecoCircle1} />
+            <View style={styles.ctaDecoCircle2} />
             <View style={[styles.ctaContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <View style={styles.ctaLeft}>
                 <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>{t("Start Assessment", "ابدأ التقييم")}</Text>
@@ -106,10 +108,10 @@ export default function HomeScreen() {
               ]}
               onPress={openScanner}
             >
-              <View style={[styles.actionIcon, { backgroundColor: "#FFF7ED" }]}>
+              <View style={[styles.actionIcon, { backgroundColor: Colors.light.accentLight }]}>
                 <MaterialCommunityIcons
                   name="pill"
-                  size={24}
+                  size={28}
                   color={Colors.light.accent}
                 />
               </View>
@@ -132,7 +134,7 @@ export default function HomeScreen() {
               <View style={[styles.actionIcon, { backgroundColor: Colors.light.emergencyLight }]}>
                 <Ionicons
                   name="heart"
-                  size={24}
+                  size={28}
                   color={Colors.light.emergency}
                 />
               </View>
@@ -157,7 +159,7 @@ export default function HomeScreen() {
               <View style={[styles.actionIcon, { backgroundColor: Colors.light.primarySurface }]}>
                 <Ionicons
                   name="location"
-                  size={24}
+                  size={28}
                   color={Colors.light.primary}
                 />
               </View>
@@ -178,7 +180,7 @@ export default function HomeScreen() {
               }}
             >
               <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
-                <MaterialCommunityIcons name="flask" size={24} color="#7C3AED" />
+                <MaterialCommunityIcons name="flask" size={28} color="#7C3AED" />
               </View>
               <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
@@ -199,7 +201,7 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <View style={styles.infoCard}>
+          <View style={[styles.infoCard, styles.infoCardAccent]}>
             <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Ionicons name="navigate" size={20} color={Colors.light.accent} />
               <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
@@ -230,7 +232,7 @@ export default function HomeScreen() {
               >
                 <View
                   style={[
-                    styles.recentDot,
+                    styles.recentIndicator,
                     {
                       backgroundColor: a.result?.assessment?.severity
                         ? a.result.assessment.severity === "severe"
@@ -255,7 +257,7 @@ export default function HomeScreen() {
                 </View>
                 <Ionicons
                   name={isRTL ? "chevron-back" : "chevron-forward"}
-                  size={16}
+                  size={18}
                   color={Colors.light.textTertiary}
                 />
               </Pressable>
@@ -282,7 +284,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 6,
+    marginTop: 8,
   },
   logoImage: {
     width: 72,
@@ -290,12 +293,13 @@ const styles = StyleSheet.create({
     resizeMode: "contain" as const,
   },
   greeting: {
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
+    color: Colors.light.textTertiary,
+    marginBottom: 2,
   },
   appName: {
-    fontSize: 34,
+    fontSize: 36,
     fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
     letterSpacing: -0.5,
@@ -303,27 +307,46 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
-    marginBottom: 24,
+    color: Colors.light.textLight,
+    marginBottom: 28,
   },
   mainCTA: {
-    marginBottom: 28,
-    borderRadius: 20,
+    marginBottom: 32,
+    borderRadius: 24,
     overflow: "hidden",
     shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
   },
   ctaGradient: {
-    padding: 24,
-    borderRadius: 20,
+    padding: 28,
+    borderRadius: 24,
+    overflow: "hidden",
+  },
+  ctaDecoCircle1: {
+    position: "absolute",
+    top: -30,
+    right: -30,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  ctaDecoCircle2: {
+    position: "absolute",
+    bottom: -20,
+    left: -20,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "rgba(255,255,255,0.05)",
   },
   ctaContent: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 18,
   },
   ctaLeft: {
     flex: 1,
@@ -332,18 +355,18 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontFamily: "DMSans_700Bold",
     color: "#fff",
-    marginBottom: 6,
+    marginBottom: 8,
   },
   ctaSubtitle: {
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
-    color: "rgba(255,255,255,0.8)",
-    lineHeight: 20,
+    color: "rgba(255,255,255,0.85)",
+    lineHeight: 21,
   },
   ctaIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 16,
+    width: 58,
+    height: 58,
+    borderRadius: 18,
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
@@ -351,79 +374,88 @@ const styles = StyleSheet.create({
   },
   ctaArrow: {
     alignSelf: "flex-end",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
   sectionTitle: {
-    fontSize: 18,
-    fontFamily: "DMSans_600SemiBold",
+    fontSize: 20,
+    fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
     marginBottom: 14,
+    marginTop: 8,
   },
   quickActionsGrid: {
-    gap: 10,
-    marginBottom: 24,
+    gap: 14,
+    marginBottom: 28,
   },
   quickActionsRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 14,
   },
   actionCard: {
     flex: 1,
     backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 14,
+    borderRadius: 18,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  actionTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 3,
+  },
+  actionDesc: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textTertiary,
+    lineHeight: 17,
+  },
+  infoCards: {
+    gap: 14,
+    marginBottom: 28,
+  },
+  infoCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 18,
+    padding: 18,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.light.primary,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 1,
   },
-  actionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  actionTitle: {
-    fontSize: 13,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.text,
-    marginBottom: 2,
-  },
-  actionDesc: {
-    fontSize: 11,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
-  },
-  infoCards: {
-    gap: 10,
-    marginBottom: 24,
-  },
-  infoCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
+  infoCardAccent: {
+    borderLeftColor: Colors.light.accent,
   },
   infoCardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    gap: 10,
+    marginBottom: 10,
   },
   infoCardTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
   },
@@ -431,34 +463,36 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   recentCard: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: Colors.light.surface,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 8,
-    gap: 12,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 10,
+    gap: 14,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
   },
-  recentDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  recentIndicator: {
+    width: 4,
+    height: 36,
+    borderRadius: 2,
   },
   recentContent: {
     flex: 1,
   },
   recentTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.text,
   },
   recentDate: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
-    marginTop: 1,
+    marginTop: 3,
   },
 });
