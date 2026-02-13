@@ -590,7 +590,7 @@ export default function AssessmentScreen() {
               onPress={showAttachMenu}
               hitSlop={8}
             >
-              <Ionicons name="attach" size={22} color={Colors.light.textSecondary} />
+              <Ionicons name="add" size={20} color={Colors.light.primary} />
             </Pressable>
             <TextInput
               style={[styles.input, isRTL && { textAlign: "right" }]}
@@ -724,10 +724,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.borderLight,
   },
   attachButton: {
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: Colors.light.primarySurface,
+    borderWidth: 1,
+    borderColor: Colors.light.primaryLight + "40",
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 2,
   },
   input: {
     flex: 1,
