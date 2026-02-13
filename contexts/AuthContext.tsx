@@ -25,12 +25,25 @@ interface SignupParams {
   name?: string;
 }
 
+interface VerificationResult {
+  success: boolean;
+  method: "email" | "phone";
+  identifier: string;
+  refreshToken?: string;
+  devCode?: string;
+  message: string;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
   login: (params: LoginParams) => Promise<void>;
   signup: (params: SignupParams) => Promise<void>;
   logout: () => Promise<void>;
+  sendVerification: (params: { email?: string; phone?: string; password: string }) => Promise<VerificationResult>;
+  verifyPhoneOTP: (identifier: string, code: string) => Promise<boolean>;
+  checkEmailVerified: (identifier: string, refreshToken?: string) => Promise<boolean>;
+  resendVerification: (params: { email?: string; phone?: string; password: string }) => Promise<VerificationResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -97,9 +110,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistUser(null);
   }, []);
 
+  const sendVerification = useCallback(async (params: { email?: string; phone?: string; password: string }): Promise<VerificationResult> => {
+    const res = await apiRequest("POST", "/api/auth/send-verification", params);
+    const data = await res.json();
+    return data as VerificationResult;
+  }, []);
+
+  const verifyPhoneOTP = useCallback(async (identifier: string, code: string): Promise<boolean> => {
+    const res = await apiRequest("POST", "/api/auth/verify-phone-otp", { identifier, code });
+    const data = await res.json();
+    return data.verified === true;
+  }, []);
+
+  const checkEmailVerified = useCallback(async (identifier: string, refreshToken?: string): Promise<boolean> => {
+    const res = await apiRequest("POST", "/api/auth/check-email-verified", { identifier, refreshToken });
+    const data = await res.json();
+    return data.verified === true;
+  }, []);
+
+  const resendVerification = useCallback(async (params: { email?: string; phone?: string; password: string }): Promise<VerificationResult> => {
+    const res = await apiRequest("POST", "/api/auth/resend-verification", params);
+    const data = await res.json();
+    return data as VerificationResult;
+  }, []);
+
   const value = useMemo(
-    () => ({ user, isLoading, login, signup, logout }),
-    [user, isLoading, login, signup, logout],
+    () => ({ user, isLoading, login, signup, logout, sendVerification, verifyPhoneOTP, checkEmailVerified, resendVerification }),
+    [user, isLoading, login, signup, logout, sendVerification, verifyPhoneOTP, checkEmailVerified, resendVerification],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

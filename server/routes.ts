@@ -3,6 +3,14 @@ import { createServer, type Server } from "node:http";
 import { GoogleGenAI } from "@google/genai";
 import bcrypt from "bcrypt";
 import { storage } from "./storage";
+import {
+  firebaseCreateUser,
+  firebaseSendVerificationEmail,
+  firebaseCheckEmailVerified,
+  firebaseRefreshToken,
+  firebaseDeleteUser,
+  generateOTP,
+} from "./firebase-auth";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -119,6 +127,172 @@ COMMUNICATION STYLE:
 - In the JSON recommendation block, write all text fields (condition, description, warnings, followUp, medicine names, test reasons) in Arabic when responding in Arabic`;
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.post("/api/auth/send-verification", async (req: Request, res: Response) => {
+    try {
+      const { email, phone, password } = req.body;
+      if (!email && !phone) {
+        return res.status(400).json({ message: "Email or phone number is required" });
+      }
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
+      }
+
+      if (email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        const existing = await storage.getUserByEmail(normalizedEmail);
+        if (existing) {
+          return res.status(409).json({ message: "An account with this email already exists" });
+        }
+        try {
+          const firebaseUser = await firebaseCreateUser(normalizedEmail, password);
+          await firebaseSendVerificationEmail(firebaseUser.idToken);
+          await storage.createVerificationCode(
+            normalizedEmail,
+            "email",
+            "firebase-email-link",
+            firebaseUser.idToken,
+          );
+          return res.json({
+            success: true,
+            method: "email",
+            identifier: normalizedEmail,
+            refreshToken: firebaseUser.refreshToken,
+            message: "Verification email sent. Please check your inbox.",
+          });
+        } catch (firebaseErr: any) {
+          const msg = firebaseErr?.message || "";
+          if (msg.includes("EMAIL_EXISTS")) {
+            try {
+              const tempUser = await firebaseCreateUser(normalizedEmail + ".temp" + Date.now() + "@del.com", password);
+              await firebaseDeleteUser(tempUser.idToken);
+            } catch {}
+            return res.status(409).json({ message: "An account with this email already exists" });
+          }
+          console.error("Firebase email verification error:", firebaseErr);
+          return res.status(500).json({ message: "Failed to send verification email" });
+        }
+      }
+
+      if (phone) {
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, "");
+        const existing = await storage.getUserByPhone(normalizedPhone);
+        if (existing) {
+          return res.status(409).json({ message: "An account with this phone number already exists" });
+        }
+        const otp = generateOTP();
+        await storage.createVerificationCode(normalizedPhone, "phone", otp);
+        console.log(`[DEV] Phone OTP for ${normalizedPhone}: ${otp}`);
+        return res.json({
+          success: true,
+          method: "phone",
+          identifier: normalizedPhone,
+          message: "Verification code sent to your phone.",
+          ...(process.env.NODE_ENV !== "production" ? { devCode: otp } : {}),
+        });
+      }
+    } catch (error) {
+      console.error("Send verification error:", error);
+      return res.status(500).json({ message: "Failed to send verification" });
+    }
+  });
+
+  app.post("/api/auth/check-email-verified", async (req: Request, res: Response) => {
+    try {
+      const { identifier, refreshToken } = req.body;
+      if (!identifier) {
+        return res.status(400).json({ message: "Identifier is required" });
+      }
+
+      const record = await storage.getVerificationCode(identifier, "firebase-email-link");
+      if (!record) {
+        return res.status(404).json({ message: "No pending verification found" });
+      }
+
+      let idToken = record.firebaseIdToken;
+      if (refreshToken) {
+        try {
+          idToken = await firebaseRefreshToken(refreshToken);
+        } catch {}
+      }
+
+      const verified = await firebaseCheckEmailVerified(idToken);
+      if (verified) {
+        await storage.markVerified(identifier);
+        await firebaseDeleteUser(idToken);
+        return res.json({ verified: true });
+      }
+      return res.json({ verified: false });
+    } catch (error) {
+      console.error("Check email verified error:", error);
+      return res.status(500).json({ message: "Failed to check verification status" });
+    }
+  });
+
+  app.post("/api/auth/verify-phone-otp", async (req: Request, res: Response) => {
+    try {
+      const { identifier, code } = req.body;
+      if (!identifier || !code) {
+        return res.status(400).json({ message: "Phone number and code are required" });
+      }
+
+      const record = await storage.getVerificationCode(identifier, code);
+      if (!record) {
+        return res.status(400).json({ message: "Invalid or expired verification code" });
+      }
+
+      await storage.markVerified(identifier);
+      return res.json({ verified: true });
+    } catch (error) {
+      console.error("Verify phone OTP error:", error);
+      return res.status(500).json({ message: "Failed to verify code" });
+    }
+  });
+
+  app.post("/api/auth/resend-verification", async (req: Request, res: Response) => {
+    try {
+      const { email, phone, password } = req.body;
+
+      if (email) {
+        const normalizedEmail = email.toLowerCase().trim();
+        try {
+          const firebaseUser = await firebaseCreateUser(normalizedEmail, password);
+          await firebaseSendVerificationEmail(firebaseUser.idToken);
+          await storage.createVerificationCode(
+            normalizedEmail,
+            "email",
+            "firebase-email-link",
+            firebaseUser.idToken,
+          );
+          return res.json({
+            success: true,
+            refreshToken: firebaseUser.refreshToken,
+          });
+        } catch (err: any) {
+          if (err?.message?.includes("EMAIL_EXISTS")) {
+            return res.status(409).json({ message: "Email already registered in Firebase. Try logging in or use a different email." });
+          }
+          throw err;
+        }
+      }
+
+      if (phone) {
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, "");
+        const otp = generateOTP();
+        await storage.createVerificationCode(normalizedPhone, "phone", otp);
+        console.log(`[DEV] Phone OTP for ${normalizedPhone}: ${otp}`);
+        return res.json({
+          success: true,
+          ...(process.env.NODE_ENV !== "production" ? { devCode: otp } : {}),
+        });
+      }
+
+      return res.status(400).json({ message: "Email or phone required" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      return res.status(500).json({ message: "Failed to resend verification" });
+    }
+  });
+
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
       const { email, phone, password, name } = req.body;
@@ -127,6 +301,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (!email && !phone) {
         return res.status(400).json({ message: "Email or phone number is required" });
+      }
+
+      const identifier = email ? email.toLowerCase().trim() : phone.replace(/[\s\-\(\)]/g, "");
+      const verified = await storage.isVerified(identifier);
+      if (!verified) {
+        return res.status(403).json({ message: "Please verify your email or phone number first" });
       }
 
       if (email) {
