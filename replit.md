@@ -26,10 +26,25 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `lib/types.ts` - TypeScript interfaces for all data models
 
 ### Backend (Express - Port 5000)
+- `POST /api/auth/send-verification` - Send email verification (Firebase) or phone OTP
+- `POST /api/auth/check-email-verified` - Poll Firebase for email verification status
+- `POST /api/auth/verify-phone-otp` - Verify phone OTP code
+- `POST /api/auth/resend-verification` - Resend verification email/OTP
+- `POST /api/auth/signup` - Create account (requires prior verification)
+- `POST /api/auth/login` - Login with email/phone + password
+- `POST /api/auth/logout` - Logout and clear session
+- `GET /api/auth/me` - Get current authenticated user
 - `POST /api/assess` - SSE streaming assessment with Gemini AI
 - `POST /api/analyze-medication` - Image-based medication OCR analysis
 - `POST /api/check-interactions` - Drug-drug interaction checking
 - `POST /api/process-rppg` - Heart rate estimation from RGB signals using POS algorithm + FFT
+
+### Authentication & Verification
+- Email signup: Firebase Auth REST API creates user and sends verification email link
+- Phone signup: Backend generates 6-digit OTP stored in verification_codes table (dev mode shows code on screen; production SMS delivery requires Twilio)
+- After verification, user account is created in PostgreSQL with bcrypt-hashed password
+- Sessions managed via express-session with PostgreSQL store + AsyncStorage persistence
+- `server/firebase-auth.ts` - Firebase REST API utilities for email verification
 
 ## Key Features
 1. Smart Symptom Assessment (conversational AI with adaptive questioning)
@@ -49,5 +64,6 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 13, 2026: Added signup verification: email verification via Firebase Auth REST API (sends verification link), phone OTP with 6-digit code stored in DB (dev mode shows code on screen)
 - Feb 13, 2026: Added non-contact heart rate monitor (rPPG) feature with POS algorithm, FFT-based BPM detection, pulse waveform visualization, confidence scoring
 - Feb 13, 2026: Initial build of Tabibi app with all core features
