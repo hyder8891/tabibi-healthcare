@@ -285,8 +285,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   logoImage: {
-    width: 48,
-    height: 48,
+    width: 72,
+    height: 72,
     resizeMode: "contain" as const,
   },
   greeting: {
