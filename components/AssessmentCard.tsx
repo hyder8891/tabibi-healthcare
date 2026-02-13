@@ -31,10 +31,11 @@ export function AssessmentCard({
     minute: "2-digit",
   });
 
-  const severityColor = assessment.result
-    ? assessment.result.assessment.severity === "severe"
+  const severity = assessment.result?.assessment?.severity;
+  const severityColor = severity
+    ? severity === "severe"
       ? Colors.light.emergency
-      : assessment.result.assessment.severity === "moderate"
+      : severity === "moderate"
         ? Colors.light.warning
         : Colors.light.success
     : Colors.light.textTertiary;
@@ -82,28 +83,30 @@ export function AssessmentCard({
           color={Colors.light.textTertiary}
         />
       </View>
-      {assessment.result && (
+      {assessment.result?.assessment && (
         <View style={styles.resultRow}>
           <Text style={styles.resultCondition} numberOfLines={1}>
-            {assessment.result.assessment.condition}
+            {assessment.result.assessment.condition || t("Assessment", "تقييم")}
           </Text>
-          <View
-            style={[
-              styles.severityBadge,
-              {
-                backgroundColor:
-                  assessment.result.assessment.severity === "severe"
-                    ? Colors.light.emergencyLight
-                    : assessment.result.assessment.severity === "moderate"
-                      ? Colors.light.warningLight
-                      : Colors.light.successLight,
-              },
-            ]}
-          >
-            <Text style={[styles.severityText, { color: severityColor }]}>
-              {assessment.result.assessment.severity}
-            </Text>
-          </View>
+          {severity && (
+            <View
+              style={[
+                styles.severityBadge,
+                {
+                  backgroundColor:
+                    severity === "severe"
+                      ? Colors.light.emergencyLight
+                      : severity === "moderate"
+                        ? Colors.light.warningLight
+                        : Colors.light.successLight,
+                },
+              ]}
+            >
+              <Text style={[styles.severityText, { color: severityColor }]}>
+                {severity}
+              </Text>
+            </View>
+          )}
         </View>
       )}
       {assessment.emergency && (
