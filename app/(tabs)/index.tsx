@@ -6,6 +6,7 @@ import {
   Pressable,
   ScrollView,
   Platform,
+  Image,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -58,7 +59,7 @@ export default function HomeScreen() {
             <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
           </View>
           <View style={styles.logoCircle}>
-            <Ionicons name="medical" size={24} color="#fff" />
+            <Image source={require("@/assets/images/logo.png")} style={styles.logoImage} />
           </View>
         </View>
 
@@ -303,6 +304,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden" as const,
+  },
+  logoImage: {
+    width: 36,
+    height: 36,
+    resizeMode: "contain" as const,
   },
   tagline: {
     fontSize: 15,

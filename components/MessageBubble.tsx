@@ -24,7 +24,7 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
     >
       {!isUser && (
         <View style={[styles.avatar, isRTL && { marginRight: 0, marginLeft: 8 }]}>
-          <Ionicons name="medical" size={16} color="#fff" />
+          <Image source={require("@/assets/images/logo.png")} style={styles.avatarImage} />
         </View>
       )}
       <View
@@ -56,7 +56,7 @@ export function TypingIndicator() {
   return (
     <View style={[styles.container, styles.aiContainer]}>
       <View style={styles.avatar}>
-        <Ionicons name="medical" size={16} color="#fff" />
+        <Image source={require("@/assets/images/logo.png")} style={styles.avatarImage} />
       </View>
       <View style={[styles.bubble, styles.aiBubble, styles.typingBubble]}>
         <View style={styles.dots}>
@@ -91,6 +91,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 8,
     marginBottom: 4,
+    overflow: "hidden" as const,
+  },
+  avatarImage: {
+    width: 24,
+    height: 24,
+    resizeMode: "contain" as const,
   },
   bubble: {
     maxWidth: "78%",
