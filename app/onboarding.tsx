@@ -7,7 +7,6 @@ import {
   Pressable,
   ScrollView,
   Platform,
-  Dimensions,
   KeyboardAvoidingView,
 } from "react-native";
 import { router } from "expo-router";
@@ -18,15 +17,11 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSpring,
-  Easing,
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { saveProfile, getProfile } from "@/lib/storage";
 import type { PatientProfile } from "@/lib/types";
-
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -48,34 +43,30 @@ export default function OnboardingScreen() {
   const [allergyInput, setAllergyInput] = useState("");
   const [allergies, setAllergies] = useState<string[]>([]);
 
-  const slideX = useSharedValue(0);
+  const fadeOpacity = useSharedValue(1);
   const totalSteps = 3;
 
-  const animatedSlide = useAnimatedStyle(() => ({
-    transform: [{ translateX: slideX.value }],
+  const animatedFade = useAnimatedStyle(() => ({
+    opacity: fadeOpacity.value,
   }));
 
   const goNext = () => {
     if (step < totalSteps - 1) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const nextStep = step + 1;
-      setStep(nextStep);
-      slideX.value = withTiming(isRTL ? nextStep * SCREEN_WIDTH : -nextStep * SCREEN_WIDTH, {
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
+      fadeOpacity.value = withTiming(0, { duration: 120 }, () => {
+        fadeOpacity.value = withTiming(1, { duration: 200 });
       });
+      setTimeout(() => setStep((s) => s + 1), 120);
     }
   };
 
   const goBack = () => {
     if (step > 0) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      const prevStep = step - 1;
-      setStep(prevStep);
-      slideX.value = withTiming(isRTL ? prevStep * SCREEN_WIDTH : -prevStep * SCREEN_WIDTH, {
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
+      fadeOpacity.value = withTiming(0, { duration: 120 }, () => {
+        fadeOpacity.value = withTiming(1, { duration: 200 });
       });
+      setTimeout(() => setStep((s) => s - 1), 120);
     }
   };
 
@@ -136,7 +127,7 @@ export default function OnboardingScreen() {
   );
 
   const renderStep0 = () => (
-    <View style={[styles.stepContainer, { width: SCREEN_WIDTH }]}>
+    <View style={styles.stepContainer}>
       <ScrollView
         contentContainerStyle={styles.stepScroll}
         showsVerticalScrollIndicator={false}
@@ -244,7 +235,7 @@ export default function OnboardingScreen() {
   );
 
   const renderStep1 = () => (
-    <View style={[styles.stepContainer, { width: SCREEN_WIDTH }]}>
+    <View style={styles.stepContainer}>
       <ScrollView
         contentContainerStyle={styles.stepScroll}
         showsVerticalScrollIndicator={false}
@@ -309,7 +300,7 @@ export default function OnboardingScreen() {
   );
 
   const renderStep2 = () => (
-    <View style={[styles.stepContainer, { width: SCREEN_WIDTH }]}>
+    <View style={styles.stepContainer}>
       <ScrollView
         contentContainerStyle={styles.stepScroll}
         showsVerticalScrollIndicator={false}
@@ -428,13 +419,11 @@ export default function OnboardingScreen() {
           </Pressable>
         </View>
 
-        <View style={styles.stepsWrapper}>
-          <Animated.View style={[styles.stepsRow, animatedSlide, isRTL && { flexDirection: "row-reverse" }]}>
-            {renderStep0()}
-            {renderStep1()}
-            {renderStep2()}
-          </Animated.View>
-        </View>
+        <Animated.View style={[styles.stepsWrapper, animatedFade]}>
+          {step === 0 && renderStep0()}
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+        </Animated.View>
 
         <View style={[styles.bottomBar, { paddingBottom: bottomInset }]}>
           <Pressable
@@ -502,12 +491,8 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "hidden",
   },
-  stepsRow: {
-    flexDirection: "row",
-    width: SCREEN_WIDTH * 3,
-  },
   stepContainer: {
-    width: SCREEN_WIDTH,
+    flex: 1,
   },
   stepScroll: {
     paddingHorizontal: 24,
