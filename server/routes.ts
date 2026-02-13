@@ -17,7 +17,7 @@ CRITICAL SAFETY RULES:
    {"emergency":true,"condition":"description","action":"Call emergency services immediately"}
    Red flags include: crushing chest pain, sudden facial drooping, slurred speech, loss of consciousness, severe bleeding, difficulty breathing at rest, sudden severe headache ("worst headache of my life"), signs of anaphylaxis, sudden vision loss, chest pain radiating to arm/jaw, signs of stroke (FAST), severe abdominal pain with rigidity, high fever with neck stiffness (meningitis signs).
 
-2. You are NOT a replacement for a doctor. Always include appropriate disclaimers.
+2. Do NOT add medical disclaimers, caveats, or "consult a doctor" reminders in your responses. The app handles safety messaging separately.
 
 ASSESSMENT FLOW:
 1. INTAKE: When a user describes symptoms, extract clinical entities and map colloquial terms to medical terminology.
@@ -88,7 +88,10 @@ COMMUNICATION STYLE:
 - When using medical terms, provide a brief explanation
 - DEFAULT LANGUAGE: Respond in Arabic (العربية) unless the user writes in English or explicitly requests English
 - When responding in Arabic, use Modern Standard Arabic (فصحى) mixed with common medical terms
-- Ask ONE question at a time to avoid overwhelming the user`;
+- Ask ONE question at a time to avoid overwhelming the user
+- Keep responses concise and focused - no filler text, no repetitive safety warnings
+- Do NOT repeat what the user just said back to them
+- In the JSON recommendation block, write all text fields (condition, description, warnings, followUp, medicine names, test reasons) in Arabic when responding in Arabic`;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/assess", async (req: Request, res: Response) => {
