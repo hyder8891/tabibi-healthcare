@@ -7,15 +7,29 @@ const AUTH_USER_KEY = "@tabibi_auth_user";
 
 interface AuthUser {
   id: string;
-  email: string;
+  email: string | null;
+  phone: string | null;
   name: string | null;
+}
+
+interface LoginParams {
+  email?: string;
+  phone?: string;
+  password: string;
+}
+
+interface SignupParams {
+  email?: string;
+  phone?: string;
+  password: string;
+  name?: string;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, name?: string) => Promise<void>;
+  login: (params: LoginParams) => Promise<void>;
+  signup: (params: SignupParams) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -61,15 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   };
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await apiRequest("POST", "/api/auth/login", { email, password });
+  const login = useCallback(async (params: LoginParams) => {
+    const res = await apiRequest("POST", "/api/auth/login", params);
     const data = await res.json();
     setUser(data);
     await persistUser(data);
   }, []);
 
-  const signup = useCallback(async (email: string, password: string, name?: string) => {
-    const res = await apiRequest("POST", "/api/auth/signup", { email, password, name });
+  const signup = useCallback(async (params: SignupParams) => {
+    const res = await apiRequest("POST", "/api/auth/signup", params);
     const data = await res.json();
     setUser(data);
     await persistUser(data);

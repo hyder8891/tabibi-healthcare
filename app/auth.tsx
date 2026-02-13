@@ -9,7 +9,6 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -17,13 +16,15 @@ import * as Haptics from "expo-haptics";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
-  withTiming,
   withSpring,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+
+type AuthMode = "login" | "signup";
+type IdentifierType = "email" | "phone";
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
@@ -32,8 +33,10 @@ export default function AuthScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : Math.max(insets.bottom, 16);
 
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [identifierType, setIdentifierType] = useState<IdentifierType>("phone");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -54,9 +57,26 @@ export default function AuthScreen() {
     setError("");
   };
 
+  const switchIdentifier = (type: IdentifierType) => {
+    if (type === identifierType) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setIdentifierType(type);
+    setError("");
+  };
+
+  const identifierValue = identifierType === "email" ? email : phone;
+
   const handleSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
+    if (!identifierValue.trim() || !password.trim()) {
       setError(t("Please fill in all fields", "يرجى ملء جميع الحقول"));
+      return;
+    }
+    if (identifierType === "email" && !email.includes("@")) {
+      setError(t("Please enter a valid email", "يرجى إدخال بريد إلكتروني صحيح"));
+      return;
+    }
+    if (identifierType === "phone" && phone.replace(/[\s\-\(\)\+]/g, "").length < 7) {
+      setError(t("Please enter a valid phone number", "يرجى إدخال رقم هاتف صحيح"));
       return;
     }
     if (mode === "signup" && password.length < 6) {
@@ -69,18 +89,28 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
+      const params = {
+        ...(identifierType === "email" ? { email: email.trim() } : { phone: phone.trim() }),
+        password,
+        ...(mode === "signup" && name.trim() ? { name: name.trim() } : {}),
+      };
+
       if (mode === "login") {
-        await login(email.trim(), password);
+        await login(params);
       } else {
-        await signup(email.trim(), password, name.trim() || undefined);
+        await signup(params);
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       const msg = err?.message || "";
       if (msg.includes("409")) {
-        setError(t("An account with this email already exists", "يوجد حساب بهذا البريد الإلكتروني بالفعل"));
+        setError(
+          identifierType === "email"
+            ? t("An account with this email already exists", "يوجد حساب بهذا البريد الإلكتروني بالفعل")
+            : t("An account with this phone number already exists", "يوجد حساب بهذا الرقم بالفعل")
+        );
       } else if (msg.includes("401")) {
-        setError(t("Invalid email or password", "البريد الإلكتروني أو كلمة المرور غير صحيحة"));
+        setError(t("Invalid credentials", "بيانات الدخول غير صحيحة"));
       } else {
         setError(t("Something went wrong. Please try again.", "حدث خطأ. يرجى المحاولة مرة أخرى."));
       }
@@ -159,21 +189,83 @@ export default function AuthScreen() {
             )}
 
             <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
-                {t("Email", "البريد الإلكتروني")}
-              </Text>
+              <View style={styles.identifierHeader}>
+                <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
+                  {identifierType === "email"
+                    ? t("Email", "البريد الإلكتروني")
+                    : t("Phone Number", "رقم الهاتف")}
+                </Text>
+                <View style={styles.identifierToggle}>
+                  <Pressable
+                    onPress={() => switchIdentifier("phone")}
+                    style={[styles.identifierPill, identifierType === "phone" && styles.identifierPillActive]}
+                    hitSlop={4}
+                  >
+                    <Ionicons
+                      name="call-outline"
+                      size={14}
+                      color={identifierType === "phone" ? Colors.light.primary : Colors.light.textTertiary}
+                    />
+                    <Text
+                      style={[
+                        styles.identifierPillText,
+                        identifierType === "phone" && styles.identifierPillTextActive,
+                      ]}
+                    >
+                      {t("Phone", "هاتف")}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => switchIdentifier("email")}
+                    style={[styles.identifierPill, identifierType === "email" && styles.identifierPillActive]}
+                    hitSlop={4}
+                  >
+                    <Ionicons
+                      name="mail-outline"
+                      size={14}
+                      color={identifierType === "email" ? Colors.light.primary : Colors.light.textTertiary}
+                    />
+                    <Text
+                      style={[
+                        styles.identifierPillText,
+                        identifierType === "email" && styles.identifierPillTextActive,
+                      ]}
+                    >
+                      {t("Email", "بريد")}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
               <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.textInput, isRTL && { textAlign: "right" }]}
-                  value={email}
-                  onChangeText={(v) => { setEmail(v); setError(""); }}
-                  placeholder={t("you@example.com", "you@example.com")}
-                  placeholderTextColor={Colors.light.textTertiary}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
+                <Ionicons
+                  name={identifierType === "email" ? "mail-outline" : "call-outline"}
+                  size={20}
+                  color={Colors.light.textTertiary}
+                  style={styles.inputIcon}
                 />
+                {identifierType === "email" ? (
+                  <TextInput
+                    style={[styles.textInput, isRTL && { textAlign: "right" }]}
+                    value={email}
+                    onChangeText={(v) => { setEmail(v); setError(""); }}
+                    placeholder="you@example.com"
+                    placeholderTextColor={Colors.light.textTertiary}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                ) : (
+                  <TextInput
+                    style={[styles.textInput, isRTL && { textAlign: "right" }]}
+                    value={phone}
+                    onChangeText={(v) => { setPhone(v); setError(""); }}
+                    placeholder={t("+1 234 567 8900", "+966 5X XXX XXXX")}
+                    placeholderTextColor={Colors.light.textTertiary}
+                    keyboardType="phone-pad"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                )}
               </View>
             </View>
 
@@ -333,6 +425,37 @@ const styles = StyleSheet.create({
   },
   inputGroup: {
     marginBottom: 18,
+  },
+  identifierHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  identifierToggle: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  identifierPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    backgroundColor: Colors.light.background,
+  },
+  identifierPillActive: {
+    backgroundColor: Colors.light.primarySurface,
+  },
+  identifierPillText: {
+    fontSize: 12,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textTertiary,
+  },
+  identifierPillTextActive: {
+    color: Colors.light.primary,
+    fontFamily: "DMSans_600SemiBold",
   },
   inputLabel: {
     fontSize: 13,

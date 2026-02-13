@@ -332,9 +332,13 @@ export default function SettingsScreen() {
         {user && (
           <View style={styles.card}>
             <View style={styles.fieldRow}>
-              <Ionicons name="mail-outline" size={18} color={Colors.light.textSecondary} />
+              <Ionicons
+                name={user.email ? "mail-outline" : "call-outline"}
+                size={18}
+                color={Colors.light.textSecondary}
+              />
               <Text style={[styles.fieldLabel, { marginLeft: 8, flex: 1 }]}>
-                {user.email}
+                {user.email || user.phone}
               </Text>
             </View>
           </View>
