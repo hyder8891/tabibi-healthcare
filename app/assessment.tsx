@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
   Image,
   ActionSheetIOS,
-  Alert,
+  Modal,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -21,6 +21,24 @@ import * as Crypto from "expo-crypto";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { fetch } from "expo/fetch";
+
+async function uriToBase64(uri: string): Promise<string> {
+  if (Platform.OS !== "web") {
+    return FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+  }
+  const response = await globalThis.fetch(uri);
+  const blob = await response.blob();
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      const base64 = result.split(",")[1] || "";
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 import Colors from "@/constants/colors";
 import { MessageBubble, TypingIndicator } from "@/components/MessageBubble";
 import { EmergencyOverlay } from "@/components/EmergencyOverlay";
@@ -46,6 +64,7 @@ export default function AssessmentScreen() {
   const [assessmentResult, setAssessmentResult] = useState<AssessmentResult | null>(null);
   const [pendingImage, setPendingImage] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
   const [existingAssessmentId, setExistingAssessmentId] = useState<string | null>(null);
+  const [showAttachModal, setShowAttachModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -124,10 +143,12 @@ export default function AssessmentScreen() {
         const asset = result.assets[0];
         let base64Data = asset.base64 || "";
         
-        if (!base64Data && asset.uri && Platform.OS !== "web") {
-          base64Data = await FileSystem.readAsStringAsync(asset.uri, {
-            encoding: "base64",
-          });
+        if (!base64Data && asset.uri) {
+          try {
+            base64Data = await uriToBase64(asset.uri);
+          } catch (e) {
+            console.error("Failed to convert image to base64:", e);
+          }
         }
 
         if (base64Data) {
@@ -158,15 +179,7 @@ export default function AssessmentScreen() {
         },
       );
     } else {
-      Alert.alert(
-        t("Attach Image", "\u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629"),
-        t("Choose source", "\u0627\u062e\u062a\u0631 \u0627\u0644\u0645\u0635\u062f\u0631"),
-        [
-          { text: t("Cancel", "\u0625\u0644\u063a\u0627\u0621"), style: "cancel" },
-          { text: t("Camera", "\u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627"), onPress: () => pickImage("camera") },
-          { text: t("Gallery", "\u0627\u0644\u0645\u0639\u0631\u0636"), onPress: () => pickImage("gallery") },
-        ],
-      );
+      setShowAttachModal(true);
     }
   };
 
@@ -427,6 +440,41 @@ export default function AssessmentScreen() {
           onDismiss={() => setEmergency(null)}
         />
       )}
+
+      <Modal
+        visible={showAttachModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAttachModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowAttachModal(false)}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {t("Attach Image", "\u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629")}
+            </Text>
+            <Pressable
+              style={({ pressed }) => [styles.modalOption, pressed && { backgroundColor: Colors.light.borderLight }]}
+              onPress={() => { setShowAttachModal(false); pickImage("camera"); }}
+            >
+              <Ionicons name="camera-outline" size={22} color={Colors.light.primary} />
+              <Text style={styles.modalOptionText}>{t("Take Photo", "\u0627\u0644\u062a\u0642\u0627\u0637 \u0635\u0648\u0631\u0629")}</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.modalOption, pressed && { backgroundColor: Colors.light.borderLight }]}
+              onPress={() => { setShowAttachModal(false); pickImage("gallery"); }}
+            >
+              <Ionicons name="images-outline" size={22} color={Colors.light.primary} />
+              <Text style={styles.modalOptionText}>{t("Choose from Gallery", "\u0627\u062e\u062a\u064a\u0627\u0631 \u0645\u0646 \u0627\u0644\u0645\u0639\u0631\u0636")}</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [styles.modalCancelButton, pressed && { opacity: 0.7 }]}
+              onPress={() => setShowAttachModal(false)}
+            >
+              <Text style={styles.modalCancelText}>{t("Cancel", "\u0625\u0644\u063a\u0627\u0621")}</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
 
       <View style={styles.header}>
         <Pressable
@@ -702,5 +750,50 @@ const styles = StyleSheet.create({
   },
   inlineResultCard: {
     marginBottom: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: Colors.light.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  modalOptionText: {
+    fontSize: 16,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.text,
+  },
+  modalCancelButton: {
+    marginTop: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderRadius: 12,
+    backgroundColor: Colors.light.background,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
   },
 });
