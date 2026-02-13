@@ -2,7 +2,7 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
 import { BlurView } from "expo-blur";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -33,30 +33,47 @@ function ClassicTabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
+        tabBarInactiveTintColor: Colors.light.textLight,
         tabBarStyle: {
           position: "absolute",
           backgroundColor: Platform.select({
             ios: "transparent",
-            default: "#fff",
+            default: Colors.light.surface,
           }),
           borderTopWidth: 0,
           elevation: 0,
           height: Platform.OS === "web" ? 84 : 88,
           paddingBottom: Platform.OS === "web" ? 34 : 28,
-          paddingTop: 8,
+          paddingTop: 10,
+          ...Platform.select({
+            android: {
+              shadowColor: Colors.light.shadow,
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 1,
+              shadowRadius: 8,
+              elevation: 12,
+            },
+            web: {
+              shadowColor: Colors.light.shadow,
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 1,
+              shadowRadius: 8,
+            },
+            default: {},
+          }),
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
             <BlurView
-              intensity={100}
+              intensity={95}
               tint="light"
               style={StyleSheet.absoluteFill}
             />
           ) : null,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontFamily: "DMSans_500Medium",
+          fontFamily: "DMSans_600SemiBold",
+          marginTop: 2,
         },
       }}
     >
@@ -64,8 +81,8 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "الرئيسية",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "heart" : "heart-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -73,8 +90,8 @@ function ClassicTabLayout() {
         name="history"
         options={{
           title: "السجل",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="time" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "time" : "time-outline"} size={24} color={color} />
           ),
         }}
       />
@@ -82,8 +99,8 @@ function ClassicTabLayout() {
         name="settings"
         options={{
           title: "الإعدادات",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings" size={size} color={color} />
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? "settings" : "settings-outline"} size={24} color={color} />
           ),
         }}
       />
