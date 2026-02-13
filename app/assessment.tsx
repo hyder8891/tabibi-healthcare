@@ -646,6 +646,8 @@ export default function AssessmentScreen() {
               style={styles.attachButton}
               onPress={showAttachMenu}
               hitSlop={8}
+              testID="attach-button"
+              accessibilityLabel="Attach image"
             >
               <Ionicons name="add" size={20} color={Colors.light.primary} />
             </Pressable>
@@ -671,6 +673,8 @@ export default function AssessmentScreen() {
               ]}
               onPress={sendMessage}
               disabled={(!inputText.trim() && !pendingImage) || isLoading}
+              testID="send-button"
+              accessibilityLabel="Send message"
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
