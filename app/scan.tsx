@@ -22,7 +22,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [medications, setMedications] = useState<ScannedMedication[]>([]);

@@ -18,7 +18,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
-    getSettings().then(setSettings);
+    getSettings().then((loaded) => {
+      setSettings(loaded);
+      I18nManager.forceRTL(loaded.language === "ar");
+    });
   }, []);
 
   const updateSettings = (partial: Partial<AppSettings>) => {

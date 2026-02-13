@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import type { AssessmentResult } from "@/lib/types";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface RecommendationCardProps {
   result: AssessmentResult;
@@ -15,6 +16,8 @@ export function RecommendationCard({
   onFindPharmacy,
   onFindLab,
 }: RecommendationCardProps) {
+  const { t } = useSettings();
+
   const severityColor =
     result.assessment.severity === "severe"
       ? Colors.light.emergency
@@ -39,7 +42,7 @@ export function RecommendationCard({
           </Text>
         </View>
         <Text style={styles.confidence}>
-          {result.assessment.confidence} confidence
+          {result.assessment.confidence} {t("confidence", "الثقة")}
         </Text>
       </View>
 
@@ -70,7 +73,7 @@ export function RecommendationCard({
                 size={20}
                 color={Colors.light.primary}
               />
-              <Text style={styles.sectionTitle}>Recommended Medicines</Text>
+              <Text style={styles.sectionTitle}>{t("Recommended Medicines", "الأدوية الموصى بها")}</Text>
             </View>
             {result.recommendations.pathwayA.medicines.map((med, i) => (
               <View key={i} style={styles.medCard}>
@@ -101,7 +104,7 @@ export function RecommendationCard({
                 onPress={onFindPharmacy}
               >
                 <Ionicons name="location" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Find Nearest Pharmacy</Text>
+                <Text style={styles.actionButtonText}>{t("Find Nearest Pharmacy", "ابحث عن أقرب صيدلية")}</Text>
               </Pressable>
             )}
           </View>
@@ -116,7 +119,7 @@ export function RecommendationCard({
                 size={20}
                 color={Colors.light.primary}
               />
-              <Text style={styles.sectionTitle}>Required Tests</Text>
+              <Text style={styles.sectionTitle}>{t("Required Tests", "الفحوصات المطلوبة")}</Text>
             </View>
             {result.recommendations.pathwayB.tests.map((test, i) => (
               <View key={i} style={styles.testCard}>
@@ -153,7 +156,7 @@ export function RecommendationCard({
                   </View>
                 </View>
                 <Text style={styles.testType}>
-                  {test.type === "lab" ? "Laboratory Test" : "Medical Imaging"}
+                  {test.type === "lab" ? t("Laboratory Test", "فحص مخبري") : t("Medical Imaging", "تصوير طبي")}
                 </Text>
                 <Text style={styles.testReason}>{test.reason}</Text>
               </View>
@@ -169,7 +172,7 @@ export function RecommendationCard({
               >
                 <Ionicons name="location" size={20} color="#fff" />
                 <Text style={styles.actionButtonText}>
-                  Find Nearest Lab / Clinic
+                  {t("Find Nearest Lab / Clinic", "ابحث عن أقرب مختبر / عيادة")}
                 </Text>
               </Pressable>
             )}

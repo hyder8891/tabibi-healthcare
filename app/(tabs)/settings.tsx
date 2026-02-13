@@ -19,7 +19,7 @@ import type { PatientProfile } from "@/lib/types";
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { settings, updateSettings, t } = useSettings();
+  const { settings, updateSettings, t, isRTL } = useSettings();
   const [profile, setProfile] = useState<PatientProfile>({
     medications: [],
     conditions: [],
@@ -61,9 +61,9 @@ export default function SettingsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>{t("Settings", "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a")}</Text>
+        <Text style={[styles.title, isRTL && { textAlign: "right" }]}>{t("Settings", "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a")}</Text>
 
-        <Text style={styles.sectionLabel}>
+        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
           {t("Health Profile", "\u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0635\u062d\u064a")}
         </Text>
         <View style={styles.card}>
@@ -98,27 +98,27 @@ export default function SettingsScreen() {
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>{t("Gender", "\u0627\u0644\u062c\u0646\u0633")}</Text>
             <View style={styles.genderRow}>
-              {["Male", "Female"].map((g) => (
+              {[{ key: "male", en: "Male", ar: "ذكر" }, { key: "female", en: "Female", ar: "أنثى" }].map((g) => (
                 <Pressable
-                  key={g}
+                  key={g.key}
                   style={[
                     styles.genderButton,
-                    profile.gender === g.toLowerCase() &&
+                    profile.gender === g.key &&
                       styles.genderButtonActive,
                   ]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    updateProfile({ gender: g.toLowerCase() });
+                    updateProfile({ gender: g.key });
                   }}
                 >
                   <Text
                     style={[
                       styles.genderText,
-                      profile.gender === g.toLowerCase() &&
+                      profile.gender === g.key &&
                         styles.genderTextActive,
                     ]}
                   >
-                    {g}
+                    {t(g.en, g.ar)}
                   </Text>
                 </Pressable>
               ))}
@@ -126,7 +126,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>
+        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
           {t("Known Conditions", "\u0627\u0644\u062d\u0627\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0641\u0629")}
         </Text>
         <View style={styles.card}>
@@ -180,7 +180,7 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={styles.sectionLabel}>
+        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
           {t("Preferences", "\u0627\u0644\u062a\u0641\u0636\u064a\u0644\u0627\u062a")}
         </Text>
         <View style={styles.card}>

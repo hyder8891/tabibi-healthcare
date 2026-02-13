@@ -4,6 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import type { NearbyFacility } from "@/lib/types";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface FacilityCardProps {
   facility: NearbyFacility;
@@ -24,6 +25,7 @@ const facilityColors: Record<string, string> = {
 };
 
 export function FacilityCard({ facility }: FacilityCardProps) {
+  const { t } = useSettings();
   const iconName = facilityIcons[facility.type] || "location";
   const color = facilityColors[facility.type] || Colors.light.primary;
 
@@ -101,7 +103,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
               },
             ]}
           >
-            {facility.isOpen ? "Open Now" : "Closed"}
+            {facility.isOpen ? t("Open Now", "مفتوح الآن") : t("Closed", "مغلق")}
           </Text>
         </View>
         {facility.openHours && (
@@ -128,7 +130,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
           onPress={openNavigation}
         >
           <Ionicons name="navigate" size={18} color="#fff" />
-          <Text style={styles.navButtonText}>Navigate</Text>
+          <Text style={styles.navButtonText}>{t("Navigate", "انتقل")}</Text>
         </Pressable>
         {facility.phone && (
           <Pressable

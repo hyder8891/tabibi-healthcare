@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
+import { useSettings } from "@/contexts/SettingsContext";
 import type { EmergencyAlert } from "@/lib/types";
 
 interface EmergencyOverlayProps {
@@ -13,6 +14,7 @@ interface EmergencyOverlayProps {
 
 export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
   const insets = useSafeAreaInsets();
+  const { t } = useSettings();
 
   const callEmergency = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -28,7 +30,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
           <Ionicons name="warning" size={48} color="#fff" />
         </View>
 
-        <Text style={styles.title}>Emergency Detected</Text>
+        <Text style={styles.title}>{t("Emergency Detected", "تم اكتشاف حالة طوارئ")}</Text>
         <Text style={styles.condition}>{alert.condition}</Text>
         <Text style={styles.action}>{alert.action}</Text>
 
@@ -40,7 +42,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
           onPress={callEmergency}
         >
           <Ionicons name="call" size={24} color="#fff" />
-          <Text style={styles.emergencyButtonText}>Call Emergency Services</Text>
+          <Text style={styles.emergencyButtonText}>{t("Call Emergency Services", "اتصل بخدمات الطوارئ")}</Text>
         </Pressable>
 
         <Pressable
@@ -50,7 +52,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
           ]}
           onPress={onDismiss}
         >
-          <Text style={styles.dismissText}>I understand the risk - dismiss</Text>
+          <Text style={styles.dismissText}>{t("I understand the risk - dismiss", "أفهم المخاطر - تجاهل")}</Text>
         </Pressable>
       </View>
     </View>

@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useSettings } from "@/contexts/SettingsContext";
 import type { ChatMessage } from "@/lib/types";
 
 interface MessageBubbleProps {
@@ -11,21 +12,29 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
   const isUser = message.role === "user";
+  const { isRTL } = useSettings();
 
   return (
     <View
-      style={[styles.container, isUser ? styles.userContainer : styles.aiContainer]}
+      style={[
+        styles.container,
+        isUser ? styles.userContainer : styles.aiContainer,
+        isRTL && { flexDirection: "row-reverse" },
+      ]}
     >
       {!isUser && (
-        <View style={styles.avatar}>
+        <View style={[styles.avatar, isRTL && { marginRight: 0, marginLeft: 8 }]}>
           <Ionicons name="medical" size={16} color="#fff" />
         </View>
       )}
       <View
-        style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble]}
+        style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble,
+          isRTL && isUser && { borderBottomRightRadius: 20, borderBottomLeftRadius: 6 },
+          isRTL && !isUser && { borderBottomLeftRadius: 20, borderBottomRightRadius: 6 },
+        ]}
       >
         <Text
-          style={[styles.text, isUser ? styles.userText : styles.aiText]}
+          style={[styles.text, isUser ? styles.userText : styles.aiText, isRTL && { textAlign: "right" }]}
           selectable
         >
           {message.content}

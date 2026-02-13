@@ -15,11 +15,13 @@ import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { getAssessments } from "@/lib/storage";
 import type { Assessment } from "@/lib/types";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [recentAssessments, setRecentAssessments] = useState<Assessment[]>([]);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const { t, isRTL } = useSettings();
 
   useEffect(() => {
     loadRecent();
@@ -50,18 +52,18 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.greetingRow}>
+        <View style={[styles.greetingRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
           <View>
-            <Text style={styles.greeting}>Welcome to</Text>
-            <Text style={styles.appName}>Tabibi</Text>
+            <Text style={[styles.greeting, isRTL && { textAlign: "right" }]}>{t("Welcome to", "مرحباً بك في")}</Text>
+            <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
           </View>
           <View style={styles.logoCircle}>
             <Ionicons name="medical" size={24} color="#fff" />
           </View>
         </View>
 
-        <Text style={styles.tagline}>
-          Your Active Healthcare Navigator
+        <Text style={[styles.tagline, isRTL && { textAlign: "right" }]}>
+          {t("Your Active Healthcare Navigator", "مساعدك الصحي الذكي")}
         </Text>
 
         <Pressable
@@ -77,24 +79,24 @@ export default function HomeScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
-            <View style={styles.ctaContent}>
+            <View style={[styles.ctaContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <View style={styles.ctaLeft}>
-                <Text style={styles.ctaTitle}>Start Assessment</Text>
-                <Text style={styles.ctaSubtitle}>
-                  Describe your symptoms and get personalized health guidance
+                <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>{t("Start Assessment", "ابدأ التقييم")}</Text>
+                <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
+                  {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
                 </Text>
               </View>
-              <View style={styles.ctaIcon}>
+              <View style={[styles.ctaIcon, isRTL ? { marginRight: 16, marginLeft: 0 } : {}]}>
                 <Ionicons name="chatbubbles" size={32} color="rgba(255,255,255,0.9)" />
               </View>
             </View>
-            <View style={styles.ctaArrow}>
-              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <View style={[styles.ctaArrow, isRTL && { alignSelf: "flex-start" }]}>
+              <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#fff" />
             </View>
           </LinearGradient>
         </Pressable>
 
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Quick Actions", "إجراءات سريعة")}</Text>
 
         <View style={styles.quickActions}>
           <Pressable
@@ -111,9 +113,9 @@ export default function HomeScreen() {
                 color={Colors.light.accent}
               />
             </View>
-            <Text style={styles.actionTitle}>Scan Medicine</Text>
-            <Text style={styles.actionDesc}>
-              Check drug interactions
+            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
+            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+              {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
             </Text>
           </Pressable>
 
@@ -134,9 +136,9 @@ export default function HomeScreen() {
                 color={Colors.light.primary}
               />
             </View>
-            <Text style={styles.actionTitle}>Find Pharmacy</Text>
-            <Text style={styles.actionDesc}>
-              Nearest open pharmacies
+            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Pharmacy", "ابحث عن صيدلية")}</Text>
+            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+              {t("Nearest open pharmacies", "أقرب الصيدليات المفتوحة")}
             </Text>
           </Pressable>
 
@@ -153,43 +155,44 @@ export default function HomeScreen() {
             <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
               <MaterialCommunityIcons name="flask" size={24} color="#7C3AED" />
             </View>
-            <Text style={styles.actionTitle}>Find Lab</Text>
-            <Text style={styles.actionDesc}>
-              Labs & imaging centers
+            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
+            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+              {t("Labs & imaging centers", "مختبرات ومراكز تصوير")}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.infoCards}>
           <View style={styles.infoCard}>
-            <View style={styles.infoCardHeader}>
+            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Ionicons name="shield-checkmark" size={20} color={Colors.light.primary} />
-              <Text style={styles.infoCardTitle}>Safety First</Text>
+              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
             </View>
-            <Text style={styles.infoCardText}>
-              Tabibi checks for emergency symptoms, drug interactions, and contraindications before making any recommendation.
+            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+              {t("Tabibi checks for emergency symptoms, drug interactions, and contraindications before making any recommendation.", "طبيبي يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
             </Text>
           </View>
 
           <View style={styles.infoCard}>
-            <View style={styles.infoCardHeader}>
+            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Ionicons name="navigate" size={20} color={Colors.light.accent} />
-              <Text style={styles.infoCardTitle}>Smart Routing</Text>
+              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
             </View>
-            <Text style={styles.infoCardText}>
-              Find the nearest facility that has exactly what you need - from pharmacies with specific medicines to labs with MRI machines.
+            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+              {t("Find the nearest facility that has exactly what you need - from pharmacies with specific medicines to labs with MRI machines.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه - من صيدليات بأدوية محددة إلى مختبرات بأجهزة الرنين المغناطيسي.")}
             </Text>
           </View>
         </View>
 
         {recentAssessments.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Recent Assessments</Text>
+            <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Recent Assessments", "التقييمات الأخيرة")}</Text>
             {recentAssessments.map((a) => (
               <Pressable
                 key={a.id}
                 style={({ pressed }) => [
                   styles.recentCard,
+                  isRTL && { flexDirection: "row-reverse" },
                   pressed && { opacity: 0.9 },
                 ]}
                 onPress={() =>
@@ -214,18 +217,18 @@ export default function HomeScreen() {
                   ]}
                 />
                 <View style={styles.recentContent}>
-                  <Text style={styles.recentTitle} numberOfLines={1}>
-                    {a.chiefComplaint || "Assessment"}
+                  <Text style={[styles.recentTitle, isRTL && { textAlign: "right" }]} numberOfLines={1}>
+                    {a.chiefComplaint || t("Assessment", "تقييم")}
                   </Text>
-                  <Text style={styles.recentDate}>
-                    {new Date(a.date).toLocaleDateString("en-US", {
+                  <Text style={[styles.recentDate, isRTL && { textAlign: "right" }]}>
+                    {new Date(a.date).toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
                       month: "short",
                       day: "numeric",
                     })}
                   </Text>
                 </View>
                 <Ionicons
-                  name="chevron-forward"
+                  name={isRTL ? "chevron-back" : "chevron-forward"}
                   size={16}
                   color={Colors.light.textTertiary}
                 />

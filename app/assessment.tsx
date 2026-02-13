@@ -30,7 +30,7 @@ function AnimatedTypingIndicator() {
 
 export default function AssessmentScreen() {
   const insets = useSafeAreaInsets();
-  const { settings, t } = useSettings();
+  const { settings, t, isRTL } = useSettings();
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
@@ -314,7 +314,7 @@ export default function AssessmentScreen() {
         >
           <View style={styles.inputWrapper}>
             <TextInput
-              style={styles.input}
+              style={[styles.input, isRTL && { textAlign: "right" }]}
               value={inputText}
               onChangeText={setInputText}
               placeholder={t(

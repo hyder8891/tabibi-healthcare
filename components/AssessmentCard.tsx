@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import type { Assessment } from "@/lib/types";
+import { useSettings } from "@/contexts/SettingsContext";
 
 interface AssessmentCardProps {
   assessment: Assessment;
@@ -16,13 +17,14 @@ export function AssessmentCard({
   onPress,
   onDelete,
 }: AssessmentCardProps) {
+  const { t, isRTL } = useSettings();
   const date = new Date(assessment.date);
-  const formattedDate = date.toLocaleDateString("en-US", {
+  const formattedDate = date.toLocaleDateString(isRTL ? "ar-SA" : "en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
   });
-  const formattedTime = date.toLocaleTimeString("en-US", {
+  const formattedTime = date.toLocaleTimeString(isRTL ? "ar-SA" : "en-US", {
     hour: "numeric",
     minute: "2-digit",
   });
@@ -50,10 +52,10 @@ export function AssessmentCard({
         <View style={[styles.indicator, { backgroundColor: severityColor }]} />
         <View style={styles.content}>
           <Text style={styles.complaint} numberOfLines={1}>
-            {assessment.chiefComplaint || "Health Assessment"}
+            {assessment.chiefComplaint || t("Health Assessment", "تقييم صحي")}
           </Text>
           <Text style={styles.dateText}>
-            {formattedDate} at {formattedTime}
+            {formattedDate} {t("at", "في")} {formattedTime}
           </Text>
         </View>
         {onDelete && (
@@ -73,7 +75,7 @@ export function AssessmentCard({
           </Pressable>
         )}
         <Ionicons
-          name="chevron-forward"
+          name={isRTL ? "chevron-back" : "chevron-forward"}
           size={18}
           color={Colors.light.textTertiary}
         />
@@ -106,7 +108,7 @@ export function AssessmentCard({
         <View style={styles.emergencyRow}>
           <Ionicons name="warning" size={14} color={Colors.light.emergency} />
           <Text style={styles.emergencyText}>
-            Emergency: {assessment.emergency.condition}
+            {t("Emergency:", "طوارئ:")} {assessment.emergency.condition}
           </Text>
         </View>
       )}

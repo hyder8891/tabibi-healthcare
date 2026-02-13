@@ -86,7 +86,8 @@ COMMUNICATION STYLE:
 - Be warm, empathetic, and reassuring but professional
 - Use simple language, avoiding medical jargon when possible
 - When using medical terms, provide a brief explanation
-- Support both English and Arabic responses based on user's language
+- DEFAULT LANGUAGE: Respond in Arabic (العربية) unless the user writes in English or explicitly requests English
+- When responding in Arabic, use Modern Standard Arabic (فصحى) mixed with common medical terms
 - Ask ONE question at a time to avoid overwhelming the user`;
 
 export async function registerRoutes(app: Express): Promise<Server> {

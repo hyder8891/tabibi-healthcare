@@ -15,9 +15,11 @@ import Colors from "@/constants/colors";
 import { AssessmentCard } from "@/components/AssessmentCard";
 import { getAssessments, deleteAssessment } from "@/lib/storage";
 import type { Assessment } from "@/lib/types";
+import { useSettings } from "@/contexts/SettingsContext";
 
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
+  const { t, isRTL } = useSettings();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -44,22 +46,28 @@ export default function HistoryScreen() {
       deleteAssessment(id).then(loadAssessments);
       return;
     }
-    Alert.alert("Delete Assessment", "Are you sure you want to delete this assessment?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteAssessment(id).then(loadAssessments),
-      },
-    ]);
+    Alert.alert(
+      t("Delete Assessment", "حذف التقييم"),
+      t("Are you sure you want to delete this assessment?", "هل أنت متأكد من حذف هذا التقييم؟"),
+      [
+        { text: t("Cancel", "إلغاء"), style: "cancel" },
+        {
+          text: t("Delete", "حذف"),
+          style: "destructive",
+          onPress: () => deleteAssessment(id).then(loadAssessments),
+        },
+      ],
+    );
   };
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topInset + 12 }]}>
-        <Text style={styles.title}>Assessment History</Text>
-        <Text style={styles.subtitle}>
-          {assessments.length} assessment{assessments.length !== 1 ? "s" : ""}
+        <Text style={[styles.title, { textAlign: isRTL ? "right" : "left" }]}>
+          {t("Assessment History", "سجل التقييمات")}
+        </Text>
+        <Text style={[styles.subtitle, { textAlign: isRTL ? "right" : "left" }]}>
+          {assessments.length} {t("assessment", "تقييم")}{assessments.length !== 1 ? (isRTL ? "" : "s") : ""}
         </Text>
       </View>
       <FlatList
@@ -93,9 +101,11 @@ export default function HistoryScreen() {
             <View style={styles.emptyIcon}>
               <Ionicons name="document-text-outline" size={48} color={Colors.light.textTertiary} />
             </View>
-            <Text style={styles.emptyTitle}>No Assessments Yet</Text>
-            <Text style={styles.emptyText}>
-              Start your first health assessment from the home screen to see your history here.
+            <Text style={[styles.emptyTitle, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("No Assessments Yet", "لا توجد تقييمات بعد")}
+            </Text>
+            <Text style={[styles.emptyText, { textAlign: isRTL ? "right" : "left" }]}>
+              {t("Start your first health assessment from the home screen to see your history here.", "ابدأ تقييمك الصحي الأول من الشاشة الرئيسية لرؤية سجلك هنا.")}
             </Text>
           </View>
         }
