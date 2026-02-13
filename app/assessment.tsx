@@ -118,7 +118,9 @@ export default function AssessmentScreen() {
       if (source === "camera") {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert(t("Permission needed", "\u0625\u0630\u0646 \u0645\u0637\u0644\u0648\u0628"), t("Camera access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627"));
+          if (Platform.OS === "web") {
+            window.alert(t("Camera access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627"));
+          }
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -129,7 +131,9 @@ export default function AssessmentScreen() {
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== "granted") {
-          Alert.alert(t("Permission needed", "\u0625\u0630\u0646 \u0645\u0637\u0644\u0648\u0628"), t("Photo access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0648\u0631"));
+          if (Platform.OS === "web") {
+            window.alert(t("Photo access is required", "\u064a\u0644\u0632\u0645 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0648\u0631"));
+          }
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -316,10 +320,23 @@ export default function AssessmentScreen() {
 
       const displayText = stripJson(fullText);
 
+      let finalContent = displayText;
+      if (!finalContent && parsedEmergency) {
+        finalContent = t(
+          `Emergency detected: ${parsedEmergency.condition}. ${parsedEmergency.action}.`,
+          `تم اكتشاف حالة طارئة: ${parsedEmergency.condition}. ${parsedEmergency.action}.`,
+        );
+      } else if (!finalContent) {
+        finalContent = t(
+          "I've analyzed the information you provided. Please describe your symptoms for a more detailed assessment.",
+          "لقد حللت المعلومات التي قدمتها. يرجى وصف أعراضك للحصول على تقييم أكثر تفصيلاً.",
+        );
+      }
+
       const aiMessage: ChatMessage = {
         id: Crypto.randomUUID(),
         role: "assistant",
-        content: displayText || fullText,
+        content: finalContent,
         timestamp: Date.now(),
       };
 
