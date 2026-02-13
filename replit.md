@@ -19,6 +19,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `app/scan.tsx` - Medication scanner using camera/gallery + Gemini vision
 - `app/results.tsx` - Assessment results with care recommendations
 - `app/routing.tsx` - Nearby facility finder with capability filtering
+- `app/heart-rate.tsx` - rPPG heart rate monitor using front camera + POS algorithm
 - `components/` - MessageBubble, EmergencyOverlay, RecommendationCard, FacilityCard, AssessmentCard
 - `contexts/SettingsContext.tsx` - Language (EN/AR) and pediatric mode settings
 - `lib/storage.ts` - AsyncStorage helpers for assessments, profile, medications
@@ -28,6 +29,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `POST /api/assess` - SSE streaming assessment with Gemini AI
 - `POST /api/analyze-medication` - Image-based medication OCR analysis
 - `POST /api/check-interactions` - Drug-drug interaction checking
+- `POST /api/process-rppg` - Heart rate estimation from RGB signals using POS algorithm + FFT
 
 ## Key Features
 1. Smart Symptom Assessment (conversational AI with adaptive questioning)
@@ -38,6 +40,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 6. Hyper-Local Care Routing (pharmacies, labs, clinics, hospitals)
 7. Pediatric Mode (weight-based dosage calculations)
 8. Bilingual Support (English/Arabic)
+9. Non-Contact Heart Rate Monitor (rPPG via front camera, POS algorithm, FFT analysis)
 
 ## Color Palette
 - Primary: #0F766E (teal)
@@ -46,4 +49,5 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 13, 2026: Added non-contact heart rate monitor (rPPG) feature with POS algorithm, FFT-based BPM detection, pulse waveform visualization, confidence scoring
 - Feb 13, 2026: Initial build of Tabibi app with all core features

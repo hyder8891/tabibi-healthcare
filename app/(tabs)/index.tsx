@@ -98,68 +98,95 @@ export default function HomeScreen() {
 
         <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Quick Actions", "إجراءات سريعة")}</Text>
 
-        <View style={styles.quickActions}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionCard,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-            ]}
-            onPress={openScanner}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: "#FFF7ED" }]}>
-              <MaterialCommunityIcons
-                name="pill"
-                size={24}
-                color={Colors.light.accent}
-              />
-            </View>
-            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
-            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-              {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
-            </Text>
-          </Pressable>
+        <View style={styles.quickActionsGrid}>
+          <View style={styles.quickActionsRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={openScanner}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: "#FFF7ED" }]}>
+                <MaterialCommunityIcons
+                  name="pill"
+                  size={24}
+                  color={Colors.light.accent}
+                />
+              </View>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
+              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
+              </Text>
+            </Pressable>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionCard,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/routing?type=pharmacy");
-            }}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: Colors.light.primarySurface }]}>
-              <Ionicons
-                name="location"
-                size={24}
-                color={Colors.light.primary}
-              />
-            </View>
-            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Pharmacy", "ابحث عن صيدلية")}</Text>
-            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-              {t("Nearest open pharmacies", "أقرب الصيدليات المفتوحة")}
-            </Text>
-          </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/heart-rate");
+              }}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: Colors.light.emergencyLight }]}>
+                <Ionicons
+                  name="heart"
+                  size={24}
+                  color={Colors.light.emergency}
+                />
+              </View>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Heart Rate", "نبضات القلب")}</Text>
+              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                {t("Camera-based monitor", "مقياس عبر الكاميرا")}
+              </Text>
+            </Pressable>
+          </View>
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionCard,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-            ]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/routing?type=lab");
-            }}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
-              <MaterialCommunityIcons name="flask" size={24} color="#7C3AED" />
-            </View>
-            <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
-            <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-              {t("Labs & imaging centers", "مختبرات ومراكز تصوير")}
-            </Text>
-          </Pressable>
+          <View style={styles.quickActionsRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/routing?type=pharmacy");
+              }}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: Colors.light.primarySurface }]}>
+                <Ionicons
+                  name="location"
+                  size={24}
+                  color={Colors.light.primary}
+                />
+              </View>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Pharmacy", "ابحث عن صيدلية")}</Text>
+              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                {t("Nearest open pharmacies", "أقرب الصيدليات المفتوحة")}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push("/routing?type=lab");
+              }}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
+                <MaterialCommunityIcons name="flask" size={24} color="#7C3AED" />
+              </View>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
+              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                {t("Labs & imaging centers", "مختبرات ومراكز تصوير")}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.infoCards}>
@@ -341,10 +368,13 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
     marginBottom: 14,
   },
-  quickActions: {
-    flexDirection: "row",
+  quickActionsGrid: {
     gap: 10,
     marginBottom: 24,
+  },
+  quickActionsRow: {
+    flexDirection: "row",
+    gap: 10,
   },
   actionCard: {
     flex: 1,
