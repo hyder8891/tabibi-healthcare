@@ -2,10 +2,16 @@ export interface PatientProfile {
   name?: string;
   age?: number;
   weight?: number;
+  height?: number;
   gender?: string;
+  bloodType?: string;
   isPediatric?: boolean;
   medications: string[];
   conditions: string[];
+  allergies: string[];
+  lastBpm?: number;
+  lastBpmDate?: number;
+  onboardingComplete?: boolean;
 }
 
 export interface ScannedMedication {
