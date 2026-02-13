@@ -1,12 +1,13 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { getProfile } from "@/lib/storage";
 import {
   useFonts,
   DMSans_400Regular,
@@ -19,9 +20,27 @@ import { StatusBar } from "expo-status-bar";
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const [checkedOnboarding, setCheckedOnboarding] = useState(false);
+
+  useEffect(() => {
+    getProfile().then((profile) => {
+      if (!profile.onboardingComplete) {
+        router.replace("/onboarding");
+      }
+      setCheckedOnboarding(true);
+    });
+  }, []);
+
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="onboarding"
+        options={{
+          headerShown: false,
+          animation: "fade",
+        }}
+      />
       <Stack.Screen
         name="assessment"
         options={{

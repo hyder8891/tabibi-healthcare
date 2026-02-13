@@ -47,8 +47,8 @@ export async function saveProfile(profile: PatientProfile): Promise<void> {
 export async function getProfile(): Promise<PatientProfile> {
   const data = await AsyncStorage.getItem(PROFILE_KEY);
   return data
-    ? JSON.parse(data)
-    : { medications: [], conditions: [] };
+    ? { medications: [], conditions: [], allergies: [], ...JSON.parse(data) }
+    : { medications: [], conditions: [], allergies: [] };
 }
 
 export async function saveMedications(
