@@ -58,7 +58,7 @@ async function uriToBase64(uri: string): Promise<string> {
 
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
-  const { t, isRTL } = useSettings();
+  const { t, isRTL, settings } = useSettings();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
   const [medicationList, setMedicationList] = useState<ScannedMedication[]>([]);
@@ -218,7 +218,7 @@ export default function ScanScreen() {
       const response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ medications: medicationList.map((m) => m.name) }),
+        body: JSON.stringify({ medications: medicationList.map((m) => m.name), language: settings.language }),
       });
 
       const data = await response.json();

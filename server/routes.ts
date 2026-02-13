@@ -294,7 +294,10 @@ Support both Arabic and English text on medication packaging.`,
 
   app.post("/api/check-interactions", async (req: Request, res: Response) => {
     try {
-      const { medications, currentMedications, newMedication } = req.body;
+      const { medications, currentMedications, newMedication, language } = req.body;
+
+      const lang = language === "en" ? "English" : "Arabic (العربية)";
+      const langInstruction = `\n\nIMPORTANT: Write ALL text fields (description, recommendation, summary) in ${lang}. Drug names can remain in their original form, but all explanatory text MUST be in ${lang}.`;
 
       let promptText: string;
       if (medications && Array.isArray(medications) && medications.length >= 2) {
@@ -317,7 +320,7 @@ Respond ONLY with JSON:
   "summary": "Brief patient-friendly summary of all interactions found. If no interactions exist, say so clearly."
 }
 
-If there are no significant interactions between any pair, return an empty interactions array with overallRisk "low" and a reassuring summary.`;
+If there are no significant interactions between any pair, return an empty interactions array with overallRisk "low" and a reassuring summary.${langInstruction}`;
       } else {
         promptText = `Check for drug-drug interactions between these current medications: ${JSON.stringify(currentMedications)} and this proposed new medication: ${JSON.stringify(newMedication)}.
 
@@ -334,7 +337,7 @@ Respond ONLY with JSON:
   ],
   "overallRisk": "low|moderate|high|critical",
   "summary": "Brief patient-friendly summary"
-}`;
+}${langInstruction}`;
       }
 
       const response = await ai.models.generateContent({
