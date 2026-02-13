@@ -128,9 +128,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
         systemContext += `\n\nPATIENT PROFILE:\n`;
+        if (patientProfile.name) systemContext += `- Name: ${patientProfile.name}\n`;
         if (patientProfile.age) systemContext += `- Age: ${patientProfile.age}\n`;
-        if (patientProfile.weight) systemContext += `- Weight: ${patientProfile.weight} kg\n`;
         if (patientProfile.gender) systemContext += `- Gender: ${patientProfile.gender}\n`;
+        if (patientProfile.weight) systemContext += `- Weight: ${patientProfile.weight} kg\n`;
+        if (patientProfile.height) systemContext += `- Height: ${patientProfile.height} cm\n`;
+        if (patientProfile.bloodType) systemContext += `- Blood Type: ${patientProfile.bloodType}\n`;
         if (patientProfile.isPediatric) systemContext += `- PEDIATRIC PATIENT: Use age/weight-appropriate dosing\n`;
         if (patientProfile.medications && patientProfile.medications.length > 0) {
           systemContext += `- Current Medications: ${patientProfile.medications.join(", ")}\n`;
@@ -138,6 +141,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (patientProfile.conditions && patientProfile.conditions.length > 0) {
           systemContext += `- Known Conditions: ${patientProfile.conditions.join(", ")}\n`;
+        }
+        if (patientProfile.allergies && patientProfile.allergies.length > 0) {
+          systemContext += `- Allergies: ${patientProfile.allergies.join(", ")}\n`;
+          systemContext += `- CRITICAL: Do NOT recommend any medications the patient is allergic to\n`;
         }
       }
 

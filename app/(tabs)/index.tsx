@@ -14,18 +14,20 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
-import { getAssessments } from "@/lib/storage";
-import type { Assessment } from "@/lib/types";
+import { getAssessments, getProfile } from "@/lib/storage";
+import type { Assessment, PatientProfile } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [recentAssessments, setRecentAssessments] = useState<Assessment[]>([]);
+  const [profile, setProfile] = useState<PatientProfile | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const { t, isRTL } = useSettings();
 
   useEffect(() => {
     loadRecent();
+    getProfile().then(setProfile);
   }, []);
 
   const loadRecent = async () => {
@@ -139,9 +141,16 @@ export default function HomeScreen() {
                 />
               </View>
               <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Heart Rate", "نبضات القلب")}</Text>
-              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Camera-based monitor", "مقياس عبر الكاميرا")}
-              </Text>
+              {profile?.lastBpm ? (
+                <View style={[styles.bpmBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Text style={styles.bpmBadgeValue}>{profile.lastBpm}</Text>
+                  <Text style={styles.bpmBadgeUnit}>BPM</Text>
+                </View>
+              ) : (
+                <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                  {t("Camera-based monitor", "مقياس عبر الكاميرا")}
+                </Text>
+              )}
             </Pressable>
           </View>
 
@@ -494,5 +503,21 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     marginTop: 3,
+  },
+  bpmBadge: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 3,
+    marginTop: 2,
+  },
+  bpmBadgeValue: {
+    fontSize: 18,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.emergency,
+  },
+  bpmBadgeUnit: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textTertiary,
   },
 });
