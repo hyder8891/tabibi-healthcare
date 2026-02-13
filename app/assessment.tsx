@@ -6,6 +6,7 @@ import {
   TextInput,
   Pressable,
   FlatList,
+  ScrollView,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -65,6 +66,7 @@ export default function AssessmentScreen() {
   const [pendingImage, setPendingImage] = useState<{ uri: string; base64: string; mimeType: string } | null>(null);
   const [existingAssessmentId, setExistingAssessmentId] = useState<string | null>(null);
   const [showAttachModal, setShowAttachModal] = useState(false);
+  const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -212,6 +214,7 @@ export default function AssessmentScreen() {
     setPendingImage(null);
     setIsLoading(true);
     setStreamingMessage("");
+    setQuickReplies([]);
 
     try {
       const profile = await getProfile();
@@ -255,7 +258,18 @@ export default function AssessmentScreen() {
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
           .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/g, "")
+          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "")
           .trim();
+      };
+
+      const extractQuickReplies = (text: string): string[] => {
+        const match = text.match(/\{"quickReplies"\s*:\s*(\[.*?\])\}/);
+        if (match) {
+          try {
+            return JSON.parse(match[1]);
+          } catch {}
+        }
+        return [];
       };
 
       while (true) {
@@ -311,6 +325,11 @@ export default function AssessmentScreen() {
                       setAssessmentResult(result);
                     } catch {}
                   }
+                }
+
+                const replies = extractQuickReplies(fullText);
+                if (replies.length > 0) {
+                  setQuickReplies(replies);
                 }
               }
             } catch {}
@@ -436,6 +455,22 @@ export default function AssessmentScreen() {
       router.back();
     }
   };
+
+  const quickReplyRef = useRef<string | null>(null);
+
+  const handleQuickReply = useCallback((reply: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    quickReplyRef.current = reply;
+    setInputText(reply);
+    setQuickReplies([]);
+  }, []);
+
+  useEffect(() => {
+    if (quickReplyRef.current && inputText === quickReplyRef.current && !isLoading) {
+      quickReplyRef.current = null;
+      sendMessage();
+    }
+  }, [inputText]);
 
   const allMessages = [...messages];
   if (streamingMessage) {
@@ -579,6 +614,28 @@ export default function AssessmentScreen() {
               <Ionicons name="close-circle" size={22} color={Colors.light.emergency} />
             </Pressable>
           </View>
+        )}
+
+        {quickReplies.length > 0 && !isLoading && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickRepliesContainer}
+            keyboardShouldPersistTaps="handled"
+          >
+            {quickReplies.map((reply, i) => (
+              <Pressable
+                key={i}
+                style={({ pressed }) => [
+                  styles.quickReplyPill,
+                  pressed && styles.quickReplyPillPressed,
+                ]}
+                onPress={() => handleQuickReply(reply)}
+              >
+                <Text style={styles.quickReplyText}>{reply}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
         )}
 
         <View
@@ -814,5 +871,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textSecondary,
+  },
+  quickRepliesContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    flexDirection: "row",
+  },
+  quickReplyPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: Colors.light.surface,
+    borderWidth: 1.5,
+    borderColor: Colors.light.primary + "30",
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  quickReplyPillPressed: {
+    backgroundColor: Colors.light.primarySurface,
+    borderColor: Colors.light.primary,
+    transform: [{ scale: 0.96 }] as const,
+  },
+  quickReplyText: {
+    fontSize: 14,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
   },
 });
