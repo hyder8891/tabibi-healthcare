@@ -9,11 +9,13 @@ import {
   TextInput,
   Platform,
 } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 import type { PatientProfile } from "@/lib/types";
 
@@ -22,6 +24,7 @@ const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, t, isRTL } = useSettings();
+  const { user, logout } = useAuth();
   const [profile, setProfile] = useState<PatientProfile>({
     medications: [],
     conditions: [],
@@ -326,6 +329,32 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {user && (
+          <View style={styles.card}>
+            <View style={styles.fieldRow}>
+              <Ionicons name="mail-outline" size={18} color={Colors.light.textSecondary} />
+              <Text style={[styles.fieldLabel, { marginLeft: 8, flex: 1 }]}>
+                {user.email}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.logoutButton,
+            pressed && { opacity: 0.8 },
+          ]}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await logout();
+            router.replace("/auth");
+          }}
+        >
+          <Ionicons name="log-out-outline" size={20} color={Colors.light.emergency} />
+          <Text style={styles.logoutText}>{t("Log Out", "تسجيل الخروج")}</Text>
+        </Pressable>
+
         <View style={styles.disclaimer}>
           <Ionicons name="information-circle" size={16} color={Colors.light.textTertiary} />
           <Text style={styles.disclaimerText}>
@@ -523,6 +552,21 @@ const styles = StyleSheet.create({
   },
   langTextActive: {
     color: Colors.light.primary,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.light.emergencyLight,
+    borderRadius: 16,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  logoutText: {
+    fontSize: 15,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.emergency,
   },
   disclaimer: {
     flexDirection: "row",

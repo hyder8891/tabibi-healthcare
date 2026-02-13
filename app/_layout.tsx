@@ -7,6 +7,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { SettingsProvider } from "@/contexts/SettingsContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { getProfile } from "@/lib/storage";
 import {
   useFonts,
@@ -16,24 +17,47 @@ import {
   DMSans_700Bold,
 } from "@expo-google-fonts/dm-sans";
 import { StatusBar } from "expo-status-bar";
+import { View, ActivityIndicator } from "react-native";
+import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
+  const { user, isLoading } = useAuth();
   const [checkedOnboarding, setCheckedOnboarding] = useState(false);
 
   useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      router.replace("/auth");
+      return;
+    }
     getProfile().then((profile) => {
       if (!profile.onboardingComplete) {
         router.replace("/onboarding");
       }
       setCheckedOnboarding(true);
     });
-  }, []);
+  }, [user, isLoading]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.light.background }}>
+        <ActivityIndicator size="large" color={Colors.light.primary} />
+      </View>
+    );
+  }
 
   return (
     <Stack screenOptions={{ headerBackTitle: "Back" }}>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen
+        name="auth"
+        options={{
+          headerShown: false,
+          animation: "fade",
+        }}
+      />
       <Stack.Screen
         name="onboarding"
         options={{
@@ -105,12 +129,14 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <SettingsProvider>
-          <GestureHandlerRootView>
-            <KeyboardProvider>
-              <StatusBar style="dark" />
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
+          <AuthProvider>
+            <GestureHandlerRootView>
+              <KeyboardProvider>
+                <StatusBar style="dark" />
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </GestureHandlerRootView>
+          </AuthProvider>
         </SettingsProvider>
       </QueryClientProvider>
     </ErrorBoundary>
