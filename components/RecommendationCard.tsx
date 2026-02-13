@@ -1,0 +1,378 @@
+import React from "react";
+import { View, Text, StyleSheet, Pressable } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+import type { AssessmentResult } from "@/lib/types";
+
+interface RecommendationCardProps {
+  result: AssessmentResult;
+  onFindPharmacy?: () => void;
+  onFindLab?: () => void;
+}
+
+export function RecommendationCard({
+  result,
+  onFindPharmacy,
+  onFindLab,
+}: RecommendationCardProps) {
+  const severityColor =
+    result.assessment.severity === "severe"
+      ? Colors.light.emergency
+      : result.assessment.severity === "moderate"
+        ? Colors.light.warning
+        : Colors.light.success;
+
+  const severityBg =
+    result.assessment.severity === "severe"
+      ? Colors.light.emergencyLight
+      : result.assessment.severity === "moderate"
+        ? Colors.light.warningLight
+        : Colors.light.successLight;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={[styles.severityBadge, { backgroundColor: severityBg }]}>
+          <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
+          <Text style={[styles.severityText, { color: severityColor }]}>
+            {result.assessment.severity.toUpperCase()}
+          </Text>
+        </View>
+        <Text style={styles.confidence}>
+          {result.assessment.confidence} confidence
+        </Text>
+      </View>
+
+      <Text style={styles.condition}>{result.assessment.condition}</Text>
+      <Text style={styles.description}>{result.assessment.description}</Text>
+
+      {result.warnings.length > 0 && (
+        <View style={styles.warningsContainer}>
+          {result.warnings.map((warning, i) => (
+            <View key={i} style={styles.warningRow}>
+              <Ionicons
+                name="alert-circle"
+                size={16}
+                color={Colors.light.accent}
+              />
+              <Text style={styles.warningText}>{warning}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {result.recommendations.pathwayA?.active &&
+        result.recommendations.pathwayA.medicines.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons
+                name="pill"
+                size={20}
+                color={Colors.light.primary}
+              />
+              <Text style={styles.sectionTitle}>Recommended Medicines</Text>
+            </View>
+            {result.recommendations.pathwayA.medicines.map((med, i) => (
+              <View key={i} style={styles.medCard}>
+                <Text style={styles.medName}>{med.name}</Text>
+                <Text style={styles.medDetail}>
+                  {med.activeIngredient} - {med.class}
+                </Text>
+                <View style={styles.medInfo}>
+                  <Text style={styles.medDosage}>
+                    {med.dosage} | {med.frequency}
+                  </Text>
+                  <Text style={styles.medDuration}>{med.duration}</Text>
+                </View>
+                {med.warnings.length > 0 && (
+                  <Text style={styles.medWarning}>
+                    {med.warnings.join(". ")}
+                  </Text>
+                )}
+              </View>
+            ))}
+            {onFindPharmacy && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  styles.pharmacyButton,
+                  pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+                ]}
+                onPress={onFindPharmacy}
+              >
+                <Ionicons name="location" size={20} color="#fff" />
+                <Text style={styles.actionButtonText}>Find Nearest Pharmacy</Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+      {result.recommendations.pathwayB?.active &&
+        result.recommendations.pathwayB.tests.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons
+                name="flask"
+                size={20}
+                color={Colors.light.primary}
+              />
+              <Text style={styles.sectionTitle}>Required Tests</Text>
+            </View>
+            {result.recommendations.pathwayB.tests.map((test, i) => (
+              <View key={i} style={styles.testCard}>
+                <View style={styles.testHeader}>
+                  <Text style={styles.testName}>{test.name}</Text>
+                  <View
+                    style={[
+                      styles.urgencyBadge,
+                      {
+                        backgroundColor:
+                          test.urgency === "emergency"
+                            ? Colors.light.emergencyLight
+                            : test.urgency === "urgent"
+                              ? Colors.light.warningLight
+                              : Colors.light.primarySurface,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.urgencyText,
+                        {
+                          color:
+                            test.urgency === "emergency"
+                              ? Colors.light.emergency
+                              : test.urgency === "urgent"
+                                ? Colors.light.warning
+                                : Colors.light.primary,
+                        },
+                      ]}
+                    >
+                      {test.urgency.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.testType}>
+                  {test.type === "lab" ? "Laboratory Test" : "Medical Imaging"}
+                </Text>
+                <Text style={styles.testReason}>{test.reason}</Text>
+              </View>
+            ))}
+            {onFindLab && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  styles.labButton,
+                  pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
+                ]}
+                onPress={onFindLab}
+              >
+                <Ionicons name="location" size={20} color="#fff" />
+                <Text style={styles.actionButtonText}>
+                  Find Nearest Lab / Clinic
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
+
+      <View style={styles.followUpContainer}>
+        <Ionicons name="time" size={16} color={Colors.light.textSecondary} />
+        <Text style={styles.followUpText}>{result.followUp}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 20,
+    padding: 20,
+    margin: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  severityBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  severityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  severityText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+  },
+  confidence: {
+    fontSize: 12,
+    color: Colors.light.textTertiary,
+    fontWeight: "500" as const,
+  },
+  condition: {
+    fontSize: 22,
+    fontWeight: "700" as const,
+    color: Colors.light.text,
+    marginBottom: 6,
+  },
+  description: {
+    fontSize: 15,
+    color: Colors.light.textSecondary,
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  warningsContainer: {
+    backgroundColor: Colors.light.accentLight,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    gap: 8,
+  },
+  warningRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.light.accent,
+    lineHeight: 18,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+  },
+  medCard: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+  },
+  medName: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    marginBottom: 2,
+  },
+  medDetail: {
+    fontSize: 13,
+    color: Colors.light.textSecondary,
+    marginBottom: 8,
+  },
+  medInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  medDosage: {
+    fontSize: 13,
+    color: Colors.light.primary,
+    fontWeight: "500" as const,
+  },
+  medDuration: {
+    fontSize: 13,
+    color: Colors.light.textTertiary,
+  },
+  medWarning: {
+    fontSize: 12,
+    color: Colors.light.accent,
+    marginTop: 6,
+    fontStyle: "italic",
+  },
+  testCard: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+  },
+  testHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  testName: {
+    fontSize: 16,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    flex: 1,
+  },
+  urgencyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  urgencyText: {
+    fontSize: 10,
+    fontWeight: "700" as const,
+  },
+  testType: {
+    fontSize: 13,
+    color: Colors.light.textSecondary,
+    marginBottom: 4,
+  },
+  testReason: {
+    fontSize: 13,
+    color: Colors.light.textSecondary,
+    lineHeight: 18,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    marginTop: 8,
+  },
+  pharmacyButton: {
+    backgroundColor: Colors.light.primary,
+  },
+  labButton: {
+    backgroundColor: Colors.light.primaryDark,
+  },
+  actionButtonText: {
+    fontSize: 15,
+    fontWeight: "600" as const,
+    color: "#fff",
+  },
+  followUpContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.borderLight,
+  },
+  followUpText: {
+    flex: 1,
+    fontSize: 13,
+    color: Colors.light.textSecondary,
+    lineHeight: 18,
+  },
+});
