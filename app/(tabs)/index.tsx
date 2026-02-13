@@ -38,6 +38,10 @@ export default function HomeScreen() {
     router.push("/assessment");
   };
 
+  const openScanner = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/scan");
+  };
 
   return (
     <View style={styles.container}>
@@ -102,6 +106,26 @@ export default function HomeScreen() {
                 styles.actionCard,
                 pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
               ]}
+              onPress={openScanner}
+            >
+              <View style={[styles.actionIcon, { backgroundColor: Colors.light.accentLight }]}>
+                <MaterialCommunityIcons
+                  name="pill"
+                  size={28}
+                  color={Colors.light.accent}
+                />
+              </View>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
+              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
+                {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push("/heart-rate");
@@ -119,7 +143,9 @@ export default function HomeScreen() {
                 {t("Camera-based monitor", "مقياس عبر الكاميرا")}
               </Text>
             </Pressable>
+          </View>
 
+          <View style={styles.quickActionsRow}>
             <Pressable
               style={({ pressed }) => [
                 styles.actionCard,
@@ -163,32 +189,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
         </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.interactionCard,
-            pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-          ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/scan");
-          }}
-        >
-          <View style={[styles.interactionCardInner, isRTL && { flexDirection: "row-reverse" }]}>
-            <View style={styles.interactionCardIcon}>
-              <MaterialCommunityIcons name="pill" size={24} color={Colors.light.accent} />
-            </View>
-            <View style={styles.interactionCardText}>
-              <Text style={[styles.interactionCardTitle, isRTL && { textAlign: "right" }]}>
-                {t("Drug Interactions", "التداخلات الدوائية")}
-              </Text>
-              <Text style={[styles.interactionCardDesc, isRTL && { textAlign: "right" }]}>
-                {t("Check interactions between your medications", "تحقق من التداخلات بين أدويتك")}
-              </Text>
-            </View>
-            <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.light.textTertiary} />
-          </View>
-        </Pressable>
 
         <View style={styles.infoCards}>
           <View style={styles.infoCard}>
@@ -428,46 +428,6 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     lineHeight: 17,
-  },
-  interactionCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 28,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  interactionCardInner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-  },
-  interactionCardIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.light.accentLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  interactionCardText: {
-    flex: 1,
-  },
-  interactionCardTitle: {
-    fontSize: 15,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.text,
-  },
-  interactionCardDesc: {
-    fontSize: 12,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
-    marginTop: 2,
   },
   infoCards: {
     gap: 14,
