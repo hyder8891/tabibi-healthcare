@@ -389,6 +389,177 @@ Respond ONLY with JSON:
     }
   });
 
+  app.post("/api/process-rppg", (req: Request, res: Response) => {
+    try {
+      const { signals, fps } = req.body;
+
+      if (!signals || !Array.isArray(signals) || signals.length < 30) {
+        return res.status(400).json({ 
+          error: "At least 30 RGB signal samples are required (10+ seconds of data)" 
+        });
+      }
+
+      const actualFps = fps || 3;
+      const n = signals.length;
+
+      const rRaw = signals.map((s: any) => s.r as number);
+      const gRaw = signals.map((s: any) => s.g as number);
+      const bRaw = signals.map((s: any) => s.b as number);
+
+      const rMean = rRaw.reduce((a: number, b: number) => a + b, 0) / n;
+      const gMean = gRaw.reduce((a: number, b: number) => a + b, 0) / n;
+      const bMean = bRaw.reduce((a: number, b: number) => a + b, 0) / n;
+
+      const rNorm = rRaw.map((v: number) => v / (rMean || 1));
+      const gNorm = gRaw.map((v: number) => v / (gMean || 1));
+      const bNorm = bRaw.map((v: number) => v / (bMean || 1));
+
+      const posSignal: number[] = [];
+      const windowSize = Math.min(Math.floor(actualFps * 1.6), n);
+      
+      for (let i = 0; i < n; i++) {
+        const start = Math.max(0, i - Math.floor(windowSize / 2));
+        const end = Math.min(n, i + Math.floor(windowSize / 2));
+        const len = end - start;
+
+        let lRMean = 0, lGMean = 0, lBMean = 0;
+        for (let j = start; j < end; j++) {
+          lRMean += rNorm[j];
+          lGMean += gNorm[j];
+          lBMean += bNorm[j];
+        }
+        lRMean /= len;
+        lGMean /= len;
+        lBMean /= len;
+
+        const xs = 3 * (rNorm[i] / (lRMean || 1)) - 2 * (gNorm[i] / (lGMean || 1));
+        const ys = 1.5 * (rNorm[i] / (lRMean || 1)) + (gNorm[i] / (lGMean || 1)) - 1.5 * (bNorm[i] / (lBMean || 1));
+
+        const stdXs = Math.sqrt(posSignal.reduce((sum, v) => sum + v * v, 0) / (posSignal.length || 1)) || 1;
+        const alpha = stdXs;
+        posSignal.push(xs + alpha * ys);
+      }
+
+      const minFreq = 0.7;
+      const maxFreq = 4.0;
+
+      const mean = posSignal.reduce((a, b) => a + b, 0) / n;
+      const centered = posSignal.map(v => v - mean);
+
+      const hannWindow = centered.map((v, i) => v * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1))));
+
+      const fftSize = Math.pow(2, Math.ceil(Math.log2(n)));
+      const real = new Array(fftSize).fill(0);
+      const imag = new Array(fftSize).fill(0);
+      for (let i = 0; i < n; i++) {
+        real[i] = hannWindow[i];
+      }
+
+      function fft(real: number[], imag: number[], n: number) {
+        if (n <= 1) return;
+
+        const halfN = n / 2;
+        const evenReal = new Array(halfN);
+        const evenImag = new Array(halfN);
+        const oddReal = new Array(halfN);
+        const oddImag = new Array(halfN);
+
+        for (let i = 0; i < halfN; i++) {
+          evenReal[i] = real[2 * i];
+          evenImag[i] = imag[2 * i];
+          oddReal[i] = real[2 * i + 1];
+          oddImag[i] = imag[2 * i + 1];
+        }
+
+        fft(evenReal, evenImag, halfN);
+        fft(oddReal, oddImag, halfN);
+
+        for (let k = 0; k < halfN; k++) {
+          const angle = -2 * Math.PI * k / n;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          const tReal = cos * oddReal[k] - sin * oddImag[k];
+          const tImag = sin * oddReal[k] + cos * oddImag[k];
+
+          real[k] = evenReal[k] + tReal;
+          imag[k] = evenImag[k] + tImag;
+          real[k + halfN] = evenReal[k] - tReal;
+          imag[k + halfN] = evenImag[k] - tImag;
+        }
+      }
+
+      fft(real, imag, fftSize);
+
+      const magnitudes: number[] = [];
+      for (let i = 0; i < fftSize / 2; i++) {
+        magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
+      }
+
+      const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
+      const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
+
+      let peakBin = scaledMinBin;
+      let peakMag = 0;
+      for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+        if (magnitudes[i] > peakMag) {
+          peakMag = magnitudes[i];
+          peakBin = i;
+        }
+      }
+
+      const peakFreq = peakBin * actualFps / fftSize;
+      let heartRate = Math.round(peakFreq * 60);
+
+      heartRate = Math.max(40, Math.min(200, heartRate));
+
+      let totalPower = 0;
+      let peakPower = 0;
+      for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+        totalPower += magnitudes[i] * magnitudes[i];
+        if (Math.abs(i - peakBin) <= 1) {
+          peakPower += magnitudes[i] * magnitudes[i];
+        }
+      }
+      const snr = totalPower > 0 ? peakPower / totalPower : 0;
+
+      let confidence: "high" | "medium" | "low";
+      if (snr > 0.3 && n >= 60) {
+        confidence = "high";
+      } else if (snr > 0.15 && n >= 30) {
+        confidence = "medium";
+      } else {
+        confidence = "low";
+      }
+
+      const waveformLength = 100;
+      const waveform: number[] = [];
+      for (let i = 0; i < waveformLength; i++) {
+        const idx = Math.floor(i * posSignal.length / waveformLength);
+        waveform.push(posSignal[idx] || 0);
+      }
+
+      const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
+      const normalizedWaveform = waveform.map(v => v / maxWave);
+
+      res.json({
+        heartRate,
+        confidence,
+        waveform: normalizedWaveform,
+        signalQuality: Math.round(snr * 100),
+        samplesProcessed: n,
+        message: confidence === "high" 
+          ? "Strong signal detected" 
+          : confidence === "medium"
+            ? "Moderate signal quality - try holding still in good lighting"
+            : "Weak signal - ensure face is well-lit and stay still",
+      });
+    } catch (error) {
+      console.error("rPPG processing error:", error);
+      res.status(500).json({ error: "Failed to process heart rate data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
