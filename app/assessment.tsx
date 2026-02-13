@@ -19,6 +19,7 @@ import { fetch } from "expo/fetch";
 import Colors from "@/constants/colors";
 import { MessageBubble, TypingIndicator } from "@/components/MessageBubble";
 import { EmergencyOverlay } from "@/components/EmergencyOverlay";
+import { RecommendationCard } from "@/components/RecommendationCard";
 import { getApiUrl } from "@/lib/query-client";
 import { saveAssessment, getProfile } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -100,6 +101,17 @@ export default function AssessmentScreen() {
 
       const decoder = new TextDecoder();
       let fullText = "";
+      let parsedResult: AssessmentResult | null = null;
+      let parsedEmergency: EmergencyAlert | null = null;
+
+      const stripJson = (text: string) => {
+        return text
+          .replace(/```json[\s\S]*?```/g, "")
+          .replace(/```[\s\S]*?```/g, "")
+          .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
+          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/g, "")
+          .trim();
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -114,7 +126,8 @@ export default function AssessmentScreen() {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 fullText += data.content;
-                setStreamingMessage(fullText);
+                const cleanStreaming = stripJson(fullText);
+                setStreamingMessage(cleanStreaming);
               }
               if (data.done) {
                 const emergencyMatch = fullText.match(
@@ -123,6 +136,7 @@ export default function AssessmentScreen() {
                 if (emergencyMatch) {
                   try {
                     const emergencyData = JSON.parse(emergencyMatch[0]);
+                    parsedEmergency = emergencyData;
                     setEmergency(emergencyData);
                     Haptics.notificationAsync(
                       Haptics.NotificationFeedbackType.Error,
@@ -136,8 +150,22 @@ export default function AssessmentScreen() {
                 if (jsonMatch) {
                   try {
                     const result = JSON.parse(jsonMatch[1]);
+                    parsedResult = result;
                     setAssessmentResult(result);
                   } catch {}
+                }
+
+                if (!parsedResult) {
+                  const rawJsonMatch = fullText.match(
+                    /\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*\}/,
+                  );
+                  if (rawJsonMatch) {
+                    try {
+                      const result = JSON.parse(rawJsonMatch[0]);
+                      parsedResult = result;
+                      setAssessmentResult(result);
+                    } catch {}
+                  }
                 }
               }
             } catch {}
@@ -145,10 +173,7 @@ export default function AssessmentScreen() {
         }
       }
 
-      const displayText = fullText
-        .replace(/```json[\s\S]*?```/g, "")
-        .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
-        .trim();
+      const displayText = stripJson(fullText);
 
       const aiMessage: ChatMessage = {
         id: Crypto.randomUUID(),
@@ -160,14 +185,14 @@ export default function AssessmentScreen() {
       setMessages((prev) => [...prev, aiMessage]);
       setStreamingMessage("");
 
-      if (assessmentResult || emergency) {
+      if (parsedResult || parsedEmergency) {
         const assessment: Assessment = {
           id: Crypto.randomUUID(),
           date: Date.now(),
           chiefComplaint: chiefComplaintRef.current,
           messages: [...updatedMessages, aiMessage],
-          result: assessmentResult || undefined,
-          emergency: emergency || undefined,
+          result: parsedResult || undefined,
+          emergency: parsedEmergency || undefined,
           medications: [],
           patientProfile: {
             ...profile,
@@ -287,6 +312,29 @@ export default function AssessmentScreen() {
           ListHeaderComponent={
             isLoading && !streamingMessage ? (
               <AnimatedTypingIndicator />
+            ) : assessmentResult ? (
+              <View style={styles.inlineResultCard}>
+                <RecommendationCard
+                  result={assessmentResult}
+                  onFindPharmacy={() =>
+                    router.push({
+                      pathname: "/routing",
+                      params: { type: "pharmacy" },
+                    })
+                  }
+                  onFindLab={() =>
+                    router.push({
+                      pathname: "/routing",
+                      params: {
+                        type: "lab",
+                        capabilities: assessmentResult?.recommendations?.pathwayB?.tests
+                          ?.map((test) => test.capabilities?.join(","))
+                          .join("|") || "",
+                      },
+                    })
+                  }
+                />
+              </View>
             ) : null
           }
         />
@@ -449,5 +497,8 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: Colors.light.textTertiary,
     opacity: 0.5,
+  },
+  inlineResultCard: {
+    marginBottom: 8,
   },
 });
