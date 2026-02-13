@@ -233,7 +233,7 @@ export default function HomeScreen() {
                   style={[
                     styles.recentDot,
                     {
-                      backgroundColor: a.result
+                      backgroundColor: a.result?.assessment?.severity
                         ? a.result.assessment.severity === "severe"
                           ? Colors.light.emergency
                           : a.result.assessment.severity === "moderate"
