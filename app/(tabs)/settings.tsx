@@ -129,10 +129,11 @@ export default function SettingsScreen() {
             <Text style={styles.fieldLabel}>{t("Age", "\u0627\u0644\u0639\u0645\u0631")}</Text>
             <TextInput
               style={styles.fieldInput}
-              value={profile.age?.toString() || ""}
-              onChangeText={(v) =>
-                updateProfile({ age: v ? parseInt(v) : undefined })
-              }
+              value={profile.age != null && !isNaN(profile.age) ? profile.age.toString() : ""}
+              onChangeText={(v) => {
+                const n = parseInt(v);
+                updateProfile({ age: v && !isNaN(n) ? n : undefined });
+              }}
               keyboardType="number-pad"
               placeholder="--"
               placeholderTextColor={Colors.light.textTertiary}
@@ -143,10 +144,11 @@ export default function SettingsScreen() {
             <Text style={styles.fieldLabel}>{t("Weight (kg)", "\u0627\u0644\u0648\u0632\u0646 (\u0643\u063a)")}</Text>
             <TextInput
               style={styles.fieldInput}
-              value={profile.weight?.toString() || ""}
-              onChangeText={(v) =>
-                updateProfile({ weight: v ? parseFloat(v) : undefined })
-              }
+              value={profile.weight != null && !isNaN(profile.weight) ? profile.weight.toString() : ""}
+              onChangeText={(v) => {
+                const n = parseFloat(v);
+                updateProfile({ weight: v && !isNaN(n) ? n : undefined });
+              }}
               keyboardType="decimal-pad"
               placeholder="--"
               placeholderTextColor={Colors.light.textTertiary}
@@ -157,10 +159,11 @@ export default function SettingsScreen() {
             <Text style={styles.fieldLabel}>{t("Height (cm)", "\u0627\u0644\u0637\u0648\u0644 (\u0633\u0645)")}</Text>
             <TextInput
               style={styles.fieldInput}
-              value={profile.height?.toString() || ""}
-              onChangeText={(v) =>
-                updateProfile({ height: v ? parseFloat(v) : undefined })
-              }
+              value={profile.height != null && !isNaN(profile.height) ? profile.height.toString() : ""}
+              onChangeText={(v) => {
+                const n = parseFloat(v);
+                updateProfile({ height: v && !isNaN(n) ? n : undefined });
+              }}
               keyboardType="decimal-pad"
               placeholder="--"
               placeholderTextColor={Colors.light.textTertiary}

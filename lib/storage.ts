@@ -46,9 +46,13 @@ export async function saveProfile(profile: PatientProfile): Promise<void> {
 
 export async function getProfile(): Promise<PatientProfile> {
   const data = await AsyncStorage.getItem(PROFILE_KEY);
-  return data
+  const profile: PatientProfile = data
     ? { medications: [], conditions: [], allergies: [], ...JSON.parse(data) }
     : { medications: [], conditions: [], allergies: [] };
+  if (typeof profile.age === "number" && isNaN(profile.age)) profile.age = undefined;
+  if (typeof profile.weight === "number" && isNaN(profile.weight)) profile.weight = undefined;
+  if (typeof profile.height === "number" && isNaN(profile.height)) profile.height = undefined;
+  return profile;
 }
 
 export async function saveMedications(
