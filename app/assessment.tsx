@@ -466,6 +466,7 @@ export default function AssessmentScreen() {
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowAttachModal(false)}>
           <View style={styles.modalContent}>
+            <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>
               {t("Attach Image", "\u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629")}
             </Text>
@@ -476,6 +477,7 @@ export default function AssessmentScreen() {
               <Ionicons name="camera-outline" size={22} color={Colors.light.primary} />
               <Text style={styles.modalOptionText}>{t("Take Photo", "\u0627\u0644\u062a\u0642\u0627\u0637 \u0635\u0648\u0631\u0629")}</Text>
             </Pressable>
+            <View style={styles.modalDivider} />
             <Pressable
               style={({ pressed }) => [styles.modalOption, pressed && { backgroundColor: Colors.light.borderLight }]}
               onPress={() => { setShowAttachModal(false); pickImage("gallery"); }}
@@ -502,7 +504,9 @@ export default function AssessmentScreen() {
           <Ionicons name="close" size={24} color={Colors.light.text} />
         </Pressable>
         <View style={styles.headerCenter}>
-          <View style={styles.headerDot} />
+          <View style={styles.headerDotRing}>
+            <View style={styles.headerDot} />
+          </View>
           <Text style={styles.headerTitle}>
             {t("Health Assessment", "\u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u0627\u0644\u0635\u062d\u064a")}
           </Text>
@@ -652,10 +656,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerButton: {
     width: 40,
@@ -667,6 +674,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+  },
+  headerDotRing: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   headerDot: {
     width: 8,
@@ -692,10 +707,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   imagePreview: {
-    width: 60,
-    height: 60,
-    borderRadius: 10,
+    width: 64,
+    height: 64,
+    borderRadius: 12,
     backgroundColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   removeImageButton: {
     marginLeft: -10,
@@ -711,9 +731,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingHorizontal: 18,
+    borderRadius: 22,
     backgroundColor: Colors.light.primarySurface,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     alignSelf: "center",
   },
   scanButtonText: {
@@ -732,12 +754,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     gap: 6,
-    backgroundColor: Colors.light.background,
-    borderRadius: 24,
+    backgroundColor: Colors.light.inputBg,
+    borderRadius: 28,
     paddingLeft: 10,
     paddingRight: 6,
     paddingVertical: 6,
-    minHeight: 48,
+    minHeight: 52,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
   },
   attachButton: {
     width: 32,
@@ -754,32 +778,40 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   sendButtonDisabled: {
     backgroundColor: Colors.light.textTertiary,
-    opacity: 0.5,
+    opacity: 0.4,
   },
   inlineResultCard: {
     marginBottom: 8,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: Colors.light.overlay,
     justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: Colors.light.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
     paddingBottom: 34,
     paddingHorizontal: 20,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.light.textLight,
+    alignSelf: "center",
+    marginBottom: 12,
   },
   modalTitle: {
     fontSize: 17,
@@ -792,7 +824,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
-    paddingVertical: 14,
+    paddingVertical: 16,
     paddingHorizontal: 12,
     borderRadius: 12,
   },
@@ -800,6 +832,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.text,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: Colors.light.divider,
+    marginHorizontal: 12,
   },
   modalCancelButton: {
     marginTop: 8,

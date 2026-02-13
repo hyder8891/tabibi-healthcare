@@ -29,8 +29,8 @@ export function MessageBubble({ message, isStreaming }: MessageBubbleProps) {
       )}
       <View
         style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble,
-          isRTL && isUser && { borderBottomRightRadius: 20, borderBottomLeftRadius: 6 },
-          isRTL && !isUser && { borderBottomLeftRadius: 20, borderBottomRightRadius: 6 },
+          isRTL && isUser && { borderBottomRightRadius: 22, borderBottomLeftRadius: 8 },
+          isRTL && !isUser && { borderBottomLeftRadius: 22, borderBottomRightRadius: 8 },
         ]}
       >
         {message.imageUri && (
@@ -72,7 +72,7 @@ export function TypingIndicator() {
 const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
-    marginBottom: 12,
+    marginBottom: 16,
     paddingHorizontal: 16,
   },
   userContainer: {
@@ -83,43 +83,50 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 8,
     marginBottom: 4,
     overflow: "hidden" as const,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
   avatarImage: {
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     resizeMode: "contain" as const,
   },
   bubble: {
     maxWidth: "78%",
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
   userBubble: {
     backgroundColor: Colors.light.primary,
-    borderBottomRightRadius: 6,
+    borderBottomRightRadius: 8,
   },
   aiBubble: {
     backgroundColor: Colors.light.surface,
-    borderBottomLeftRadius: 6,
+    borderBottomLeftRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   text: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 24,
   },
   userText: {
     color: "#fff",
@@ -128,9 +135,9 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   messageImage: {
-    width: 180,
-    height: 140,
-    borderRadius: 12,
+    width: 200,
+    height: 160,
+    borderRadius: 14,
     marginBottom: 8,
     backgroundColor: Colors.light.borderLight,
   },
@@ -147,10 +154,10 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.light.textTertiary,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: Colors.light.primaryLight,
   },
   dot1: { opacity: 0.4 },
   dot2: { opacity: 0.6 },

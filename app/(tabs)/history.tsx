@@ -105,7 +105,7 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="document-text-outline" size={48} color={Colors.light.textTertiary} />
+              <Ionicons name="document-text-outline" size={48} color={Colors.light.primary} />
             </View>
             <Text style={[styles.emptyTitle, { textAlign: isRTL ? "right" : "left" }]}>
               {t("No Assessments Yet", "لا توجد تقييمات بعد")}
@@ -127,25 +127,28 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingBottom: 20,
     backgroundColor: Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
   },
   subtitle: {
-    fontSize: 14,
-    fontFamily: "DMSans_400Regular",
+    fontSize: 15,
+    fontFamily: "DMSans_500Medium",
     color: Colors.light.textTertiary,
     marginTop: 2,
   },
   list: {
-    padding: 16,
-    paddingBottom: 120,
+    padding: 20,
+    paddingBottom: 130,
   },
   emptyContainer: {
     flex: 1,
@@ -157,26 +160,26 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.light.borderLight,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: Colors.light.primarySurface,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
     marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 260,
+    lineHeight: 22,
+    maxWidth: 280,
   },
 });

@@ -145,7 +145,7 @@ export default function SettingsScreen() {
               <View style={styles.conditionRow}>
                 <Ionicons
                   name="medical"
-                  size={16}
+                  size={18}
                   color={Colors.light.primary}
                 />
                 <Text style={styles.conditionText}>{c}</Text>
@@ -296,36 +296,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.textTertiary,
+    color: Colors.light.textSecondary,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
     marginBottom: 8,
     marginLeft: 4,
+    marginTop: 4,
   },
   card: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     elevation: 1,
   },
   fieldRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 8,
   },
   fieldLabel: {
     fontSize: 15,
@@ -350,13 +353,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   genderButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 12,
     backgroundColor: Colors.light.background,
   },
   genderButtonActive: {
     backgroundColor: Colors.light.primarySurface,
+    borderWidth: 1,
+    borderColor: Colors.light.primaryLight,
   },
   genderText: {
     fontSize: 14,
@@ -369,7 +374,7 @@ const styles = StyleSheet.create({
   conditionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     paddingVertical: 4,
   },
   conditionText: {
@@ -388,12 +393,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.text,
-    padding: 4,
+    padding: 8,
   },
   addButton: {
     width: 32,
     height: 32,
-    borderRadius: 16,
+    borderRadius: 12,
     backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -402,7 +407,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 4,
+    paddingVertical: 10,
   },
   switchLeft: {
     flexDirection: "row",
@@ -426,9 +431,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   langButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
     backgroundColor: Colors.light.background,
   },
   langButtonActive: {
@@ -445,8 +450,9 @@ const styles = StyleSheet.create({
   disclaimer: {
     flexDirection: "row",
     alignItems: "flex-start",
-    gap: 8,
+    gap: 10,
     paddingVertical: 16,
+    paddingHorizontal: 4,
   },
   disclaimerText: {
     flex: 1,
