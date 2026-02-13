@@ -294,16 +294,32 @@ Support both Arabic and English text on medication packaging.`,
 
   app.post("/api/check-interactions", async (req: Request, res: Response) => {
     try {
-      const { currentMedications, newMedication } = req.body;
+      const { medications, currentMedications, newMedication } = req.body;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: `Check for drug-drug interactions between these current medications: ${JSON.stringify(currentMedications)} and this proposed new medication: ${JSON.stringify(newMedication)}.
+      let promptText: string;
+      if (medications && Array.isArray(medications) && medications.length >= 2) {
+        promptText = `Check for ALL possible drug-drug interactions between the following medications that a patient is taking simultaneously: ${JSON.stringify(medications)}.
+
+Check every pair of medications against each other. There are ${medications.length} medications, so check all ${medications.length * (medications.length - 1) / 2} possible pairs.
+
+Respond ONLY with JSON:
+{
+  "interactions": [
+    {
+      "drug1": "name",
+      "drug2": "name", 
+      "severity": "mild|moderate|severe|contraindicated",
+      "description": "Brief patient-friendly description of the interaction and its effects",
+      "recommendation": "What the patient should do about this interaction"
+    }
+  ],
+  "overallRisk": "low|moderate|high|critical",
+  "summary": "Brief patient-friendly summary of all interactions found. If no interactions exist, say so clearly."
+}
+
+If there are no significant interactions between any pair, return an empty interactions array with overallRisk "low" and a reassuring summary.`;
+      } else {
+        promptText = `Check for drug-drug interactions between these current medications: ${JSON.stringify(currentMedications)} and this proposed new medication: ${JSON.stringify(newMedication)}.
 
 Respond ONLY with JSON:
 {
@@ -318,13 +334,23 @@ Respond ONLY with JSON:
   ],
   "overallRisk": "low|moderate|high|critical",
   "summary": "Brief patient-friendly summary"
-}`,
+}`;
+      }
+
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: promptText,
               },
             ],
           },
         ],
         config: {
-          maxOutputTokens: 2048,
+          maxOutputTokens: 4096,
         },
       });
 

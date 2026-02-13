@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +23,20 @@ import { getApiUrl } from "@/lib/query-client";
 import { getMedications, saveMedications, getProfile, saveProfile } from "@/lib/storage";
 import type { ScannedMedication } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+
+interface InteractionResult {
+  drug1: string;
+  drug2: string;
+  severity: "mild" | "moderate" | "severe" | "contraindicated";
+  description: string;
+  recommendation: string;
+}
+
+interface InteractionReport {
+  interactions: InteractionResult[];
+  overallRisk: "low" | "moderate" | "high" | "critical";
+  summary: string;
+}
 
 async function uriToBase64(uri: string): Promise<string> {
   if (Platform.OS !== "web") {
@@ -42,11 +59,16 @@ async function uriToBase64(uri: string): Promise<string> {
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL } = useSettings();
-  const [imageUri, setImageUri] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [medications, setMedications] = useState<ScannedMedication[]>([]);
+  const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
+  const [medicationList, setMedicationList] = useState<ScannedMedication[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [manualName, setManualName] = useState("");
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [interactionReport, setInteractionReport] = useState<InteractionReport | null>(null);
+  const [expandedMedIndex, setExpandedMedIndex] = useState<number | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const scrollRef = useRef<ScrollView>(null);
 
   const pickImage = async (useCamera: boolean) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,7 +80,7 @@ export default function ScanScreen() {
       if (status !== "granted") {
         setError(t(
           "Camera permission is needed to scan medications.",
-          "\u064a\u062c\u0628 \u0627\u0644\u0633\u0645\u0627\u062d \u0628\u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627.",
+          "يجب السماح بالوصول إلى الكاميرا.",
         ));
         return;
       }
@@ -77,7 +99,6 @@ export default function ScanScreen() {
 
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
-      setImageUri(asset.uri);
 
       let base64Data = asset.base64 || "";
       if (!base64Data && asset.uri) {
@@ -85,13 +106,13 @@ export default function ScanScreen() {
           base64Data = await uriToBase64(asset.uri);
         } catch (e) {
           console.error("Failed to convert image to base64:", e);
-          setError(t("Failed to process image. Please try again.", "\u0641\u0634\u0644 \u0641\u064a \u0645\u0639\u0627\u0644\u062c\u0629 \u0627\u0644\u0635\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+          setError(t("Failed to process image. Please try again.", "فشل في معالجة الصورة. حاول مرة أخرى."));
           return;
         }
       }
 
       if (!base64Data) {
-        setError(t("Could not read image data. Please try again.", "\u0644\u0645 \u0623\u062a\u0645\u0643\u0646 \u0645\u0646 \u0642\u0631\u0627\u0621\u0629 \u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0635\u0648\u0631\u0629. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+        setError(t("Could not read image data. Please try again.", "لم أتمكن من قراءة بيانات الصورة. حاول مرة أخرى."));
         return;
       }
 
@@ -101,8 +122,8 @@ export default function ScanScreen() {
 
   const analyzeImage = async (base64: string, mimeType: string) => {
     setIsAnalyzing(true);
-    setMedications([]);
     setError(null);
+    setInteractionReport(null);
 
     try {
       const apiUrl = getApiUrl();
@@ -117,7 +138,12 @@ export default function ScanScreen() {
       const data = await response.json();
 
       if (data.medications && !data.medications[0]?.error) {
-        setMedications(data.medications);
+        const newMeds = data.medications as ScannedMedication[];
+        setMedicationList((prev) => {
+          const existingNames = new Set(prev.map((m) => m.name.toLowerCase()));
+          const uniqueNew = newMeds.filter((m) => !existingNames.has(m.name.toLowerCase()));
+          return [...prev, ...uniqueNew];
+        });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         const existing = await getMedications();
@@ -132,16 +158,126 @@ export default function ScanScreen() {
         setError(
           data.medications?.[0]?.error ||
             data.medications?.[0]?.suggestion ||
-            t("Could not identify medication. Try a clearer photo.", "\u0644\u0645 \u0623\u062a\u0645\u0643\u0646 \u0645\u0646 \u062a\u062d\u062f\u064a\u062f \u0627\u0644\u062f\u0648\u0627\u0621. \u062d\u0627\u0648\u0644 \u0635\u0648\u0631\u0629 \u0623\u0648\u0636\u062d."),
+            t("Could not identify medication. Try a clearer photo.", "لم أتمكن من تحديد الدواء. حاول صورة أوضح."),
         );
       }
     } catch (err) {
       setError(t(
         "Failed to analyze medication. Please try again.",
-        "\u0641\u0634\u0644 \u0641\u064a \u062a\u062d\u0644\u064a\u0644 \u0627\u0644\u062f\u0648\u0627\u0621. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
+        "فشل في تحليل الدواء. حاول مرة أخرى.",
       ));
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const addManualMedication = () => {
+    const name = manualName.trim();
+    if (!name) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const exists = medicationList.some((m) => m.name.toLowerCase() === name.toLowerCase());
+    if (exists) {
+      setError(t("This medication is already in your list.", "هذا الدواء موجود بالفعل في قائمتك."));
+      setShowManualModal(false);
+      setManualName("");
+      return;
+    }
+
+    setMedicationList((prev) => [...prev, { name }]);
+    setManualName("");
+    setShowManualModal(false);
+    setInteractionReport(null);
+  };
+
+  const removeMedication = (index: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setMedicationList((prev) => prev.filter((_, i) => i !== index));
+    setInteractionReport(null);
+    if (expandedMedIndex === index) setExpandedMedIndex(null);
+  };
+
+  const checkInteractions = async () => {
+    if (medicationList.length < 2) {
+      setError(t(
+        "Add at least 2 medications to check interactions.",
+        "أضف دواءين على الأقل للتحقق من التداخلات.",
+      ));
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsCheckingInteractions(true);
+    setError(null);
+    setInteractionReport(null);
+
+    try {
+      const apiUrl = getApiUrl();
+      const url = new URL("/api/check-interactions", apiUrl);
+
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ medications: medicationList.map((m) => m.name) }),
+      });
+
+      const data = await response.json();
+
+      if (data.error) {
+        setError(data.error);
+      } else {
+        setInteractionReport(data);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setTimeout(() => {
+          scrollRef.current?.scrollToEnd({ animated: true });
+        }, 300);
+      }
+    } catch (err) {
+      setError(t(
+        "Failed to check interactions. Please try again.",
+        "فشل في التحقق من التداخلات. حاول مرة أخرى.",
+      ));
+    } finally {
+      setIsCheckingInteractions(false);
+    }
+  };
+
+  const severityColor = (severity: string) => {
+    switch (severity) {
+      case "contraindicated":
+        return Colors.light.emergency;
+      case "severe":
+        return Colors.light.emergency;
+      case "moderate":
+        return Colors.light.warning;
+      default:
+        return Colors.light.success;
+    }
+  };
+
+  const riskColor = (risk: string) => {
+    switch (risk) {
+      case "critical":
+        return Colors.light.emergency;
+      case "high":
+        return Colors.light.emergency;
+      case "moderate":
+        return Colors.light.warning;
+      default:
+        return Colors.light.success;
+    }
+  };
+
+  const riskBgColor = (risk: string) => {
+    switch (risk) {
+      case "critical":
+        return Colors.light.emergencyLight;
+      case "high":
+        return Colors.light.emergencyLight;
+      case "moderate":
+        return Colors.light.warningLight;
+      default:
+        return Colors.light.successLight;
     }
   };
 
@@ -152,16 +288,18 @@ export default function ScanScreen() {
           <Ionicons name="close" size={24} color={Colors.light.text} />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {t("Medication Scanner", "\u0645\u0627\u0633\u062d \u0627\u0644\u0623\u062f\u0648\u064a\u0629")}
+          {t("Drug Interactions", "التداخلات الدوائية")}
         </Text>
         <View style={styles.headerButton} />
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {!imageUri && !isAnalyzing && medications.length === 0 && (
+        {medicationList.length === 0 && !isAnalyzing && (
           <View style={styles.emptyState}>
             <View style={styles.emptyIcon}>
               <MaterialCommunityIcons
@@ -171,32 +309,23 @@ export default function ScanScreen() {
               />
             </View>
             <Text style={[styles.emptyTitle, isRTL && { textAlign: "right" }]}>
-              {t("Scan Your Medications", "\u0627\u0645\u0633\u062d \u0623\u062f\u0648\u064a\u062a\u0643")}
+              {t("Check Drug Interactions", "تحقق من التداخلات الدوائية")}
             </Text>
             <Text style={styles.emptyDesc}>
               {t(
-                "Take a photo of your medication box, blister pack, or prescription to check for drug interactions.",
-                "\u0627\u0644\u062a\u0642\u0637 \u0635\u0648\u0631\u0629 \u0644\u0639\u0644\u0628\u0629 \u0627\u0644\u062f\u0648\u0627\u0621 \u0623\u0648 \u0627\u0644\u0648\u0635\u0641\u0629 \u0627\u0644\u0637\u0628\u064a\u0629 \u0644\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u062a\u062f\u0627\u062e\u0644\u0627\u062a \u0627\u0644\u062f\u0648\u0627\u0626\u064a\u0629.",
+                "Add your medications by scanning photos, choosing from gallery, or typing names manually. Then check for interactions between them.",
+                "أضف أدويتك عن طريق تصوير العلبة أو اختيار صورة من المعرض أو كتابة الاسم يدوياً. ثم تحقق من التداخلات بينها.",
               )}
             </Text>
           </View>
         )}
 
-        {imageUri && (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: imageUri }}
-              style={styles.previewImage}
-              contentFit="cover"
-            />
-            {isAnalyzing && (
-              <View style={styles.analyzingOverlay}>
-                <ActivityIndicator size="large" color="#fff" />
-                <Text style={styles.analyzingText}>
-                  {t("Analyzing medication...", "\u062c\u0627\u0631\u064a \u062a\u062d\u0644\u064a\u0644 \u0627\u0644\u062f\u0648\u0627\u0621...")}
-                </Text>
-              </View>
-            )}
+        {isAnalyzing && (
+          <View style={styles.analyzingCard}>
+            <ActivityIndicator size="small" color={Colors.light.primary} />
+            <Text style={styles.analyzingCardText}>
+              {t("Analyzing medication...", "جاري تحليل الدواء...")}
+            </Text>
           </View>
         )}
 
@@ -207,120 +336,366 @@ export default function ScanScreen() {
           </View>
         )}
 
-        {medications.map((med, i) => (
-          <View key={i} style={styles.medCard}>
-            <View style={[styles.medHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <MaterialCommunityIcons
-                name="pill"
-                size={22}
-                color={Colors.light.primary}
-              />
-              <View style={styles.medHeaderText}>
-                <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
-                {med.genericName && (
-                  <Text style={[styles.medGeneric, isRTL && { textAlign: "right" }]}>{med.genericName}</Text>
-                )}
-              </View>
+        {medicationList.length > 0 && (
+          <View style={styles.medListSection}>
+            <View style={[styles.medListHeader, isRTL && { flexDirection: "row-reverse" }]}>
+              <Text style={[styles.medListTitle, isRTL && { textAlign: "right" }]}>
+                {t("Your Medications", "أدويتك")} ({medicationList.length})
+              </Text>
             </View>
 
-            {med.dosage && (
-              <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
-                  {t("Dosage", "\u0627\u0644\u062c\u0631\u0639\u0629")}
-                </Text>
-                <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>
-                  {med.dosage} {med.form ? `(${med.form})` : ""}
+            {medicationList.map((med, i) => {
+              const isExpanded = expandedMedIndex === i;
+              const hasDetails = med.genericName || med.dosage || med.drugClass ||
+                (med.commonUses && med.commonUses.length > 0) ||
+                (med.commonSideEffects && med.commonSideEffects.length > 0) ||
+                (med.warnings && med.warnings.length > 0);
+
+              return (
+                <View key={`${med.name}-${i}`} style={styles.medCard}>
+                  <Pressable
+                    style={[styles.medCardHeader, isRTL && { flexDirection: "row-reverse" }]}
+                    onPress={() => {
+                      if (hasDetails) {
+                        setExpandedMedIndex(isExpanded ? null : i);
+                      }
+                    }}
+                  >
+                    <View style={styles.medPillIcon}>
+                      <MaterialCommunityIcons
+                        name="pill"
+                        size={18}
+                        color={Colors.light.primary}
+                      />
+                    </View>
+                    <View style={styles.medCardInfo}>
+                      <Text style={[styles.medName, isRTL && { textAlign: "right" }]} numberOfLines={1}>
+                        {med.name}
+                      </Text>
+                      {med.genericName && (
+                        <Text style={[styles.medGeneric, isRTL && { textAlign: "right" }]} numberOfLines={1}>
+                          {med.genericName}
+                        </Text>
+                      )}
+                    </View>
+                    {hasDetails && (
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={18}
+                        color={Colors.light.textTertiary}
+                      />
+                    )}
+                    <Pressable
+                      onPress={() => removeMedication(i)}
+                      hitSlop={10}
+                      style={styles.removeButton}
+                    >
+                      <Ionicons name="close-circle" size={22} color={Colors.light.textLight} />
+                    </Pressable>
+                  </Pressable>
+
+                  {isExpanded && hasDetails && (
+                    <View style={styles.medDetails}>
+                      {med.dosage && (
+                        <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
+                          <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
+                            {t("Dosage", "الجرعة")}
+                          </Text>
+                          <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>
+                            {med.dosage} {med.form ? `(${med.form})` : ""}
+                          </Text>
+                        </View>
+                      )}
+
+                      {med.drugClass && (
+                        <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
+                          <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
+                            {t("Class", "الفئة")}
+                          </Text>
+                          <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>{med.drugClass}</Text>
+                        </View>
+                      )}
+
+                      {med.commonUses && med.commonUses.length > 0 && (
+                        <View style={styles.medSection}>
+                          <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
+                            {t("Common Uses", "الاستخدامات")}
+                          </Text>
+                          {med.commonUses.map((use, j) => (
+                            <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
+                              <View style={styles.bullet} />
+                              <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{use}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {med.commonSideEffects && med.commonSideEffects.length > 0 && (
+                        <View style={styles.medSection}>
+                          <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
+                            {t("Side Effects", "الآثار الجانبية")}
+                          </Text>
+                          {med.commonSideEffects.map((effect, j) => (
+                            <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
+                              <View style={[styles.bullet, { backgroundColor: Colors.light.warning }]} />
+                              <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{effect}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {med.warnings && med.warnings.length > 0 && (
+                        <View style={styles.warningSection}>
+                          {med.warnings.map((w, j) => (
+                            <View key={j} style={[styles.warningRow, isRTL && { flexDirection: "row-reverse" }]}>
+                              <Ionicons name="warning" size={14} color={Colors.light.accent} />
+                              <Text style={[styles.warningText, isRTL && { textAlign: "right" }]}>{w}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <View style={styles.addMethodsSection}>
+          <Text style={[styles.addMethodsTitle, isRTL && { textAlign: "right" }]}>
+            {medicationList.length > 0
+              ? t("Add More Medications", "أضف أدوية أخرى")
+              : t("Add Medications", "أضف أدوية")}
+          </Text>
+
+          <View style={styles.addMethodsGrid}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.addMethodCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => pickImage(true)}
+              disabled={isAnalyzing}
+            >
+              <View style={[styles.addMethodIcon, { backgroundColor: Colors.light.primarySurface }]}>
+                <Ionicons name="camera" size={24} color={Colors.light.primary} />
+              </View>
+              <Text style={styles.addMethodLabel}>
+                {t("Camera", "كاميرا")}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.addMethodCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => pickImage(false)}
+              disabled={isAnalyzing}
+            >
+              <View style={[styles.addMethodIcon, { backgroundColor: Colors.light.accentLight }]}>
+                <Ionicons name="images" size={24} color={Colors.light.accent} />
+              </View>
+              <Text style={styles.addMethodLabel}>
+                {t("Gallery", "المعرض")}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.addMethodCard,
+                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+              ]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowManualModal(true);
+              }}
+            >
+              <View style={[styles.addMethodIcon, { backgroundColor: "#F3E8FF" }]}>
+                <Ionicons name="create" size={24} color="#7C3AED" />
+              </View>
+              <Text style={styles.addMethodLabel}>
+                {t("Type Name", "اكتب الاسم")}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {medicationList.length >= 2 && (
+          <Pressable
+            style={({ pressed }) => [
+              styles.checkButton,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+              isCheckingInteractions && { opacity: 0.7 },
+            ]}
+            onPress={checkInteractions}
+            disabled={isCheckingInteractions}
+          >
+            {isCheckingInteractions ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <MaterialCommunityIcons name="swap-horizontal-bold" size={22} color="#fff" />
+            )}
+            <Text style={styles.checkButtonText}>
+              {isCheckingInteractions
+                ? t("Checking...", "جاري التحقق...")
+                : t("Check Interactions", "تحقق من التداخلات")}
+            </Text>
+          </Pressable>
+        )}
+
+        {interactionReport && (
+          <View style={styles.interactionSection}>
+            <View style={[styles.riskBanner, { backgroundColor: riskBgColor(interactionReport.overallRisk) }]}>
+              <View style={[styles.riskBannerHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons
+                  name={interactionReport.overallRisk === "low" ? "checkmark-circle" : "warning"}
+                  size={22}
+                  color={riskColor(interactionReport.overallRisk)}
+                />
+                <Text style={[styles.riskBannerTitle, { color: riskColor(interactionReport.overallRisk) }]}>
+                  {interactionReport.overallRisk === "low"
+                    ? t("Low Risk", "خطر منخفض")
+                    : interactionReport.overallRisk === "moderate"
+                      ? t("Moderate Risk", "خطر متوسط")
+                      : interactionReport.overallRisk === "high"
+                        ? t("High Risk", "خطر عالي")
+                        : t("Critical Risk", "خطر حرج")}
                 </Text>
               </View>
-            )}
+              <Text style={[styles.riskSummary, isRTL && { textAlign: "right" }]}>
+                {interactionReport.summary}
+              </Text>
+            </View>
 
-            {med.drugClass && (
-              <View style={[styles.medRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Text style={[styles.medLabel, isRTL && { textAlign: "right" }]}>
-                  {t("Class", "\u0627\u0644\u0641\u0626\u0629")}
+            {interactionReport.interactions && interactionReport.interactions.length > 0 && (
+              <View style={styles.interactionsList}>
+                <Text style={[styles.interactionsListTitle, isRTL && { textAlign: "right" }]}>
+                  {t("Interaction Details", "تفاصيل التداخلات")}
                 </Text>
-                <Text style={[styles.medValue, isRTL && { textAlign: "right" }]}>{med.drugClass}</Text>
-              </View>
-            )}
-
-            {med.commonUses && med.commonUses.length > 0 && (
-              <View style={styles.medSection}>
-                <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
-                  {t("Common Uses", "\u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\u0627\u062a")}
-                </Text>
-                {med.commonUses.map((use, j) => (
-                  <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View style={styles.bullet} />
-                    <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{use}</Text>
+                {interactionReport.interactions.map((interaction, i) => (
+                  <View key={i} style={styles.interactionCard}>
+                    <View style={[styles.interactionHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                      <View style={styles.interactionDrugs}>
+                        <Text style={[styles.interactionDrugText, isRTL && { textAlign: "right" }]}>
+                          {interaction.drug1}
+                        </Text>
+                        <MaterialCommunityIcons
+                          name="swap-horizontal"
+                          size={16}
+                          color={Colors.light.textTertiary}
+                        />
+                        <Text style={[styles.interactionDrugText, isRTL && { textAlign: "right" }]}>
+                          {interaction.drug2}
+                        </Text>
+                      </View>
+                      <View style={[
+                        styles.severityBadge,
+                        {
+                          backgroundColor: severityColor(interaction.severity) + "18",
+                        },
+                      ]}>
+                        <Text style={[
+                          styles.severityBadgeText,
+                          { color: severityColor(interaction.severity) },
+                        ]}>
+                          {interaction.severity === "contraindicated"
+                            ? t("Contraindicated", "ممنوع")
+                            : interaction.severity === "severe"
+                              ? t("Severe", "شديد")
+                              : interaction.severity === "moderate"
+                                ? t("Moderate", "متوسط")
+                                : t("Mild", "خفيف")}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.interactionDesc, isRTL && { textAlign: "right" }]}>
+                      {interaction.description}
+                    </Text>
+                    {interaction.recommendation && (
+                      <View style={[styles.interactionRec, isRTL && { flexDirection: "row-reverse" }]}>
+                        <Ionicons name="information-circle" size={16} color={Colors.light.primary} />
+                        <Text style={[styles.interactionRecText, isRTL && { textAlign: "right" }]}>
+                          {interaction.recommendation}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
             )}
 
-            {med.commonSideEffects && med.commonSideEffects.length > 0 && (
-              <View style={styles.medSection}>
-                <Text style={[styles.medSectionTitle, isRTL && { textAlign: "right" }]}>
-                  {t("Side Effects", "\u0627\u0644\u0622\u062b\u0627\u0631 \u0627\u0644\u062c\u0627\u0646\u0628\u064a\u0629")}
+            {interactionReport.interactions && interactionReport.interactions.length === 0 && (
+              <View style={styles.noInteractionsCard}>
+                <Ionicons name="checkmark-circle" size={32} color={Colors.light.success} />
+                <Text style={styles.noInteractionsText}>
+                  {t("No significant interactions found between your medications.",
+                    "لم يتم العثور على تداخلات مهمة بين أدويتك.")}
                 </Text>
-                {med.commonSideEffects.map((effect, j) => (
-                  <View key={j} style={[styles.bulletRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <View
-                      style={[
-                        styles.bullet,
-                        { backgroundColor: Colors.light.warning },
-                      ]}
-                    />
-                    <Text style={[styles.bulletText, isRTL && { textAlign: "right" }]}>{effect}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {med.warnings && med.warnings.length > 0 && (
-              <View style={styles.warningSection}>
-                {med.warnings.map((w, j) => (
-                  <View key={j} style={[styles.warningRow, isRTL && { flexDirection: "row-reverse" }]}>
-                    <Ionicons
-                      name="warning"
-                      size={14}
-                      color={Colors.light.accent}
-                    />
-                    <Text style={[styles.warningText, isRTL && { textAlign: "right" }]}>{w}</Text>
-                  </View>
-                ))}
               </View>
             )}
           </View>
-        ))}
+        )}
 
-        <View style={styles.buttonContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.captureButton,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-            ]}
-            onPress={() => pickImage(true)}
-          >
-            <Ionicons name="camera" size={22} color="#fff" />
-            <Text style={styles.captureButtonText}>
-              {t("Take Photo", "\u0627\u0644\u062a\u0642\u0637 \u0635\u0648\u0631\u0629")}
-            </Text>
-          </Pressable>
-
-          <Pressable
-            style={({ pressed }) => [
-              styles.galleryButton,
-              pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-            ]}
-            onPress={() => pickImage(false)}
-          >
-            <Ionicons name="images" size={22} color={Colors.light.primary} />
-            <Text style={styles.galleryButtonText}>
-              {t("From Gallery", "\u0645\u0646 \u0627\u0644\u0645\u0639\u0631\u0636")}
-            </Text>
-          </Pressable>
-        </View>
+        <View style={{ height: 40 }} />
       </ScrollView>
+
+      <Modal
+        visible={showManualModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowManualModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setShowManualModal(false)}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalHandle} />
+              <Text style={[styles.modalTitle, isRTL && { textAlign: "right" }]}>
+                {t("Add Medication", "أضف دواء")}
+              </Text>
+              <Text style={[styles.modalDesc, isRTL && { textAlign: "right" }]}>
+                {t("Type the medication name", "اكتب اسم الدواء")}
+              </Text>
+              <TextInput
+                style={[styles.modalInput, isRTL && { textAlign: "right" }]}
+                placeholder={t("e.g. Ibuprofen, Paracetamol...", "مثال: إيبوبروفين، باراسيتامول...")}
+                placeholderTextColor={Colors.light.textLight}
+                value={manualName}
+                onChangeText={setManualName}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={addManualMedication}
+              />
+              <View style={styles.modalButtons}>
+                <Pressable
+                  style={[styles.modalCancelBtn]}
+                  onPress={() => {
+                    setShowManualModal(false);
+                    setManualName("");
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>{t("Cancel", "إلغاء")}</Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modalAddBtn,
+                    !manualName.trim() && { opacity: 0.5 },
+                  ]}
+                  onPress={addManualMedication}
+                  disabled={!manualName.trim()}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.modalAddText}>{t("Add", "أضف")}</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -360,7 +735,7 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: "center",
-    paddingVertical: 40,
+    paddingVertical: 32,
   },
   emptyIcon: {
     width: 96,
@@ -376,37 +751,29 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
     marginBottom: 8,
+    textAlign: "center",
   },
   emptyDesc: {
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
     textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 280,
+    lineHeight: 21,
+    maxWidth: 300,
   },
-  imageContainer: {
-    borderRadius: 20,
-    overflow: "hidden",
+  analyzingCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: Colors.light.primarySurface,
+    borderRadius: 14,
+    padding: 16,
     marginBottom: 16,
   },
-  previewImage: {
-    width: "100%",
-    height: 200,
-    borderRadius: 20,
-  },
-  analyzingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-    borderRadius: 20,
-  },
-  analyzingText: {
-    fontSize: 15,
+  analyzingCardText: {
+    fontSize: 14,
     fontFamily: "DMSans_500Medium",
-    color: "#fff",
+    color: Colors.light.primary,
   },
   errorCard: {
     flexDirection: "row",
@@ -424,38 +791,69 @@ const styles = StyleSheet.create({
     color: Colors.light.accent,
     lineHeight: 20,
   },
-  medCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 1,
+  medListSection: {
+    marginBottom: 20,
   },
-  medHeader: {
+  medListHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    marginBottom: 14,
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
-  medHeaderText: {
-    flex: 1,
-  },
-  medName: {
+  medListTitle: {
     fontSize: 18,
     fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
   },
+  medCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    overflow: "hidden",
+  },
+  medCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 10,
+  },
+  medPillIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.primarySurface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  medCardInfo: {
+    flex: 1,
+  },
+  medName: {
+    fontSize: 15,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+  },
   medGeneric: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
     marginTop: 1,
+  },
+  removeButton: {
+    padding: 4,
+  },
+  medDetails: {
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.divider,
   },
   medRow: {
     flexDirection: "row",
@@ -465,50 +863,50 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.light.borderLight,
   },
   medLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textSecondary,
   },
   medValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.text,
   },
   medSection: {
-    marginTop: 12,
+    marginTop: 10,
   },
   medSectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.textTertiary,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   bulletRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 3,
+    paddingVertical: 2,
   },
   bullet: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     backgroundColor: Colors.light.primary,
   },
   bulletText: {
-    fontSize: 14,
+    fontSize: 13,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.text,
     flex: 1,
   },
   warningSection: {
     backgroundColor: Colors.light.accentLight,
-    borderRadius: 12,
-    padding: 14,
-    marginTop: 12,
-    gap: 6,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+    gap: 4,
   },
   warningRow: {
     flexDirection: "row",
@@ -517,49 +915,255 @@ const styles = StyleSheet.create({
   },
   warningText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.accent,
-    lineHeight: 18,
+    lineHeight: 17,
   },
-  buttonContainer: {
+  addMethodsSection: {
+    marginBottom: 20,
+  },
+  addMethodsTitle: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 12,
+  },
+  addMethodsGrid: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 8,
   },
-  captureButton: {
+  addMethodCard: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: Colors.light.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+    gap: 8,
+  },
+  addMethodIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  addMethodLabel: {
+    fontSize: 12,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+  },
+  checkButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: Colors.light.primary,
+    paddingVertical: 16,
+    borderRadius: 16,
+    marginBottom: 20,
+    shadowColor: Colors.light.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  checkButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: "#fff",
+  },
+  interactionSection: {
+    marginBottom: 8,
+  },
+  riskBanner: {
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+  },
+  riskBannerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  riskBannerTitle: {
+    fontSize: 17,
+    fontFamily: "DMSans_700Bold",
+  },
+  riskSummary: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.text,
+    lineHeight: 21,
+  },
+  interactionsList: {
+    gap: 12,
+  },
+  interactionsListTitle: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  interactionCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  interactionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  interactionDrugs: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+    flexWrap: "wrap",
+  },
+  interactionDrugText: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+  },
+  severityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  severityBadgeText: {
+    fontSize: 11,
+    fontFamily: "DMSans_700Bold",
+    textTransform: "capitalize" as const,
+  },
+  interactionDesc: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 19,
+    marginBottom: 8,
+  },
+  interactionRec: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: Colors.light.primarySurface,
+    borderRadius: 10,
+    padding: 10,
+  },
+  interactionRecText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
+    lineHeight: 18,
+  },
+  noInteractionsCard: {
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 24,
+    backgroundColor: Colors.light.successLight,
+    borderRadius: 18,
+    padding: 20,
+  },
+  noInteractionsText: {
+    fontSize: 15,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.success,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: Colors.light.overlay,
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: Colors.light.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: Platform.OS === "web" ? 58 : 40,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.light.textLight,
+    alignSelf: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  modalDesc: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: Colors.light.inputBg,
+    borderRadius: 14,
+    padding: 16,
+    fontSize: 16,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.text,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: Colors.light.surfaceSecondary,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+  },
+  modalAddBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 14,
     backgroundColor: Colors.light.primary,
-    paddingVertical: 18,
-    borderRadius: 16,
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
   },
-  captureButtonText: {
+  modalAddText: {
     fontSize: 15,
     fontFamily: "DMSans_600SemiBold",
     color: "#fff",
-  },
-  galleryButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.light.primarySurface,
-    paddingVertical: 18,
-    borderRadius: 16,
-  },
-  galleryButtonText: {
-    fontSize: 15,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.primary,
   },
 });
