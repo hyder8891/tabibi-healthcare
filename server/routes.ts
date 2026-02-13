@@ -121,22 +121,38 @@ COMMUNICATION STYLE:
 export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/signup", async (req: Request, res: Response) => {
     try {
-      const { email, password, name } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+      const { email, phone, password, name } = req.body;
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
       }
-      const existing = await storage.getUserByEmail(email.toLowerCase().trim());
-      if (existing) {
-        return res.status(409).json({ message: "An account with this email already exists" });
+      if (!email && !phone) {
+        return res.status(400).json({ message: "Email or phone number is required" });
       }
+
+      if (email) {
+        const existing = await storage.getUserByEmail(email.toLowerCase().trim());
+        if (existing) {
+          return res.status(409).json({ message: "An account with this email already exists" });
+        }
+      }
+      if (phone) {
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, "");
+        const existing = await storage.getUserByPhone(normalizedPhone);
+        if (existing) {
+          return res.status(409).json({ message: "An account with this phone number already exists" });
+        }
+      }
+
       const hashedPassword = await bcrypt.hash(password, 10);
+      const normalizedPhone = phone ? phone.replace(/[\s\-\(\)]/g, "") : null;
       const user = await storage.createUser({
-        email: email.toLowerCase().trim(),
+        email: email ? email.toLowerCase().trim() : null,
+        phone: normalizedPhone,
         password: hashedPassword,
         name: name?.trim() || null,
       });
       req.session.userId = user.id;
-      return res.json({ id: user.id, email: user.email, name: user.name });
+      return res.json({ id: user.id, email: user.email, phone: user.phone, name: user.name });
     } catch (error) {
       console.error("Signup error:", error);
       return res.status(500).json({ message: "Failed to create account" });
@@ -145,20 +161,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        return res.status(400).json({ message: "Email and password are required" });
+      const { email, phone, password } = req.body;
+      if (!password) {
+        return res.status(400).json({ message: "Password is required" });
       }
-      const user = await storage.getUserByEmail(email.toLowerCase().trim());
+      if (!email && !phone) {
+        return res.status(400).json({ message: "Email or phone number is required" });
+      }
+
+      let user;
+      if (phone) {
+        const normalizedPhone = phone.replace(/[\s\-\(\)]/g, "");
+        user = await storage.getUserByPhone(normalizedPhone);
+      } else {
+        user = await storage.getUserByEmail(email.toLowerCase().trim());
+      }
+
       if (!user) {
-        return res.status(401).json({ message: "Invalid email or password" });
+        return res.status(401).json({ message: "Invalid credentials" });
       }
       const valid = await bcrypt.compare(password, user.password);
       if (!valid) {
-        return res.status(401).json({ message: "Invalid email or password" });
+        return res.status(401).json({ message: "Invalid credentials" });
       }
       req.session.userId = user.id;
-      return res.json({ id: user.id, email: user.email, name: user.name });
+      return res.json({ id: user.id, email: user.email, phone: user.phone, name: user.name });
     } catch (error) {
       console.error("Login error:", error);
       return res.status(500).json({ message: "Failed to log in" });
@@ -183,7 +210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) {
       return res.status(401).json({ message: "Not authenticated" });
     }
-    return res.json({ id: user.id, email: user.email, name: user.name });
+    return res.json({ id: user.id, email: user.email, phone: user.phone, name: user.name });
   });
 
   app.post("/api/assess", async (req: Request, res: Response) => {
