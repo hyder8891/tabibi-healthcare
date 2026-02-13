@@ -17,14 +17,18 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 import type { PatientProfile } from "@/lib/types";
 
+const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { settings, updateSettings, t, isRTL } = useSettings();
   const [profile, setProfile] = useState<PatientProfile>({
     medications: [],
     conditions: [],
+    allergies: [],
   });
   const [newCondition, setNewCondition] = useState("");
+  const [newAllergy, setNewAllergy] = useState("");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   useEffect(() => {
@@ -40,16 +44,31 @@ export default function SettingsScreen() {
   const addCondition = () => {
     if (newCondition.trim()) {
       updateProfile({
-        conditions: [...profile.conditions, newCondition.trim()],
+        conditions: [...(profile.conditions || []), newCondition.trim()],
       });
       setNewCondition("");
     }
   };
 
   const removeCondition = (index: number) => {
-    const updated = [...profile.conditions];
+    const updated = [...(profile.conditions || [])];
     updated.splice(index, 1);
     updateProfile({ conditions: updated });
+  };
+
+  const addAllergy = () => {
+    if (newAllergy.trim()) {
+      updateProfile({
+        allergies: [...(profile.allergies || []), newAllergy.trim()],
+      });
+      setNewAllergy("");
+    }
+  };
+
+  const removeAllergy = (index: number) => {
+    const updated = [...(profile.allergies || [])];
+    updated.splice(index, 1);
+    updateProfile({ allergies: updated });
   };
 
   return (
@@ -77,6 +96,35 @@ export default function SettingsScreen() {
               placeholderTextColor={Colors.light.textTertiary}
             />
           </View>
+          <View style={styles.divider} />
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>{t("Gender", "\u0627\u0644\u062c\u0646\u0633")}</Text>
+            <View style={styles.genderRow}>
+              {[{ key: "male", en: "Male", ar: "\u0630\u0643\u0631" }, { key: "female", en: "Female", ar: "\u0623\u0646\u062b\u0649" }].map((g) => (
+                <Pressable
+                  key={g.key}
+                  style={[
+                    styles.genderButton,
+                    profile.gender === g.key && styles.genderButtonActive,
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    updateProfile({ gender: g.key });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.genderText,
+                      profile.gender === g.key && styles.genderTextActive,
+                    ]}
+                  >
+                    {t(g.en, g.ar)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+          <View style={styles.divider} />
           <View style={styles.fieldRow}>
             <Text style={styles.fieldLabel}>{t("Age", "\u0627\u0644\u0639\u0645\u0631")}</Text>
             <TextInput
@@ -106,33 +154,39 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.fieldRow}>
-            <Text style={styles.fieldLabel}>{t("Gender", "\u0627\u0644\u062c\u0646\u0633")}</Text>
-            <View style={styles.genderRow}>
-              {[{ key: "male", en: "Male", ar: "ذكر" }, { key: "female", en: "Female", ar: "أنثى" }].map((g) => (
-                <Pressable
-                  key={g.key}
-                  style={[
-                    styles.genderButton,
-                    profile.gender === g.key &&
-                      styles.genderButtonActive,
-                  ]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    updateProfile({ gender: g.key });
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.genderText,
-                      profile.gender === g.key &&
-                        styles.genderTextActive,
-                    ]}
+            <Text style={styles.fieldLabel}>{t("Height (cm)", "\u0627\u0644\u0637\u0648\u0644 (\u0633\u0645)")}</Text>
+            <TextInput
+              style={styles.fieldInput}
+              value={profile.height?.toString() || ""}
+              onChangeText={(v) =>
+                updateProfile({ height: v ? parseFloat(v) : undefined })
+              }
+              keyboardType="decimal-pad"
+              placeholder="--"
+              placeholderTextColor={Colors.light.textTertiary}
+            />
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.fieldRow}>
+            <Text style={styles.fieldLabel}>{t("Blood Type", "\u0641\u0635\u064a\u0644\u0629 \u0627\u0644\u062f\u0645")}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={styles.bloodTypeRow}>
+                {BLOOD_TYPES.map((bt) => (
+                  <Pressable
+                    key={bt}
+                    style={[styles.bloodTypeChip, profile.bloodType === bt && styles.bloodTypeChipActive]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      updateProfile({ bloodType: bt === profile.bloodType ? undefined : bt });
+                    }}
                   >
-                    {t(g.en, g.ar)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+                    <Text style={[styles.bloodTypeText, profile.bloodType === bt && styles.bloodTypeTextActive]}>
+                      {bt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         </View>
 
@@ -140,32 +194,22 @@ export default function SettingsScreen() {
           {t("Known Conditions", "\u0627\u0644\u062d\u0627\u0644\u0627\u062a \u0627\u0644\u0645\u0639\u0631\u0648\u0641\u0629")}
         </Text>
         <View style={styles.card}>
-          {profile.conditions.map((c, i) => (
+          {(profile.conditions || []).map((c, i) => (
             <View key={i}>
               <View style={styles.conditionRow}>
-                <Ionicons
-                  name="medical"
-                  size={18}
-                  color={Colors.light.primary}
-                />
+                <Ionicons name="medical" size={18} color={Colors.light.primary} />
                 <Text style={styles.conditionText}>{c}</Text>
                 <Pressable onPress={() => removeCondition(i)} hitSlop={8}>
-                  <Ionicons
-                    name="close-circle"
-                    size={20}
-                    color={Colors.light.textTertiary}
-                  />
+                  <Ionicons name="close-circle" size={20} color={Colors.light.textTertiary} />
                 </Pressable>
               </View>
-              {i < profile.conditions.length - 1 && (
-                <View style={styles.divider} />
-              )}
+              {i < (profile.conditions || []).length - 1 && <View style={styles.divider} />}
             </View>
           ))}
           <View
             style={[
               styles.addRow,
-              profile.conditions.length > 0 && { borderTopWidth: 1, borderTopColor: Colors.light.borderLight, paddingTop: 12, marginTop: 8 },
+              (profile.conditions || []).length > 0 && { borderTopWidth: 1, borderTopColor: Colors.light.borderLight, paddingTop: 12, marginTop: 8 },
             ]}
           >
             <TextInput
@@ -178,12 +222,50 @@ export default function SettingsScreen() {
               returnKeyType="done"
             />
             <Pressable
-              style={[
-                styles.addButton,
-                !newCondition.trim() && { opacity: 0.4 },
-              ]}
+              style={[styles.addButton, !newCondition.trim() && { opacity: 0.4 }]}
               onPress={addCondition}
               disabled={!newCondition.trim()}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </Pressable>
+          </View>
+        </View>
+
+        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
+          {t("Allergies", "\u0627\u0644\u062d\u0633\u0627\u0633\u064a\u0629")}
+        </Text>
+        <View style={styles.card}>
+          {(profile.allergies || []).map((a, i) => (
+            <View key={i}>
+              <View style={styles.conditionRow}>
+                <Ionicons name="warning" size={18} color={Colors.light.accent} />
+                <Text style={styles.conditionText}>{a}</Text>
+                <Pressable onPress={() => removeAllergy(i)} hitSlop={8}>
+                  <Ionicons name="close-circle" size={20} color={Colors.light.textTertiary} />
+                </Pressable>
+              </View>
+              {i < (profile.allergies || []).length - 1 && <View style={styles.divider} />}
+            </View>
+          ))}
+          <View
+            style={[
+              styles.addRow,
+              (profile.allergies || []).length > 0 && { borderTopWidth: 1, borderTopColor: Colors.light.borderLight, paddingTop: 12, marginTop: 8 },
+            ]}
+          >
+            <TextInput
+              style={styles.addInput}
+              value={newAllergy}
+              onChangeText={setNewAllergy}
+              placeholder={t("Add allergy (e.g., Penicillin)", "\u0623\u0636\u0641 \u062d\u0633\u0627\u0633\u064a\u0629 (\u0645\u062b\u0644 \u0627\u0644\u0628\u0646\u0633\u0644\u064a\u0646)")}
+              placeholderTextColor={Colors.light.textTertiary}
+              onSubmitEditing={addAllergy}
+              returnKeyType="done"
+            />
+            <Pressable
+              style={[styles.addButton, { backgroundColor: Colors.light.accent }, !newAllergy.trim() && { opacity: 0.4 }]}
+              onPress={addAllergy}
+              disabled={!newAllergy.trim()}
             >
               <Ionicons name="add" size={20} color="#fff" />
             </Pressable>
@@ -196,47 +278,27 @@ export default function SettingsScreen() {
         <View style={styles.card}>
           <View style={styles.switchRow}>
             <View style={styles.switchLeft}>
-              <MaterialCommunityIcons
-                name="baby-face-outline"
-                size={22}
-                color={Colors.light.primary}
-              />
+              <MaterialCommunityIcons name="baby-face-outline" size={22} color={Colors.light.primary} />
               <View>
-                <Text style={styles.switchLabel}>
-                  {t("Pediatric Mode", "\u0648\u0636\u0639 \u0627\u0644\u0623\u0637\u0641\u0627\u0644")}
-                </Text>
+                <Text style={styles.switchLabel}>{t("Pediatric Mode", "\u0648\u0636\u0639 \u0627\u0644\u0623\u0637\u0641\u0627\u0644")}</Text>
                 <Text style={styles.switchDesc}>
-                  {t(
-                    "Weight-based dosage calculations",
-                    "\u062d\u0633\u0627\u0628\u0627\u062a \u0627\u0644\u062c\u0631\u0639\u0629 \u062d\u0633\u0628 \u0627\u0644\u0648\u0632\u0646",
-                  )}
+                  {t("Weight-based dosage calculations", "\u062d\u0633\u0627\u0628\u0627\u062a \u0627\u0644\u062c\u0631\u0639\u0629 \u062d\u0633\u0628 \u0627\u0644\u0648\u0632\u0646")}
                 </Text>
               </View>
             </View>
             <Switch
               value={settings.pediatricMode}
               onValueChange={(v) => updateSettings({ pediatricMode: v })}
-              trackColor={{
-                false: Colors.light.borderLight,
-                true: Colors.light.primaryLight,
-              }}
-              thumbColor={
-                settings.pediatricMode ? Colors.light.primary : "#f4f3f4"
-              }
+              trackColor={{ false: Colors.light.borderLight, true: Colors.light.primaryLight }}
+              thumbColor={settings.pediatricMode ? Colors.light.primary : "#f4f3f4"}
             />
           </View>
           <View style={styles.divider} />
           <View style={styles.switchRow}>
             <View style={styles.switchLeft}>
-              <Ionicons
-                name="language"
-                size={22}
-                color={Colors.light.primary}
-              />
+              <Ionicons name="language" size={22} color={Colors.light.primary} />
               <View>
-                <Text style={styles.switchLabel}>
-                  {t("Language", "\u0627\u0644\u0644\u063a\u0629")}
-                </Text>
+                <Text style={styles.switchLabel}>{t("Language", "\u0627\u0644\u0644\u063a\u0629")}</Text>
                 <Text style={styles.switchDesc}>
                   {settings.language === "en" ? "English" : "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"}
                 </Text>
@@ -246,21 +308,13 @@ export default function SettingsScreen() {
               {(["en", "ar"] as const).map((lang) => (
                 <Pressable
                   key={lang}
-                  style={[
-                    styles.langButton,
-                    settings.language === lang && styles.langButtonActive,
-                  ]}
+                  style={[styles.langButton, settings.language === lang && styles.langButtonActive]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     updateSettings({ language: lang });
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.langText,
-                      settings.language === lang && styles.langTextActive,
-                    ]}
-                  >
+                  <Text style={[styles.langText, settings.language === lang && styles.langTextActive]}>
                     {lang === "en" ? "EN" : "\u0639\u0631"}
                   </Text>
                 </Pressable>
@@ -270,11 +324,7 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.disclaimer}>
-          <Ionicons
-            name="information-circle"
-            size={16}
-            color={Colors.light.textTertiary}
-          />
+          <Ionicons name="information-circle" size={16} color={Colors.light.textTertiary} />
           <Text style={styles.disclaimerText}>
             {t(
               "Tabibi is not a replacement for professional medical advice. Always consult a healthcare provider for serious conditions.",
@@ -369,6 +419,30 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
   },
   genderTextActive: {
+    color: Colors.light.primary,
+  },
+  bloodTypeRow: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  bloodTypeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: Colors.light.background,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  bloodTypeChipActive: {
+    backgroundColor: Colors.light.primarySurface,
+    borderColor: Colors.light.primary,
+  },
+  bloodTypeText: {
+    fontSize: 12,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+  },
+  bloodTypeTextActive: {
     color: Colors.light.primary,
   },
   conditionRow: {

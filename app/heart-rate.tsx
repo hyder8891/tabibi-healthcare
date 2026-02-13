@@ -25,6 +25,7 @@ import Animated, {
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getApiUrl } from "@/lib/query-client";
+import { getProfile, saveProfile } from "@/lib/storage";
 
 const MEASUREMENT_DURATION = 25;
 const CAPTURE_FPS = 3;
@@ -219,6 +220,10 @@ export default function HeartRateScreen() {
       setState("result");
       startPulseAnimation();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      getProfile().then((profile) => {
+        saveProfile({ ...profile, lastBpm: data.heartRate, lastBpmDate: Date.now() });
+      });
     } catch (err) {
       setError(t(
         "Failed to process heart rate data. Please try again.",
