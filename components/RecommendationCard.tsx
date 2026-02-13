@@ -199,12 +199,14 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: Colors.light.surface,
     borderRadius: 20,
-    padding: 20,
+    padding: 18,
     margin: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 3,
   },
   header: {

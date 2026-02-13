@@ -199,10 +199,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerButton: {
     width: 40,
@@ -219,7 +222,8 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   summaryHeader: {
-    padding: 20,
+    paddingHorizontal: 24,
+    paddingTop: 20,
     paddingBottom: 4,
   },
   complaintLabel: {
@@ -231,7 +235,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   complaint: {
-    fontSize: 24,
+    fontSize: 26,
     fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
     marginBottom: 4,
@@ -247,8 +251,8 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: Colors.light.emergency,
     margin: 16,
-    padding: 16,
-    borderRadius: 14,
+    padding: 18,
+    borderRadius: 18,
   },
   emergencyContent: {
     flex: 1,
@@ -271,7 +275,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.surface,
     margin: 16,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 18,
   },
   noResultText: {
     flex: 1,
@@ -288,7 +292,7 @@ const styles = StyleSheet.create({
   backButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: Colors.light.primary,
   },
   backButtonText: {
@@ -304,8 +308,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     marginHorizontal: 16,
     marginTop: 8,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: Colors.light.surface,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
   },
   chatToggleText: {
     fontSize: 14,

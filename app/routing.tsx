@@ -262,11 +262,13 @@ export default function RoutingScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyState}>
-              <Ionicons
-                name="location-outline"
-                size={48}
-                color={Colors.light.textTertiary}
-              />
+              <View style={styles.emptyIconCircle}>
+                <Ionicons
+                  name="location-outline"
+                  size={48}
+                  color={Colors.light.primary}
+                />
+              </View>
               <Text style={styles.emptyText}>
                 {t(
                   "No facilities found in your area.",
@@ -291,10 +293,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     backgroundColor: Colors.light.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerButton: {
     width: 40,
@@ -319,9 +324,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 10,
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: Colors.light.borderLight,
     backgroundColor: Colors.light.surface,
@@ -338,7 +343,7 @@ const styles = StyleSheet.create({
     margin: 16,
     marginBottom: 0,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 14,
     backgroundColor: Colors.light.accentLight,
   },
   errorText: {
@@ -363,7 +368,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   resultCount: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textTertiary,
     marginBottom: 12,
@@ -375,7 +380,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     marginTop: 4,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: Colors.light.primarySurface,
   },
   loadMoreText: {
@@ -387,6 +392,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 60,
     gap: 12,
+  },
+  emptyIconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: Colors.light.primarySurface,
+    alignItems: "center",
+    justifyContent: "center",
   },
   emptyText: {
     fontSize: 15,

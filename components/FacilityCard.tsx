@@ -151,13 +151,15 @@ export function FacilityCard({ facility }: FacilityCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 2,
   },
   topRow: {
