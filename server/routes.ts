@@ -128,18 +128,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
-        const parts: any[] = [];
-        if (m.imageData) {
-          parts.push({
-            inlineData: {
-              data: m.imageData,
-              mimeType: m.mimeType || "image/jpeg",
+      let imageAnalysis = "";
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.imageData && lastMessage.role === "user") {
+        try {
+          const imageResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    inlineData: {
+                      data: lastMessage.imageData,
+                      mimeType: lastMessage.mimeType || "image/jpeg",
+                    },
+                  },
+                  {
+                    text: `You are a medical imaging expert. Thoroughly analyze this medical image. Describe:
+1. The imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
+2. The anatomical region shown
+3. All visible findings - normal and abnormal
+4. Any pathology, lesions, masses, fractures, signal abnormalities, or other notable observations
+5. Clinical significance of the findings
+
+If this is a lab result, read all values and flag abnormal ones.
+If this is a skin/wound photo, describe morphology and differential diagnoses.
+If this is a prescription or medication label, extract the medication information.
+Be thorough and specific. Provide your analysis in the same language the user is using.`,
+                  },
+                ],
+              },
+            ],
+            config: {
+              maxOutputTokens: 2048,
             },
           });
+          imageAnalysis = imageResponse.text || "";
+          console.log("Image analysis completed:", imageAnalysis.substring(0, 200));
+        } catch (imgErr) {
+          console.error("Image analysis error:", imgErr);
+          imageAnalysis = "Image was attached but could not be analyzed due to a processing error.";
         }
+      }
+
+      const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
+        const parts: any[] = [];
         if (m.content) {
-          parts.push({ text: m.content });
+          let content = m.content;
+          if (m === lastMessage && imageAnalysis) {
+            content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
+          }
+          parts.push({ text: content });
         }
         return {
           role: m.role === "user" ? "user" : "model",
