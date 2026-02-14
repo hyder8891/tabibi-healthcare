@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import { verifyFirebaseToken } from "./firebase-auth";
+import { z } from "zod";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -10,6 +11,52 @@ const ai = new GoogleGenAI({
     apiVersion: "",
     baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
   },
+});
+
+const messageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(10000),
+  imageData: z.string().optional(),
+  mimeType: z.string().optional(),
+});
+
+const patientProfileSchema = z.object({
+  name: z.string().max(200).optional(),
+  age: z.number().min(0).max(150).optional(),
+  gender: z.string().max(50).optional(),
+  weight: z.number().min(0).max(500).optional(),
+  height: z.number().min(0).max(300).optional(),
+  bloodType: z.string().max(10).optional(),
+  isPediatric: z.boolean().optional(),
+  medications: z.array(z.string().max(200)).optional(),
+  conditions: z.array(z.string().max(200)).optional(),
+  allergies: z.array(z.string().max(200)).optional(),
+}).optional();
+
+const assessmentSchema = z.object({
+  messages: z.array(messageSchema).min(1).max(50),
+  patientProfile: patientProfileSchema,
+});
+
+const medicationAnalysisSchema = z.object({
+  imageBase64: z.string().min(1),
+  mimeType: z.string().optional(),
+});
+
+const interactionCheckSchema = z.object({
+  medications: z.array(z.string().max(200)).optional(),
+  currentMedications: z.array(z.string().max(200)).optional(),
+  newMedication: z.string().max(200).optional(),
+  language: z.enum(["en", "ar"]).optional(),
+});
+
+const rppgSchema = z.object({
+  signals: z.array(z.object({
+    r: z.number(),
+    g: z.number(),
+    b: z.number(),
+  })).min(30).max(1000),
+  fps: z.number().min(1).max(60).optional(),
 });
 
 const MEDICAL_SYSTEM_PROMPT = `You are Tabibi, an expert AI healthcare assessment assistant. Your role is to simulate the reasoning of an experienced diagnostician through a conversational, adaptive interview.
@@ -173,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authProvider: user.authProvider,
       });
     } catch (error) {
-      console.error("Firebase auth error:", error);
+      console.error("Firebase auth error:", error instanceof Error ? error.message : "Unknown error");
       return res.status(500).json({ message: "Authentication failed" });
     }
   });
@@ -208,11 +255,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/assess", async (req: Request, res: Response) => {
     try {
-      const { messages, patientProfile } = req.body;
-
-      if (!messages || !Array.isArray(messages)) {
-        return res.status(400).json({ error: "Messages array is required" });
+      const validation = assessmentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request data", details: validation.error.issues.map(i => i.message) });
       }
+      const { messages, patientProfile } = validation.data;
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
@@ -322,7 +369,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
       res.write(`data: ${JSON.stringify({ done: true, fullResponse })}\n\n`);
       res.end();
     } catch (error) {
-      console.error("Assessment error:", error);
+      console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Assessment failed" })}\n\n`);
         res.end();
@@ -334,11 +381,11 @@ Be thorough and specific. Provide your analysis in the same language the user is
 
   app.post("/api/analyze-medication", async (req: Request, res: Response) => {
     try {
-      const { imageBase64, mimeType } = req.body;
-
-      if (!imageBase64) {
+      const validation = medicationAnalysisSchema.safeParse(req.body);
+      if (!validation.success) {
         return res.status(400).json({ error: "Image data is required" });
       }
+      const { imageBase64, mimeType } = validation.data;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -395,14 +442,18 @@ Support both Arabic and English text on medication packaging.`,
 
       res.json({ medications });
     } catch (error) {
-      console.error("Medication analysis error:", error);
+      console.error("Medication analysis error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to analyze medication" });
     }
   });
 
   app.post("/api/check-interactions", async (req: Request, res: Response) => {
     try {
-      const { medications, currentMedications, newMedication, language } = req.body;
+      const validation = interactionCheckSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      const { medications, currentMedications, newMedication, language } = validation.data;
 
       const lang = language === "en" ? "English" : "Arabic (العربية)";
       const langInstruction = `\n\nIMPORTANT: Write ALL text fields (description, recommendation, summary) in ${lang}. Drug names can remain in their original form, but all explanatory text MUST be in ${lang}.`;
@@ -480,7 +531,7 @@ Respond ONLY with JSON:
 
       res.json(result);
     } catch (error) {
-      console.error("Interaction check error:", error);
+      console.error("Interaction check error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to check interactions" });
     }
   });
@@ -572,20 +623,20 @@ Respond ONLY with JSON:
         nextPageToken: data.next_page_token || null,
       });
     } catch (error) {
-      console.error("Nearby facilities error:", error);
+      console.error("Nearby facilities error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to fetch nearby facilities" });
     }
   });
 
   app.post("/api/process-rppg", (req: Request, res: Response) => {
     try {
-      const { signals, fps } = req.body;
-
-      if (!signals || !Array.isArray(signals) || signals.length < 30) {
+      const validation = rppgSchema.safeParse(req.body);
+      if (!validation.success) {
         return res.status(400).json({ 
           error: "At least 30 RGB signal samples are required (10+ seconds of data)" 
         });
       }
+      const { signals, fps } = validation.data;
 
       const actualFps = fps || 3;
       const n = signals.length;
@@ -743,7 +794,7 @@ Respond ONLY with JSON:
             : "Weak signal - ensure face is well-lit and stay still",
       });
     } catch (error) {
-      console.error("rPPG processing error:", error);
+      console.error("rPPG processing error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to process heart rate data" });
     }
   });

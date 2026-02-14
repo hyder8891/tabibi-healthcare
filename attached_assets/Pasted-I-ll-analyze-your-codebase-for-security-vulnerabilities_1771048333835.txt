@@ -1,0 +1,329 @@
+I'll analyze your codebase for **security vulnerabilities** and **common debugging issues**:
+
+## 🔴 Critical Security Issues
+
+### 1. **Missing Environment Variable Validation**
+```typescript
+// server/firebase-auth.ts - Line 1
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+// ❌ No validation - will be undefined if not set
+```
+
+**Fix:**
+```typescript
+const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY) {
+  throw new Error("FIREBASE_API_KEY environment variable is required");
+}
+```
+
+### 2. **Exposed Session Secret**
+```typescript
+// server/index.ts - Line 152
+secret: process.env.SESSION_SECRET || "tabibi-secret-key",
+// ❌ Weak fallback secret in production
+```
+
+**Fix:**
+```typescript
+secret: process.env.SESSION_SECRET || (() => {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET must be set in production");
+  }
+  return "dev-secret-only";
+})(),
+```
+
+### 3. **No Rate Limiting**
+Your `/api/assess`, `/api/analyze-medication`, and `/api/check-interactions` endpoints have no rate limiting. An attacker could:
+- Drain your Gemini API quota
+- DoS your server
+- Scrape medical data
+
+**Fix - Add rate limiting:**
+```bash
+npm install express-rate-limit
+```
+
+```typescript
+// server/index.ts
+import rateLimit from 'express-rate-limit';
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: "Too many requests, please try again later"
+});
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit AI calls to 10/min per IP
+  message: "Too many AI requests, please slow down"
+});
+
+app.use("/api/", apiLimiter);
+app.use("/api/assess", aiLimiter);
+app.use("/api/analyze-medication", aiLimiter);
+app.use("/api/check-interactions", aiLimiter);
+```
+
+### 4. **SQL Injection Risk (Low but present)**
+While Drizzle ORM provides protection, you're not validating user IDs:
+
+```typescript
+// server/routes.ts - Line 22
+req.session.userId = user.id;
+// Later used in queries without validation
+```
+
+**Fix - Add validation:**
+```typescript
+import { z } from "zod";
+
+const userIdSchema = z.string().uuid();
+
+// In routes:
+if (!req.session.userId || !userIdSchema.safeParse(req.session.userId).success) {
+  return res.status(401).json({ message: "Invalid session" });
+}
+```
+
+### 5. **Missing Input Validation**
+```typescript
+// server/routes.ts - Line 78
+const { messages, patientProfile } = req.body;
+if (!messages || !Array.isArray(messages)) {
+  return res.status(400).json({ error: "Messages array is required" });
+}
+// ❌ No validation of message structure, patientProfile fields
+```
+
+**Fix:**
+```typescript
+import { z } from "zod";
+
+const messageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(5000),
+  imageData: z.string().optional(),
+  mimeType: z.string().optional(),
+});
+
+const patientProfileSchema = z.object({
+  age: z.number().min(0).max(150).optional(),
+  weight: z.number().min(0).max(500).optional(),
+  medications: z.array(z.string()).optional(),
+  // ... other fields
+});
+
+const assessmentSchema = z.object({
+  messages: z.array(messageSchema).min(1).max(50),
+  patientProfile: patientProfileSchema.optional(),
+});
+
+// In route:
+const validation = assessmentSchema.safeParse(req.body);
+if (!validation.success) {
+  return res.status(400).json({ error: validation.error.issues });
+}
+const { messages, patientProfile } = validation.data;
+```
+
+### 6. **CORS Misconfiguration**
+```typescript
+// server/index.ts - Line 28
+const isLocalhost =
+  origin?.startsWith("http://localhost:") ||
+  origin?.startsWith("http://127.0.0.1:");
+// ❌ Allows ANY localhost port - potential security risk
+```
+
+**Fix:**
+```typescript
+const allowedOrigins = new Set([
+  `https://${process.env.REPLIT_DEV_DOMAIN}`,
+  'http://localhost:8081', // Specific Expo port only
+  // Add production domains
+]);
+
+if (process.env.NODE_ENV === 'production') {
+  // Remove localhost entirely in production
+  allowedOrigins.delete('http://localhost:8081');
+}
+
+const origin = req.header("origin");
+if (origin && allowedOrigins.has(origin)) {
+  res.header("Access-Control-Allow-Origin", origin);
+  // ... rest of headers
+}
+```
+
+### 7. **No Request Size Limits for Images**
+```typescript
+// server/index.ts - Line 47
+app.use(express.json({ limit: "50mb" }));
+// ⚠️ 50MB is very large - allows huge payloads
+```
+
+**Fix:**
+```typescript
+app.use(express.json({
+  limit: "10mb", // Reduce to 10mb
+  verify: (req, res, buf, encoding) => {
+    // Additional validation if needed
+  }
+}));
+
+// Add specific limit for image routes
+app.use("/api/analyze-medication", express.json({ limit: "5mb" }));
+```
+
+### 8. **Sensitive Data in Logs**
+```typescript
+// server/routes.ts - Multiple places
+console.error("Assessment error:", error);
+// ❌ Could log patient health data
+```
+
+**Fix:**
+```typescript
+console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");
+// Never log req.body which contains patient data
+```
+
+### 9. **Session Cookie Security**
+```typescript
+// server/index.ts - Line 157
+cookie: {
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  secure: false, // ❌ Should be true in production
+  sameSite: "lax",
+}
+```
+
+**Fix:**
+```typescript
+cookie: {
+  maxAge: 30 * 24 * 60 * 60 * 1000,
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production", // ✅ HTTPS only in prod
+  sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+  domain: process.env.NODE_ENV === "production" ? process.env.REPLIT_DEV_DOMAIN : undefined,
+}
+```
+
+## 🐛 Common Debugging Issues
+
+### 1. **Firebase Token Verification Failures**
+```typescript
+// server/firebase-auth.ts - Line 10
+export async function verifyFirebaseToken(idToken: string): Promise<FirebaseUserInfo | null> {
+  try {
+    const res = await globalThis.fetch(/* ... */);
+    if (!res.ok) return null; // ❌ Silent failure
+```
+
+**Fix - Add logging:**
+```typescript
+if (!res.ok) {
+  const errorText = await res.text();
+  console.error(`Firebase token verification failed: ${res.status} - ${errorText}`);
+  return null;
+}
+```
+
+### 2. **Gemini API Errors Not Logged**
+```typescript
+// server/routes.ts - Multiple places
+} catch (error) {
+  console.error("Assessment error:", error);
+  // ❌ Not logging response details
+```
+
+**Fix:**
+```typescript
+} catch (error) {
+  if (error.response) {
+    console.error("Gemini API error:", {
+      status: error.response.status,
+      data: error.response.data,
+    });
+  } else {
+    console.error("Assessment error:", error);
+  }
+  // ...
+}
+```
+
+### 3. **AsyncStorage Errors Silently Swallowed**
+```typescript
+// lib/storage.ts - Multiple places
+try {
+  // ...
+} catch {}
+// ❌ Silent catch blocks make debugging impossible
+```
+
+**Fix:**
+```typescript
+try {
+  // ...
+} catch (error) {
+  console.error("AsyncStorage error:", error);
+  // Optionally re-throw or handle
+}
+```
+
+### 4. **Missing Database Connection Error Handling**
+```typescript
+// server/storage.ts - Line 6
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+// ❌ No validation or error handling
+```
+
+**Fix:**
+```typescript
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is required");
+}
+
+const pool = new Pool({ 
+  connectionString: process.env.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected database error:', err);
+});
+```
+
+## 🛡️ Security Checklist Summary
+
+Create this file for tracking:
+
+```typescript
+// SECURITY_CHECKLIST.md
+
+## Pre-Production Security Checklist
+
+- [ ] All environment variables validated on startup
+- [ ] Rate limiting implemented on all AI endpoints
+- [ ] Input validation with Zod schemas
+- [ ] CORS restricted to known domains only
+- [ ] Session cookies: secure=true, sameSite=strict
+- [ ] No patient data logged
+- [ ] Request size limits enforced
+- [ ] HTTPS enforced in production
+- [ ] Firebase API key validated
+- [ ] Google Maps API key restricted by domain
+- [ ] Database credentials rotated
+- [ ] Error messages don't leak sensitive info
+- [ ] SQL injection prevention verified
+- [ ] XSS prevention verified (React handles this mostly)
+- [ ] CSRF protection (sessions handle this)
+```
+
+Would you like me to create a complete security patch file you can apply, or dive deeper into any specific area?
