@@ -82,6 +82,43 @@ export default function RoutingScreen() {
     return loc;
   };
 
+  const enrichWithPhoneNumbers = async (facilityList: NearbyFacility[], apiUrl: string) => {
+    const details = await Promise.allSettled(
+      facilityList
+        .filter((f) => f.placeId)
+        .map(async (f) => {
+          try {
+            const detailUrl = new URL(`/api/place-details/${f.placeId}`, apiUrl);
+            const resp = await fetch(detailUrl.toString());
+            if (!resp.ok) return null;
+            const d = await resp.json();
+            return { placeId: f.placeId, phone: d.phone || "", internationalPhone: d.internationalPhone || "" };
+          } catch {
+            return null;
+          }
+        })
+    );
+
+    const phoneMap = new Map<string, { phone: string; internationalPhone: string }>();
+    for (const result of details) {
+      if (result.status === "fulfilled" && result.value) {
+        phoneMap.set(result.value.placeId!, result.value);
+      }
+    }
+
+    if (phoneMap.size > 0) {
+      setFacilities((prev) =>
+        prev.map((f) => {
+          const pd = f.placeId ? phoneMap.get(f.placeId) : undefined;
+          if (pd) {
+            return { ...f, phone: pd.phone, internationalPhone: pd.internationalPhone };
+          }
+          return f;
+        })
+      );
+    }
+  };
+
   const loadFacilities = async () => {
     setLoading(true);
     setLocationError(null);
@@ -102,8 +139,10 @@ export default function RoutingScreen() {
         setLocationError(data.error);
         setFacilities([]);
       } else {
-        setFacilities(data.facilities || []);
+        const loadedFacilities = data.facilities || [];
+        setFacilities(loadedFacilities);
         setNextPageToken(data.nextPageToken || null);
+        enrichWithPhoneNumbers(loadedFacilities, apiUrl);
       }
     } catch (err) {
       setLocationError(
@@ -135,8 +174,11 @@ export default function RoutingScreen() {
       const data = await response.json();
 
       if (!data.error) {
-        setFacilities((prev) => [...prev, ...(data.facilities || [])]);
+        const newFacilities = data.facilities || [];
+        setFacilities((prev) => [...prev, ...newFacilities]);
         setNextPageToken(data.nextPageToken || null);
+        const apiUrl = getApiUrl();
+        enrichWithPhoneNumbers(newFacilities, apiUrl);
       }
     } catch {} finally {
       setLoadingMore(false);
