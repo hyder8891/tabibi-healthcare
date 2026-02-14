@@ -185,15 +185,15 @@ export default function HomeScreen() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/routing?type=lab");
+                router.push("/routing");
               }}
             >
               <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
-                <MaterialCommunityIcons name="flask" size={28} color="#7C3AED" />
+                <Ionicons name="medkit" size={28} color="#7C3AED" />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Care", "ابحث عن رعاية")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Labs & imaging centers", "مختبرات ومراكز تصوير")}
+                {t("Clinics, labs & hospitals", "عيادات ومختبرات ومستشفيات")}
               </Text>
             </Pressable>
           </View>

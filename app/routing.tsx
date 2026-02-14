@@ -20,7 +20,7 @@ import type { NearbyFacility } from "@/lib/types";
 
 export default function RoutingScreen() {
   const insets = useSafeAreaInsets();
-  const { type = "pharmacy", capabilities } = useLocalSearchParams<{
+  const { type = "clinic", capabilities } = useLocalSearchParams<{
     type: string;
     capabilities?: string;
   }>();
