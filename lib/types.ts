@@ -109,7 +109,11 @@ export interface NearbyFacility {
   longitude: number;
   capabilities: string[];
   phone?: string;
+  internationalPhone?: string;
   openHours?: string;
+  openingHours?: string[];
+  website?: string;
+  googleMapsUrl?: string;
   placeId?: string;
   totalRatings?: number;
   photos?: string[];
