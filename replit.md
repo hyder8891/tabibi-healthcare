@@ -76,6 +76,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 14, 2026: Iraq localization - AI recommends Iraqi-preferred medicine brands (SDI Samarra, Brufen, Amoxil, Glucophage, etc.), includes govPriceIQD from gudea.gov.iq knowledge, displays local Arabic brand names and government price tags in RecommendationCard UI. Updated MedicineRecommendation type with localBrand, govPriceIQD, priceNote fields.
 - Feb 14, 2026: Security audit hardening - AI prompt injection sanitization (13 regex patterns), tightened Zod validation ranges (age≤120, weight≤300, height≤250, content≤5000), image mime-type validation, security headers (HSTS, X-Frame-Options, CSP-adjacent), encrypted pharmacyPhone/pharmacyAddress/medicineFrequency in orders, removed legacy password column, audit logging table with order create/cancel tracking.
 - Feb 14, 2026: Added OTC medicine ordering feature - database orders table, backend API routes (CRUD + cancel), multi-step order flow UI (pharmacy selection → delivery details → confirmation with WhatsApp/call), order history/tracking screen with status badges, "Order for Delivery" buttons on assessment results, "My Orders" quick action on home screen.
 - Feb 14, 2026: Enhanced facility cards with phone numbers, WhatsApp/SMS/call buttons via Place Details API. Added photo proxy to hide API key. Added requireAuth middleware on AI endpoints. Added rate limiting, Zod input validation, sanitized error logging, session cookie security, DB pool config.
