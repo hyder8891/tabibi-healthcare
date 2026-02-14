@@ -83,7 +83,23 @@ export function RecommendationCard({
             </View>
             {result.recommendations.pathwayA.medicines.map((med, i) => (
               <View key={i} style={styles.medCard}>
-                <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
+                <View style={[styles.medNameRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
+                    {med.localBrand && (
+                      <Text style={[styles.medLocalBrand, isRTL && { textAlign: "right" }]}>{med.localBrand}</Text>
+                    )}
+                  </View>
+                  {med.govPriceIQD != null && med.govPriceIQD > 0 && (
+                    <View style={styles.govPriceTag}>
+                      <MaterialCommunityIcons name="shield-check-outline" size={12} color={Colors.light.primary} />
+                      <Text style={styles.govPriceText}>
+                        {med.govPriceIQD.toLocaleString()} {t("IQD", "د.ع")}
+                      </Text>
+                      <Text style={styles.govPriceLabel}>gudea.gov.iq</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={[styles.medDetail, isRTL && { textAlign: "right" }]}>
                   {med.activeIngredient} - {med.class}
                 </Text>
@@ -93,7 +109,7 @@ export function RecommendationCard({
                   </Text>
                   <Text style={styles.medDuration}>{med.duration}</Text>
                 </View>
-                {med.warnings.length > 0 && (
+                {med.warnings && med.warnings.length > 0 && (
                   <Text style={styles.medWarning}>
                     {med.warnings.join(". ")}
                   </Text>
@@ -302,11 +318,49 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 8,
   },
+  medNameRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 4,
+  },
   medName: {
     fontSize: 16,
     fontWeight: "600" as const,
     color: Colors.light.text,
+    marginBottom: 1,
+  },
+  medLocalBrand: {
+    fontSize: 13,
+    fontWeight: "500" as const,
+    color: Colors.light.primary,
     marginBottom: 2,
+  },
+  govPriceTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.light.primarySurface,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.primaryLight,
+    flexWrap: "wrap",
+    maxWidth: 120,
+  },
+  govPriceText: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    color: Colors.light.primary,
+  },
+  govPriceLabel: {
+    fontSize: 9,
+    fontWeight: "500" as const,
+    color: Colors.light.textTertiary,
+    width: "100%",
+    textAlign: "center",
   },
   medDetail: {
     fontSize: 13,
