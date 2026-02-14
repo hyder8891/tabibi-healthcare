@@ -261,23 +261,41 @@ export default function HomeScreen() {
 
         <View style={styles.infoCards}>
           <View style={styles.infoCard}>
-            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Ionicons name="shield-checkmark" size={20} color={Colors.light.primary} />
-              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
+            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.infoCardIconWrap}>
+                <LinearGradient
+                  colors={[Colors.light.primary, "#14B8A6"]}
+                  style={styles.infoCardIconGradient}
+                >
+                  <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                </LinearGradient>
+              </View>
+              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
+                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
+                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+                  {t("Checks for emergency symptoms, drug interactions, and contraindications before any recommendation.", "يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-              {t("Tabibi checks for emergency symptoms, drug interactions, and contraindications before making any recommendation.", "طبيبي يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
-            </Text>
           </View>
 
-          <View style={[styles.infoCard, styles.infoCardAccent]}>
-            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Ionicons name="navigate" size={20} color={Colors.light.accent} />
-              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
+          <View style={styles.infoCard}>
+            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.infoCardIconWrap}>
+                <LinearGradient
+                  colors={[Colors.light.accent, "#FB923C"]}
+                  style={styles.infoCardIconGradient}
+                >
+                  <Ionicons name="navigate" size={20} color="#fff" />
+                </LinearGradient>
+              </View>
+              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
+                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
+                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+                  {t("Find the nearest facility with exactly what you need \u2014 pharmacies, labs, or clinics.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه \u2014 صيدليات أو مختبرات أو عيادات.")}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-              {t("Find the nearest facility that has exactly what you need - from pharmacies with specific medicines to labs with MRI machines.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه - من صيدليات بأدوية محددة إلى مختبرات بأجهزة الرنين المغناطيسي.")}
-            </Text>
           </View>
         </View>
 
@@ -640,40 +658,54 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   infoCards: {
-    gap: 14,
+    gap: 12,
     marginBottom: 28,
   },
   infoCard: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.light.primary,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  infoCardAccent: {
-    borderLeftColor: Colors.light.accent,
-  },
-  infoCardHeader: {
+  infoCardRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+  },
+  infoCardIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    overflow: "hidden",
+  },
+  infoCardIconGradient: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
+    justifyContent: "center",
+  },
+  infoCardContent: {
+    flex: 1,
+    gap: 4,
   },
   infoCardTitle: {
-    fontSize: 16,
-    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
+    letterSpacing: -0.1,
   },
   infoCardText: {
     fontSize: 13,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   recentCard: {
     flexDirection: "row",
