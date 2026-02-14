@@ -206,6 +206,7 @@ export default function HeartRateScreen() {
           signals,
           fps: CAPTURE_FPS,
         }),
+        credentials: "include",
       });
 
       const data = await response.json();
