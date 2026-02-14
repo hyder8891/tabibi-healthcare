@@ -96,33 +96,34 @@ export default function HomeScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.mainCTA,
-            pressed && { opacity: 0.95, transform: [{ scale: 0.98 }] },
+            pressed && { opacity: 0.95, transform: [{ scale: 0.97 }] },
           ]}
           onPress={startAssessment}
         >
-          <LinearGradient
-            colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.ctaGradient}
-          >
-            <View style={styles.ctaDecoCircle1} />
-            <View style={styles.ctaDecoCircle2} />
-            <View style={[styles.ctaContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.ctaLeft}>
-                <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>{t("Start Assessment", "ابدأ التقييم")}</Text>
+          <View style={styles.ctaCard}>
+            <View style={[styles.ctaRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.ctaIconCircle}>
+                <Ionicons name="chatbubbles" size={24} color={Colors.light.primary} />
+              </View>
+              <View style={[styles.ctaTextWrap, isRTL && { alignItems: "flex-end" }]}>
+                <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>
+                  {t("Start Assessment", "ابدأ التقييم")}
+                </Text>
                 <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
                   {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
                 </Text>
               </View>
-              <View style={[styles.ctaIcon, isRTL ? { marginRight: 16, marginLeft: 0 } : {}]}>
-                <Ionicons name="chatbubbles" size={32} color="rgba(255,255,255,0.9)" />
+            </View>
+            <View style={[styles.ctaBottom, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.ctaChip}>
+                <Ionicons name="flash" size={13} color={Colors.light.accent} />
+                <Text style={styles.ctaChipText}>{t("AI-Powered", "بالذكاء الاصطناعي")}</Text>
+              </View>
+              <View style={styles.ctaArrow}>
+                <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color="#fff" />
               </View>
             </View>
-            <View style={[styles.ctaArrow, isRTL && { alignSelf: "flex-start" }]}>
-              <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#fff" />
-            </View>
-          </LinearGradient>
+          </View>
         </Pressable>
 
         <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Quick Actions", "إجراءات سريعة")}</Text>
@@ -469,73 +470,75 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   mainCTA: {
-    marginBottom: 32,
-    borderRadius: 24,
+    marginBottom: 28,
+    borderRadius: 22,
     overflow: "hidden",
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  ctaGradient: {
-    padding: 28,
-    borderRadius: 24,
-    overflow: "hidden",
+  ctaCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
   },
-  ctaDecoCircle1: {
-    position: "absolute",
-    top: -30,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  ctaDecoCircle2: {
-    position: "absolute",
-    bottom: -20,
-    left: -20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
-  ctaContent: {
+  ctaRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 18,
+    alignItems: "flex-start",
+    gap: 16,
+    marginBottom: 16,
   },
-  ctaLeft: {
-    flex: 1,
-  },
-  ctaTitle: {
-    fontSize: 22,
-    fontFamily: "DMSans_700Bold",
-    color: "#fff",
-    marginBottom: 8,
-  },
-  ctaSubtitle: {
-    fontSize: 14,
-    fontFamily: "DMSans_400Regular",
-    color: "rgba(255,255,255,0.85)",
-    lineHeight: 21,
-  },
-  ctaIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  ctaIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 15,
+    backgroundColor: Colors.light.primarySurface,
     alignItems: "center",
     justifyContent: "center",
-    marginLeft: 16,
+  },
+  ctaTextWrap: {
+    flex: 1,
+    gap: 4,
+  },
+  ctaTitle: {
+    fontSize: 18,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+  },
+  ctaSubtitle: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 19,
+  },
+  ctaBottom: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  ctaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.light.accentLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  ctaChipText: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.accent,
   },
   ctaArrow: {
-    alignSelf: "flex-end",
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
   },
