@@ -47,8 +47,6 @@ export interface MedicineRecommendation {
   dosage: string;
   frequency: string;
   duration: string;
-  govPriceIQD?: number;
-  priceNote?: string;
   warnings: string[];
 }
 
