@@ -1,5 +1,73 @@
 import type { Express, Request, Response } from "express";
 
+// Cache for Place Details API responses
+const placeDetailsCache = new Map<string, { data: any; expires: number }>();
+const PLACE_DETAILS_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+// Cache for Nearby Search results
+const nearbySearchCache = new Map<string, { data: any; expires: number }>();
+const NEARBY_SEARCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get cached Place Details if available and not expired
+ */
+function getCachedPlaceDetails(placeId: string): any {
+  const cached = placeDetailsCache.get(placeId);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+  placeDetailsCache.delete(placeId);
+  return null;
+}
+
+/**
+ * Set Place Details in cache with TTL and LRU size limit
+ */
+function setCachedPlaceDetails(placeId: string, data: any): void {
+  // Limit cache size to prevent memory leaks (simple FIFO eviction)
+  if (placeDetailsCache.size > 500) {
+    const oldest = placeDetailsCache.keys().next().value;
+    if (oldest) placeDetailsCache.delete(oldest);
+  }
+  placeDetailsCache.set(placeId, { data, expires: Date.now() + PLACE_DETAILS_CACHE_TTL });
+}
+
+/**
+ * Get nearby search cache key from coordinates and type
+ * Rounds to 3 decimal places (approximately 100m precision)
+ */
+function getNearbySearchCacheKey(latitude: string, longitude: string, type: string): string {
+  const lat = parseFloat(latitude);
+  const lng = parseFloat(longitude);
+  const roundedLat = Math.round(lat * 1000) / 1000;
+  const roundedLng = Math.round(lng * 1000) / 1000;
+  return `${roundedLat},${roundedLng},${type}`;
+}
+
+/**
+ * Get cached nearby search results if available and not expired
+ */
+function getCachedNearbySearch(cacheKey: string): any {
+  const cached = nearbySearchCache.get(cacheKey);
+  if (cached && cached.expires > Date.now()) {
+    return cached.data;
+  }
+  nearbySearchCache.delete(cacheKey);
+  return null;
+}
+
+/**
+ * Set nearby search results in cache with TTL and LRU size limit
+ */
+function setCachedNearbySearch(cacheKey: string, data: any): void {
+  // Limit cache size to prevent memory leaks (simple FIFO eviction)
+  if (nearbySearchCache.size > 100) {
+    const oldest = nearbySearchCache.keys().next().value;
+    if (oldest) nearbySearchCache.delete(oldest);
+  }
+  nearbySearchCache.set(cacheKey, { data, expires: Date.now() + NEARBY_SEARCH_CACHE_TTL });
+}
+
 export function registerGeoRoutes(app: Express): void {
   app.get("/api/nearby-facilities", async (req: Request, res: Response) => {
     try {
@@ -22,6 +90,18 @@ export function registerGeoRoutes(app: Express): void {
       };
 
       const googleType = typeMap[type as string] || "pharmacy";
+
+      // Try to get from cache first (only for initial searches, not paginated)
+      let cacheKey: string | null = null;
+      let cachedData: any = null;
+      
+      if (!pagetoken) {
+        cacheKey = getNearbySearchCacheKey(latitude as string, longitude as string, type as string);
+        cachedData = getCachedNearbySearch(cacheKey);
+        if (cachedData) {
+          return res.json(cachedData);
+        }
+      }
       
       let url: string;
       if (pagetoken) {
@@ -34,7 +114,9 @@ export function registerGeoRoutes(app: Express): void {
       const data = await response.json();
 
       if (data.status === "ZERO_RESULTS") {
-        return res.json({ facilities: [], nextPageToken: null });
+        const result = { facilities: [], nextPageToken: null };
+        if (cacheKey) setCachedNearbySearch(cacheKey, result);
+        return res.json(result);
       }
 
       if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
@@ -45,7 +127,7 @@ export function registerGeoRoutes(app: Express): void {
       const lat = parseFloat(latitude as string);
       const lng = parseFloat(longitude as string);
 
-      const baseFacilities = (data.results || []).map((place: any, index: number) => {
+      const facilities = (data.results || []).map((place: any, index: number) => {
         const placeLat = place.geometry?.location?.lat || lat;
         const placeLng = place.geometry?.location?.lng || lng;
         
@@ -82,28 +164,19 @@ export function registerGeoRoutes(app: Express): void {
         };
       });
 
-      baseFacilities.sort((a: any, b: any) => a.distance - b.distance);
+      facilities.sort((a: any, b: any) => a.distance - b.distance);
 
-      const detailsPromises = baseFacilities.map(async (facility: any) => {
-        if (!facility.placeId) return facility;
-        try {
-          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(facility.placeId)}&fields=formatted_phone_number,international_phone_number&key=${apiKey}`;
-          const detailsRes = await globalThis.fetch(detailsUrl);
-          const detailsData = await detailsRes.json();
-          if (detailsData.status === "OK" && detailsData.result) {
-            facility.phone = detailsData.result.formatted_phone_number || "";
-            facility.internationalPhone = detailsData.result.international_phone_number || "";
-          }
-        } catch {}
-        return facility;
-      });
-
-      const facilities = await Promise.all(detailsPromises);
-
-      res.json({
+      const result = {
         facilities,
         nextPageToken: data.next_page_token || null,
-      });
+      };
+
+      // Cache the result for initial searches (not paginated)
+      if (cacheKey) {
+        setCachedNearbySearch(cacheKey, result);
+      }
+
+      res.json(result);
     } catch (error) {
       console.error("Nearby facilities error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to fetch nearby facilities" });
@@ -146,6 +219,13 @@ export function registerGeoRoutes(app: Express): void {
       }
 
       const id = Array.isArray(placeId) ? placeId[0] : placeId;
+
+      // Check cache first
+      const cachedDetails = getCachedPlaceDetails(id);
+      if (cachedDetails) {
+        return res.json(cachedDetails);
+      }
+
       const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(id)}&fields=formatted_phone_number,international_phone_number,opening_hours,website,url&key=${apiKey}`;
       const response = await globalThis.fetch(url);
       const data = await response.json();
@@ -155,14 +235,19 @@ export function registerGeoRoutes(app: Express): void {
       }
 
       const result = data.result || {};
-      res.json({
+      const responseData = {
         phone: result.formatted_phone_number || "",
         internationalPhone: result.international_phone_number || "",
         website: result.website || "",
         googleMapsUrl: result.url || "",
         openingHours: result.opening_hours?.weekday_text || [],
         isOpen: result.opening_hours?.open_now ?? null,
-      });
+      };
+
+      // Cache the response
+      setCachedPlaceDetails(id, responseData);
+
+      res.json(responseData);
     } catch (error) {
       console.error("Place details error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to fetch place details" });
