@@ -236,27 +236,6 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.quickActionsRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.actionCard,
-                styles.actionCardWide,
-                pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/orders");
-              }}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: "#FFF7ED" }]}>
-                <MaterialCommunityIcons name="truck-delivery-outline" size={28} color={Colors.light.accent} />
-              </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("My Orders", "طلباتي")}</Text>
-              <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Track medicine deliveries", "تتبع توصيل الأدوية")}
-              </Text>
-            </Pressable>
-          </View>
         </View>
 
         <View style={styles.infoCards}>
