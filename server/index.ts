@@ -8,10 +8,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 if (!process.env.SESSION_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET environment variable is required in production");
-  }
-  console.warn("WARNING: SESSION_SECRET not set, using development fallback. Do not use in production.");
+  throw new Error("SESSION_SECRET environment variable is required. Set it before starting the server.");
 }
 
 const app = express();
@@ -118,35 +115,11 @@ function setupRequestLogging(app: express.Application) {
   app.use((req, res, next) => {
     const start = Date.now();
     const reqPath = req.path;
-    let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
-
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
 
     res.on("finish", () => {
       if (!reqPath.startsWith("/api")) return;
-
       const duration = Date.now() - start;
-
-      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        const sanitized = { ...capturedJsonResponse };
-        delete sanitized.idToken;
-        delete sanitized.password;
-        delete sanitized.messages;
-        delete sanitized.imageBase64;
-        delete sanitized.signals;
-        logLine += ` :: ${JSON.stringify(sanitized)}`;
-      }
-
-      if (logLine.length > 120) {
-        logLine = logLine.slice(0, 119) + "\u2026";
-      }
-
-      log(logLine);
+      log(`${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
     });
 
     next();
@@ -290,7 +263,7 @@ function setupSession(app: express.Application) {
         conString: process.env.DATABASE_URL,
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "dev-only-secret-key",
+      secret: process.env.SESSION_SECRET!,
       resave: false,
       saveUninitialized: false,
       cookie: {
