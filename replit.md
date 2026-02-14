@@ -36,12 +36,14 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 
 ### Authentication (Firebase Authentication)
 - **Email/Password**: Firebase JS SDK handles registration + login on frontend, backend verifies ID token via REST API
+- **Phone OTP**: Firebase `signInWithPhoneNumber` with `RecaptchaVerifier` (invisible reCAPTCHA) on web, sends SMS automatically, 6-digit OTP verification
 - **Google Sign-In**: Firebase `signInWithPopup` on web, syncs with backend via ID token
 - **Forgot Password**: Firebase `sendPasswordResetEmail` - sends reset link to user's email
+- **Auth screen**: Email/Phone identifier toggle, Login/Signup tabs, OTP verification view with 6-digit input boxes, Google sign-in button
 - **Backend sync**: After Firebase auth, frontend sends ID token to `/api/auth/firebase` which verifies via Identity Toolkit API, creates/updates user in PostgreSQL, and establishes express-session
 - **Session management**: express-session with PostgreSQL store + AsyncStorage persistence on client
 - `lib/firebase.ts` - Firebase client SDK initialization and auth exports
-- `contexts/AuthContext.tsx` - Auth state management with Firebase `onAuthStateChanged` listener
+- `contexts/AuthContext.tsx` - Auth state management with Firebase `onAuthStateChanged` listener, phone OTP methods
 - `server/firebase-auth.ts` - Firebase Identity Toolkit REST API for token verification (no service account needed)
 
 ## Key Features
