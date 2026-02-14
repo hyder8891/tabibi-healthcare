@@ -2,6 +2,7 @@ import { type User, type InsertUser, users, type Order, type InsertOrder, orders
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool } from "@neondatabase/serverless";
+import { encrypt, decrypt } from "./encryption";
 
 if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
@@ -9,7 +10,7 @@ if (!process.env.DATABASE_URL) {
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  max: 20,
+  max: 5,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 5000,
 });
@@ -19,6 +20,30 @@ pool.on("error", (err: Error) => {
 });
 
 const db = drizzle(pool);
+
+function encryptOrder(order: InsertOrder): InsertOrder {
+  return {
+    ...order,
+    medicineName: order.medicineName ? encrypt(order.medicineName) : order.medicineName,
+    medicineDosage: order.medicineDosage ? encrypt(order.medicineDosage) : order.medicineDosage,
+    patientName: order.patientName ? encrypt(order.patientName) : order.patientName,
+    patientPhone: order.patientPhone ? encrypt(order.patientPhone) : order.patientPhone,
+    notes: order.notes ? encrypt(order.notes) : order.notes,
+    deliveryAddress: order.deliveryAddress ? encrypt(order.deliveryAddress) : order.deliveryAddress,
+  };
+}
+
+function decryptOrder(order: Order): Order {
+  return {
+    ...order,
+    medicineName: order.medicineName ? decrypt(order.medicineName) : order.medicineName,
+    medicineDosage: order.medicineDosage ? decrypt(order.medicineDosage) : order.medicineDosage,
+    patientName: order.patientName ? decrypt(order.patientName) : order.patientName,
+    patientPhone: order.patientPhone ? decrypt(order.patientPhone) : order.patientPhone,
+    notes: order.notes ? decrypt(order.notes) : order.notes,
+    deliveryAddress: order.deliveryAddress ? decrypt(order.deliveryAddress) : order.deliveryAddress,
+  };
+}
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -65,22 +90,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrder(order: InsertOrder): Promise<Order> {
-    const [newOrder] = await db.insert(orders).values(order).returning();
-    return newOrder;
+    const encryptedOrder = encryptOrder(order);
+    const [newOrder] = await db.insert(orders).values(encryptedOrder).returning();
+    return decryptOrder(newOrder);
   }
 
   async getOrder(id: string): Promise<Order | undefined> {
     const [order] = await db.select().from(orders).where(eq(orders.id, id));
-    return order;
+    return order ? decryptOrder(order) : undefined;
   }
 
   async getUserOrders(userId: string): Promise<Order[]> {
-    return await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+    const userOrders = await db.select().from(orders).where(eq(orders.userId, userId)).orderBy(desc(orders.createdAt));
+    return userOrders.map(decryptOrder);
   }
 
   async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order> {
-    const [order] = await db.update(orders).set(data).where(eq(orders.id, id)).returning();
-    return order;
+    const encryptedData = encryptOrder(data as InsertOrder) as Partial<InsertOrder>;
+    const [order] = await db.update(orders).set(encryptedData).where(eq(orders.id, id)).returning();
+    return decryptOrder(order);
   }
 }
 

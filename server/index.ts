@@ -1,18 +1,9 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import session from "express-session";
-import connectPgSimple from "connect-pg-simple";
 import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
-
-if (!process.env.SESSION_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("SESSION_SECRET environment variable is required in production");
-  }
-  console.warn("WARNING: SESSION_SECRET not set, using development fallback. Do not use in production.");
-}
 
 const app = express();
 app.set("trust proxy", 1);
@@ -21,12 +12,6 @@ const log = console.log;
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
-  }
-}
-
-declare module "express-session" {
-  interface SessionData {
-    userId: string;
   }
 }
 
@@ -57,7 +42,7 @@ function setupCors(app: express.Application) {
         "Access-Control-Allow-Methods",
         "GET, POST, PUT, DELETE, OPTIONS",
       );
-      res.header("Access-Control-Allow-Headers", "Content-Type");
+      res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
       res.header("Access-Control-Allow-Credentials", "true");
     }
 
@@ -118,35 +103,11 @@ function setupRequestLogging(app: express.Application) {
   app.use((req, res, next) => {
     const start = Date.now();
     const reqPath = req.path;
-    let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
-
-    const originalResJson = res.json;
-    res.json = function (bodyJson, ...args) {
-      capturedJsonResponse = bodyJson;
-      return originalResJson.apply(res, [bodyJson, ...args]);
-    };
 
     res.on("finish", () => {
       if (!reqPath.startsWith("/api")) return;
-
       const duration = Date.now() - start;
-
-      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        const sanitized = { ...capturedJsonResponse };
-        delete sanitized.idToken;
-        delete sanitized.password;
-        delete sanitized.messages;
-        delete sanitized.imageBase64;
-        delete sanitized.signals;
-        logLine += ` :: ${JSON.stringify(sanitized)}`;
-      }
-
-      if (logLine.length > 120) {
-        logLine = logLine.slice(0, 119) + "\u2026";
-      }
-
-      log(logLine);
+      log(`${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`);
     });
 
     next();
@@ -281,32 +242,9 @@ function setupErrorHandler(app: express.Application) {
   });
 }
 
-function setupSession(app: express.Application) {
-  const isProduction = process.env.NODE_ENV === "production";
-  const PgStore = connectPgSimple(session);
-  app.use(
-    session({
-      store: new PgStore({
-        conString: process.env.DATABASE_URL,
-        createTableIfMissing: true,
-      }),
-      secret: process.env.SESSION_SECRET || "dev-only-secret-key",
-      resave: false,
-      saveUninitialized: false,
-      cookie: {
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? "strict" : "lax",
-      },
-    }),
-  );
-}
-
 (async () => {
   setupCors(app);
   setupBodyParsing(app);
-  setupSession(app);
   setupRateLimiting(app);
   setupRequestLogging(app);
 

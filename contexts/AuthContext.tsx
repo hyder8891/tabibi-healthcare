@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
+import * as SecureStore from "expo-secure-store";
+import { apiRequest } from "@/lib/query-client";
+import { setAuthTokenGetter } from "@/lib/query-client";
 import {
   auth,
   onAuthStateChanged,
@@ -18,7 +18,7 @@ import {
 } from "@/lib/firebase";
 import { Platform } from "react-native";
 
-const AUTH_USER_KEY = "@tabibi_auth_user";
+const AUTH_USER_KEY = "tabibi_auth_user";
 
 interface AuthUser {
   id: string;
@@ -48,30 +48,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<any>(null);
+  const firebaseUserRef = useRef<FirebaseUser | null>(null);
 
   const persistUser = async (userData: AuthUser | null) => {
     try {
       if (userData) {
-        await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));
+        await SecureStore.setItemAsync(AUTH_USER_KEY, JSON.stringify(userData));
       } else {
-        await AsyncStorage.removeItem(AUTH_USER_KEY);
+        await SecureStore.deleteItemAsync(AUTH_USER_KEY);
       }
     } catch {}
   };
 
   const syncWithBackend = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
-    const idToken = await firebaseUser.getIdToken();
-    const res = await apiRequest("POST", "/api/auth/firebase", { idToken });
+    const res = await apiRequest("POST", "/api/auth/firebase");
     const data = await res.json();
     return data as AuthUser;
   };
+
+  useEffect(() => {
+    setAuthTokenGetter(async () => {
+      const fbUser = firebaseUserRef.current;
+      if (!fbUser) return null;
+      try {
+        return await fbUser.getIdToken();
+      } catch {
+        return null;
+      }
+    });
+    return () => setAuthTokenGetter(async () => null);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
 
     const loadCached = async () => {
       try {
-        const stored = await AsyncStorage.getItem(AUTH_USER_KEY);
+        const stored = await SecureStore.getItemAsync(AUTH_USER_KEY);
         if (stored && mounted) {
           setUser(JSON.parse(stored));
         }
@@ -83,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!mounted) return;
 
       if (firebaseUser) {
+        firebaseUserRef.current = firebaseUser;
         try {
           const backendUser = await syncWithBackend(firebaseUser);
           if (mounted) {
@@ -91,20 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         } catch (err) {
           console.error("Backend sync failed:", err);
-          try {
-            const baseUrl = getApiUrl();
-            const url = new URL("/api/auth/me", baseUrl);
-            const meRes = await fetch(url.toString(), { credentials: "include" });
-            if (meRes.ok) {
-              const meData = await meRes.json();
-              if (mounted) {
-                setUser(meData);
-                await persistUser(meData);
-              }
-            }
-          } catch {}
         }
       } else {
+        firebaseUserRef.current = null;
         if (mounted) {
           setUser(null);
           await persistUser(null);
@@ -126,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
+    firebaseUserRef.current = cred.user;
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
@@ -133,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signupWithEmail = useCallback(async (email: string, password: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
+    firebaseUserRef.current = cred.user;
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
@@ -141,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async () => {
     if (Platform.OS === "web") {
       const cred = await signInWithPopup(auth, googleProvider);
+      firebaseUserRef.current = cred.user;
       const backendUser = await syncWithBackend(cred.user);
       setUser(backendUser);
       await persistUser(backendUser);
@@ -168,6 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error("No pending phone verification. Please request a code first.");
     }
     const cred = await confirmationResultRef.current.confirm(code);
+    firebaseUserRef.current = cred.user;
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
@@ -182,9 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await firebaseSignOut(auth);
     } catch {}
-    try {
-      await apiRequest("POST", "/api/auth/logout");
-    } catch {}
+    firebaseUserRef.current = null;
     setUser(null);
     await persistUser(null);
     confirmationResultRef.current = null;
