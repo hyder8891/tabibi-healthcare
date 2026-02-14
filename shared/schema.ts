@@ -10,7 +10,6 @@ export const users = pgTable("users", {
   firebaseUid: text("firebase_uid").unique(),
   email: text("email").unique(),
   phone: text("phone").unique(),
-  password: text("password"),
   name: text("name"),
   photoUrl: text("photo_url"),
   authProvider: text("auth_provider").default("email"),
@@ -21,7 +20,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firebaseUid: true,
   email: true,
   phone: true,
-  password: true,
   name: true,
   photoUrl: true,
   authProvider: true,
@@ -67,3 +65,16 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  metadata: text("metadata"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});

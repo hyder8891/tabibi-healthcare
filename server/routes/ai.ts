@@ -11,19 +11,42 @@ const ai = new GoogleGenAI({
   },
 });
 
+function sanitizeInput(text: string): string {
+  const injectionPatterns = [
+    /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|rules|guidelines)/gi,
+    /ignore\s+all\s+instructions/gi,
+    /disregard\s+(all\s+)?(previous|prior|above|earlier)?\s*(instructions|prompts|rules|guidelines)/gi,
+    /forget\s+(your|all|previous)\s+(instructions|prompts|rules|guidelines|training)/gi,
+    /override\s+(all\s+)?(safety|security|system)\s*(protocols?|rules?|instructions?|guidelines?)?/gi,
+    /new\s+instructions?\s*:/gi,
+    /system\s*:\s*/gi,
+    /you\s+are\s+now\s+/gi,
+    /pretend\s+(you\s+are|to\s+be)\s+/gi,
+    /act\s+as\s+(if|though)\s+/gi,
+    /\bdo\s+not\s+follow\s+(your|the|any)\s+(rules|instructions|guidelines)/gi,
+    /reveal\s+(your|the|system)\s+(prompt|instructions|rules)/gi,
+    /what\s+(are|is)\s+your\s+(system\s+)?(prompt|instructions|rules)/gi,
+  ];
+  let sanitized = text;
+  for (const pattern of injectionPatterns) {
+    sanitized = sanitized.replace(pattern, "");
+  }
+  return sanitized.trim();
+}
+
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().max(10000),
+  content: z.string().max(5000),
   imageData: z.string().optional(),
   mimeType: z.string().optional(),
 });
 
 const patientProfileSchema = z.object({
   name: z.string().max(200).optional(),
-  age: z.number().min(0).max(150).optional(),
+  age: z.number().min(0).max(120).optional(),
   gender: z.string().max(50).optional(),
-  weight: z.number().min(0).max(500).optional(),
-  height: z.number().min(0).max(300).optional(),
+  weight: z.number().min(0).max(300).optional(),
+  height: z.number().min(0).max(250).optional(),
   bloodType: z.string().max(10).optional(),
   isPediatric: z.boolean().optional(),
   medications: z.array(z.string().max(200)).optional(),
@@ -37,8 +60,8 @@ const assessmentSchema = z.object({
 });
 
 const medicationAnalysisSchema = z.object({
-  imageBase64: z.string().min(1),
-  mimeType: z.string().optional(),
+  imageBase64: z.string().min(1).max(15_000_000),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]).optional(),
 });
 
 const interactionCheckSchema = z.object({
@@ -233,7 +256,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
       const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
         const parts: any[] = [];
         if (m.content) {
-          let content = m.content;
+          let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
           if (m === lastMessage && imageAnalysis) {
             content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
           }
@@ -357,14 +380,18 @@ Support both Arabic and English text on medication packaging.`,
       }
       const { medications, currentMedications, newMedication, language } = validation.data;
 
+      const sanitizedMedications = medications?.map(m => sanitizeInput(m));
+      const sanitizedCurrentMeds = currentMedications?.map(m => sanitizeInput(m));
+      const sanitizedNewMed = newMedication ? sanitizeInput(newMedication) : undefined;
+
       const lang = language === "en" ? "English" : "Arabic (العربية)";
       const langInstruction = `\n\nIMPORTANT: Write ALL text fields (description, recommendation, summary) in ${lang}. Drug names can remain in their original form, but all explanatory text MUST be in ${lang}.`;
 
       let promptText: string;
-      if (medications && Array.isArray(medications) && medications.length >= 2) {
-        promptText = `Check for ALL possible drug-drug interactions between the following medications that a patient is taking simultaneously: ${JSON.stringify(medications)}.
+      if (sanitizedMedications && Array.isArray(sanitizedMedications) && sanitizedMedications.length >= 2) {
+        promptText = `Check for ALL possible drug-drug interactions between the following medications that a patient is taking simultaneously: ${JSON.stringify(sanitizedMedications)}.
 
-Check every pair of medications against each other. There are ${medications.length} medications, so check all ${medications.length * (medications.length - 1) / 2} possible pairs.
+Check every pair of medications against each other. There are ${sanitizedMedications.length} medications, so check all ${sanitizedMedications.length * (sanitizedMedications.length - 1) / 2} possible pairs.
 
 Respond ONLY with JSON:
 {
@@ -383,7 +410,7 @@ Respond ONLY with JSON:
 
 If there are no significant interactions between any pair, return an empty interactions array with overallRisk "low" and a reassuring summary.${langInstruction}`;
       } else {
-        promptText = `Check for drug-drug interactions between these current medications: ${JSON.stringify(currentMedications)} and this proposed new medication: ${JSON.stringify(newMedication)}.
+        promptText = `Check for drug-drug interactions between these current medications: ${JSON.stringify(sanitizedCurrentMeds)} and this proposed new medication: ${JSON.stringify(sanitizedNewMed)}.
 
 Respond ONLY with JSON:
 {

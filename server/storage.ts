@@ -1,4 +1,4 @@
-import { type User, type InsertUser, users, type Order, type InsertOrder, orders } from "@shared/schema";
+import { type User, type InsertUser, users, type Order, type InsertOrder, orders, auditLogs } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool } from "@neondatabase/serverless";
@@ -30,6 +30,9 @@ function encryptOrder(order: InsertOrder): InsertOrder {
     patientPhone: order.patientPhone ? encrypt(order.patientPhone) : order.patientPhone,
     notes: order.notes ? encrypt(order.notes) : order.notes,
     deliveryAddress: order.deliveryAddress ? encrypt(order.deliveryAddress) : order.deliveryAddress,
+    pharmacyPhone: order.pharmacyPhone ? encrypt(order.pharmacyPhone) : order.pharmacyPhone,
+    pharmacyAddress: order.pharmacyAddress ? encrypt(order.pharmacyAddress) : order.pharmacyAddress,
+    medicineFrequency: order.medicineFrequency ? encrypt(order.medicineFrequency) : order.medicineFrequency,
   };
 }
 
@@ -42,6 +45,9 @@ function decryptOrder(order: Order): Order {
     patientPhone: order.patientPhone ? decrypt(order.patientPhone) : order.patientPhone,
     notes: order.notes ? decrypt(order.notes) : order.notes,
     deliveryAddress: order.deliveryAddress ? decrypt(order.deliveryAddress) : order.deliveryAddress,
+    pharmacyPhone: order.pharmacyPhone ? decrypt(order.pharmacyPhone) : order.pharmacyPhone,
+    pharmacyAddress: order.pharmacyAddress ? decrypt(order.pharmacyAddress) : order.pharmacyAddress,
+    medicineFrequency: order.medicineFrequency ? decrypt(order.medicineFrequency) : order.medicineFrequency,
   };
 }
 
@@ -56,6 +62,7 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   getUserOrders(userId: string): Promise<Order[]>;
   updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order>;
+  logAuditEvent(event: { userId?: string; action: string; resourceType: string; resourceId?: string; metadata?: string; ipAddress?: string }): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -109,6 +116,14 @@ export class DatabaseStorage implements IStorage {
     const encryptedData = encryptOrder(data as InsertOrder) as Partial<InsertOrder>;
     const [order] = await db.update(orders).set(encryptedData).where(eq(orders.id, id)).returning();
     return decryptOrder(order);
+  }
+
+  async logAuditEvent(event: { userId?: string; action: string; resourceType: string; resourceId?: string; metadata?: string; ipAddress?: string }): Promise<void> {
+    try {
+      await db.insert(auditLogs).values(event);
+    } catch (err) {
+      console.error("Audit log error:", err instanceof Error ? err.message : "Unknown");
+    }
   }
 }
 
