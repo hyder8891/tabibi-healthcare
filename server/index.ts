@@ -15,6 +15,7 @@ if (!process.env.SESSION_SECRET) {
 }
 
 const app = express();
+app.set("trust proxy", 1);
 const log = console.log;
 
 declare module "http" {
