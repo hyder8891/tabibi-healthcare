@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
@@ -10,8 +10,11 @@ import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signInWithPopup,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
   googleProvider,
   type FirebaseUser,
+  type ConfirmationResult,
 } from "@/lib/firebase";
 import { Platform } from "react-native";
 
@@ -32,6 +35,8 @@ interface AuthContextValue {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  sendPhoneOTP: (phoneNumber: string) => Promise<void>;
+  verifyPhoneOTP: (code: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -41,6 +46,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+  const recaptchaVerifierRef = useRef<any>(null);
 
   const persistUser = async (userData: AuthUser | null) => {
     try {
@@ -142,6 +149,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const sendPhoneOTP = useCallback(async (phoneNumber: string) => {
+    if (Platform.OS === "web") {
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+        });
+      }
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
+      confirmationResultRef.current = confirmation;
+    } else {
+      throw new Error("Phone auth on native requires additional setup");
+    }
+  }, []);
+
+  const verifyPhoneOTP = useCallback(async (code: string) => {
+    if (!confirmationResultRef.current) {
+      throw new Error("No pending phone verification. Please request a code first.");
+    }
+    const cred = await confirmationResultRef.current.confirm(code);
+    const backendUser = await syncWithBackend(cred.user);
+    setUser(backendUser);
+    await persistUser(backendUser);
+    confirmationResultRef.current = null;
+  }, []);
+
   const resetPassword = useCallback(async (email: string) => {
     await sendPasswordResetEmail(auth, email);
   }, []);
@@ -155,11 +187,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
     setUser(null);
     await persistUser(null);
+    confirmationResultRef.current = null;
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, logout }),
-    [user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, logout],
+    () => ({ user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP, resetPassword, logout }),
+    [user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP, resetPassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
