@@ -161,8 +161,8 @@ export default function OrderScreen() {
             onPress: () => callPharmacy(selectedPharmacy!),
           },
           {
-            text: t("Done", "تم"),
-            onPress: () => router.back(),
+            text: t("My Orders", "طلباتي"),
+            onPress: () => router.replace("/orders"),
           },
         ],
       );

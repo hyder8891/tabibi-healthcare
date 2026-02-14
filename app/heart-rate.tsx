@@ -93,6 +93,7 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
 
   let width = 0;
   let height = 0;
+  let colorType = 6;
   let pos = 8;
   while (pos < bytes.length) {
     const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
@@ -100,6 +101,7 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
     if (type === "IHDR") {
       width = (bytes[pos+8] << 24) | (bytes[pos+9] << 16) | (bytes[pos+10] << 8) | bytes[pos+11];
       height = (bytes[pos+12] << 24) | (bytes[pos+13] << 16) | (bytes[pos+14] << 8) | bytes[pos+15];
+      colorType = bytes[pos+17];
     }
     pos += 12 + length;
   }
@@ -130,7 +132,7 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
     return { r: 128, g: 128, b: 128 };
   }
 
-  const bpp = 4;
+  const bpp = (colorType === 2) ? 3 : 4;
   const rowBytes = width * bpp;
   const pixels = new Uint8Array(width * height * bpp);
 
@@ -171,9 +173,9 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
 
   let rSum = 0, gSum = 0, bSum = 0, count = 0;
   for (let i = 0; i < width * height; i++) {
-    rSum += pixels[i * 4];
-    gSum += pixels[i * 4 + 1];
-    bSum += pixels[i * 4 + 2];
+    rSum += pixels[i * bpp];
+    gSum += pixels[i * bpp + 1];
+    bSum += pixels[i * bpp + 2];
     count++;
   }
 
@@ -195,7 +197,7 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
       uri,
       [
         { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-        { resize: { width: 4, height: 4 } },
+        { resize: { width: 8, height: 8 } },
       ],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
@@ -422,9 +424,9 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
   const hasVariation = signalVariance > 1e-10;
 
   let confidence: "high" | "medium" | "low";
-  if (snr > 0.25 && n >= 150 && hasVariation) {
+  if (snr > 0.20 && n >= 60 && hasVariation) {
     confidence = "high";
-  } else if (snr > 0.12 && n >= 80 && hasVariation) {
+  } else if (snr > 0.10 && n >= 40 && hasVariation) {
     confidence = "medium";
   } else {
     confidence = "low";
@@ -603,6 +605,7 @@ export default function HeartRateScreen() {
       }
 
       const rgbSignals = signals.map(s => ({ r: s.r, g: s.g, b: s.b }));
+      console.log(`rPPG: ${signals.length} samples, actualFps=${actualFps.toFixed(1)}, first RGB=[${rgbSignals[0]?.r.toFixed(1)},${rgbSignals[0]?.g.toFixed(1)},${rgbSignals[0]?.b.toFixed(1)}], last RGB=[${rgbSignals[rgbSignals.length-1]?.r.toFixed(1)},${rgbSignals[rgbSignals.length-1]?.g.toFixed(1)},${rgbSignals[rgbSignals.length-1]?.b.toFixed(1)}]`);
       const data = processRppgClient(rgbSignals, actualFps);
 
       setResult(data);
