@@ -76,6 +76,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 14, 2026: Security audit hardening - AI prompt injection sanitization (13 regex patterns), tightened Zod validation ranges (age≤120, weight≤300, height≤250, content≤5000), image mime-type validation, security headers (HSTS, X-Frame-Options, CSP-adjacent), encrypted pharmacyPhone/pharmacyAddress/medicineFrequency in orders, removed legacy password column, audit logging table with order create/cancel tracking.
 - Feb 14, 2026: Added OTC medicine ordering feature - database orders table, backend API routes (CRUD + cancel), multi-step order flow UI (pharmacy selection → delivery details → confirmation with WhatsApp/call), order history/tracking screen with status badges, "Order for Delivery" buttons on assessment results, "My Orders" quick action on home screen.
 - Feb 14, 2026: Enhanced facility cards with phone numbers, WhatsApp/SMS/call buttons via Place Details API. Added photo proxy to hide API key. Added requireAuth middleware on AI endpoints. Added rate limiting, Zod input validation, sanitized error logging, session cookie security, DB pool config.
 - Feb 14, 2026: Migrated to full Firebase Authentication - email/password, Google sign-in, forgot password. Removed bcrypt/custom auth. Backend verifies Firebase ID tokens via REST API. Database schema updated with firebase_uid, photo_url, auth_provider fields.
