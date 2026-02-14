@@ -599,6 +599,15 @@ export default function AssessmentScreen() {
                       },
                     })
                   }
+                  onOrderMedicine={(med) =>
+                    router.push({
+                      pathname: "/order",
+                      params: {
+                        medicineName: med.name,
+                        medicineDosage: `${med.dosage} - ${med.frequency}`,
+                      },
+                    })
+                  }
                 />
               </View>
             ) : null
