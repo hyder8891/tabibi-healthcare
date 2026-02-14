@@ -1,1 +1,0 @@
-# Tabibi Healthcare Navigator
