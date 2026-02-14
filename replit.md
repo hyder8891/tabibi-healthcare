@@ -64,6 +64,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 14, 2026: Enhanced facility cards with phone numbers, WhatsApp/SMS/call buttons via Place Details API. Added photo proxy to hide API key. Added requireAuth middleware on AI endpoints. Added rate limiting, Zod input validation, sanitized error logging, session cookie security, DB pool config.
 - Feb 14, 2026: Migrated to full Firebase Authentication - email/password, Google sign-in, forgot password. Removed bcrypt/custom auth. Backend verifies Firebase ID tokens via REST API. Database schema updated with firebase_uid, photo_url, auth_provider fields.
 - Feb 13, 2026: Added non-contact heart rate monitor (rPPG) feature with POS algorithm, FFT-based BPM detection, pulse waveform visualization, confidence scoring
 - Feb 13, 2026: Initial build of Tabibi app with all core features
