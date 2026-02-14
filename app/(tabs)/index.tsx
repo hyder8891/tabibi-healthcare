@@ -96,45 +96,42 @@ export default function HomeScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.mainCTA,
-            pressed && { opacity: 0.96, transform: [{ scale: 0.98 }] },
+            pressed && { opacity: 0.95, transform: [{ scale: 0.97 }] },
           ]}
           onPress={startAssessment}
         >
           <LinearGradient
-            colors={["#F0FDFA", "#E6FAF7", "#FFFFFF"]}
+            colors={["#0D9488", "#0A7C72", "#07635B"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.ctaCard}
+            style={styles.ctaGradient}
           >
-            <View style={styles.ctaAccentBar} />
-            <View style={[styles.ctaRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.ctaIconCircle}>
-                <LinearGradient
-                  colors={[Colors.light.primary, "#14B8A6"]}
-                  style={styles.ctaIconGradient}
-                >
-                  <Ionicons name="chatbubbles" size={22} color="#fff" />
-                </LinearGradient>
+            <View style={styles.ctaDecoArc} />
+            <View style={styles.ctaDecoGlow} />
+
+            <View style={[styles.ctaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.ctaIconWrap}>
+                <Ionicons name="chatbubbles" size={26} color={Colors.light.primary} />
               </View>
-              <View style={[styles.ctaTextWrap, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>
-                  {t("Start Assessment", "ابدأ التقييم")}
-                </Text>
-                <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
-                  {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.ctaBottom, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <View style={styles.ctaChip}>
-                <Ionicons name="flash" size={12} color={Colors.light.accent} />
+                <View style={styles.ctaChipDot} />
                 <Text style={styles.ctaChipText}>{t("AI-Powered", "بالذكاء الاصطناعي")}</Text>
               </View>
-              <View style={[styles.ctaArrowRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                <Text style={styles.ctaArrowLabel}>{t("Begin", "ابدأ")}</Text>
-                <View style={styles.ctaArrow}>
-                  <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={16} color="#fff" />
-                </View>
+            </View>
+
+            <View style={[styles.ctaTextBlock, isRTL && { alignItems: "flex-end" }]}>
+              <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>
+                {t("Start Assessment", "ابدأ التقييم")}
+              </Text>
+              <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
+                {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
+              </Text>
+            </View>
+
+            <View style={[styles.ctaAction, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <Text style={styles.ctaActionText}>{t("Begin Now", "ابدأ الآن")}</Text>
+              <View style={styles.ctaArrow}>
+                <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color={Colors.light.primary} />
               </View>
             </View>
           </LinearGradient>
@@ -485,98 +482,109 @@ const styles = StyleSheet.create({
   },
   mainCTA: {
     marginBottom: 28,
-    borderRadius: 22,
+    borderRadius: 24,
     overflow: "hidden",
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.3,
+    shadowRadius: 28,
+    elevation: 14,
   },
-  ctaCard: {
-    borderRadius: 22,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: "rgba(13, 148, 136, 0.12)",
+  ctaGradient: {
+    borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 22,
     overflow: "hidden",
   },
-  ctaAccentBar: {
+  ctaDecoArc: {
     position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-    backgroundColor: Colors.light.primary,
+    top: -60,
+    right: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  ctaRow: {
+  ctaDecoGlow: {
+    position: "absolute",
+    bottom: -30,
+    left: -20,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  ctaHeader: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 18,
   },
-  ctaIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    overflow: "hidden",
-  },
-  ctaIconGradient: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+  ctaIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
-  },
-  ctaTextWrap: {
-    flex: 1,
-    gap: 5,
-  },
-  ctaTitle: {
-    fontSize: 17,
-    fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
-    letterSpacing: -0.2,
-  },
-  ctaSubtitle: {
-    fontSize: 13,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
-    lineHeight: 19,
-  },
-  ctaBottom: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
   },
   ctaChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(249, 115, 22, 0.08)",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 10,
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  ctaChipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
   },
   ctaChipText: {
     fontSize: 11,
     fontFamily: "DMSans_500Medium",
-    color: Colors.light.accent,
+    color: "rgba(255,255,255,0.9)",
   },
-  ctaArrowRow: {
+  ctaTextBlock: {
+    marginBottom: 22,
+    gap: 6,
+  },
+  ctaTitle: {
+    fontSize: 24,
+    fontFamily: "DMSans_700Bold",
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+  },
+  ctaSubtitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 21,
+  },
+  ctaAction: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 10,
+    justifyContent: "center",
   },
-  ctaArrowLabel: {
-    fontSize: 13,
+  ctaActionText: {
+    fontSize: 16,
     fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.primary,
+    color: "#FFFFFF",
   },
   ctaArrow: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
