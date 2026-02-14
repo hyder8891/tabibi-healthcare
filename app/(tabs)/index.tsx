@@ -117,9 +117,9 @@ export default function HomeScreen() {
                   color={Colors.light.accent}
                 />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Drug Interactions", "التداخلات الدوائية")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
+                {t("Check medicine safety", "تحقق من سلامة الأدوية")}
               </Text>
             </Pressable>
 
