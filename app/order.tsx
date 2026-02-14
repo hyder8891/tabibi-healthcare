@@ -24,7 +24,7 @@ import { fetch } from "expo/fetch";
 import type { NearbyFacility, PatientProfile } from "@/lib/types";
 import * as Location from "expo-location";
 
-type OrderStep = "pharmacy" | "details" | "confirm";
+type OrderStep = "pharmacy" | "details" | "confirm" | "success";
 
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
@@ -174,7 +174,7 @@ export default function OrderScreen() {
     setOrderError(null);
     try {
       const pharmacy = getPharmacyWithPhone(selectedPharmacy);
-      const res = await apiRequest("POST", "/api/orders", {
+      await apiRequest("POST", "/api/orders", {
         pharmacyName: pharmacy.name,
         pharmacyPhone: pharmacy.internationalPhone || pharmacy.phone || "",
         pharmacyAddress: pharmacy.address,
@@ -189,29 +189,8 @@ export default function OrderScreen() {
         notes: notes.trim() || "",
       });
 
-      const order = await res.json();
-
-      Alert.alert(
-        t("Order Placed", "تم تقديم الطلب"),
-        t(
-          "Your order has been placed. Contact the pharmacy via WhatsApp or call to confirm availability.",
-          "تم تقديم طلبك. تواصل مع الصيدلية عبر واتساب أو اتصل لتأكيد التوفر.",
-        ),
-        [
-          {
-            text: t("WhatsApp", "واتساب"),
-            onPress: () => openWhatsApp(selectedPharmacy!),
-          },
-          {
-            text: t("Call", "اتصال"),
-            onPress: () => callPharmacy(selectedPharmacy!),
-          },
-          {
-            text: t("My Orders", "طلباتي"),
-            onPress: () => router.replace("/(tabs)/orders"),
-          },
-        ],
-      );
+      setSubmitting(false);
+      setStep("success");
     } catch (err: any) {
       console.error("Order error:", err);
       const errorMsg = t("Failed to place order. Please try again.", "فشل في تقديم الطلب. يرجى المحاولة مرة أخرى.");
@@ -465,6 +444,57 @@ export default function OrderScreen() {
     </View>
   );
 
+  const renderSuccessStep = () => (
+    <View style={styles.stepContent}>
+      <View style={{ alignItems: "center", paddingTop: 40, paddingBottom: 24 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.light.primarySurface, alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <Ionicons name="checkmark-circle" size={48} color={Colors.light.primary} />
+        </View>
+        <Text style={{ fontSize: 22, fontFamily: "DMSans_700Bold", color: Colors.light.text, textAlign: "center", marginBottom: 8 }}>
+          {t("Order Placed!", "تم تقديم الطلب!")}
+        </Text>
+        <Text style={{ fontSize: 14, fontFamily: "DMSans_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20, paddingHorizontal: 20 }}>
+          {t(
+            "Contact the pharmacy via WhatsApp or call to confirm availability and delivery.",
+            "تواصل مع الصيدلية عبر واتساب أو اتصل لتأكيد التوفر والتوصيل.",
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.contactRow}>
+        <Pressable
+          style={({ pressed }) => [styles.contactBtn, styles.whatsappBtn, pressed && { opacity: 0.8 }]}
+          onPress={() => selectedPharmacy && openWhatsApp(selectedPharmacy)}
+        >
+          <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+          <Text style={styles.contactBtnText}>
+            {t("WhatsApp", "واتساب")}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.contactBtn, styles.callBtn, pressed && { opacity: 0.8 }]}
+          onPress={() => selectedPharmacy && callPharmacy(selectedPharmacy)}
+        >
+          <Ionicons name="call" size={20} color={Colors.light.primary} />
+          <Text style={[styles.contactBtnText, { color: Colors.light.primary }]}>
+            {t("Call", "اتصال")}
+          </Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.nextBtn, { marginTop: 24 }, pressed && { opacity: 0.85 }]}
+        onPress={() => router.replace("/(tabs)/orders")}
+      >
+        <MaterialCommunityIcons name="clipboard-list-outline" size={20} color="#fff" />
+        <Text style={[styles.nextBtnText, { marginLeft: 8 }]}>
+          {t("View My Orders", "عرض طلباتي")}
+        </Text>
+      </Pressable>
+    </View>
+  );
+
   const canProceed = () => {
     if (step === "pharmacy") return !!selectedPharmacy;
     if (step === "details") return !!patientName.trim() && !!patientPhone.trim() && !!deliveryAddress.trim();
@@ -483,25 +513,35 @@ export default function OrderScreen() {
     else router.back();
   };
 
-  const stepIndex = step === "pharmacy" ? 0 : step === "details" ? 1 : 2;
+  const stepIndex = step === "pharmacy" ? 0 : step === "details" ? 1 : step === "confirm" ? 2 : 3;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <Pressable style={styles.headerBtn} onPress={handleBack}>
-          <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={Colors.light.text} />
-        </Pressable>
+        {step !== "success" ? (
+          <Pressable style={styles.headerBtn} onPress={handleBack}>
+            <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={Colors.light.text} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
         <Text style={styles.headerTitle}>
-          {t("Order Medicine", "طلب دواء")}
+          {step === "success" ? t("Order Confirmed", "تم تأكيد الطلب") : t("Order Medicine", "طلب دواء")}
         </Text>
-        <View style={styles.headerBtn} />
+        {step === "success" ? (
+          <Pressable style={styles.headerBtn} onPress={() => router.replace("/(tabs)")}>
+            <Ionicons name="close" size={24} color={Colors.light.text} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
       </View>
 
-      <View style={styles.stepper}>
+      {step !== "success" && <View style={styles.stepper}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.stepDot, i <= stepIndex && styles.stepDotActive]} />
         ))}
-      </View>
+      </View>}
 
       <ScrollView
         style={{ flex: 1 }}
@@ -512,9 +552,10 @@ export default function OrderScreen() {
         {step === "pharmacy" && renderPharmacyStep()}
         {step === "details" && renderDetailsStep()}
         {step === "confirm" && renderConfirmStep()}
+        {step === "success" && renderSuccessStep()}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, 16) }]}>
+      {step !== "success" && <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, 16) }]}>
         <Pressable
           style={({ pressed }) => [
             styles.nextBtn,
@@ -539,7 +580,7 @@ export default function OrderScreen() {
             </>
           )}
         </Pressable>
-      </View>
+      </View>}
     </View>
   );
 }

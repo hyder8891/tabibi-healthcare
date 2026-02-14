@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
 import type { MedicineOrder } from "@/lib/types";
 
@@ -46,9 +46,12 @@ export default function OrdersTabScreen() {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      const authHeaders = await getAuthHeaders();
       const baseUrl = getApiUrl();
       const url = new URL("/api/orders", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await fetch(url.toString(), {
+        headers: authHeaders,
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
