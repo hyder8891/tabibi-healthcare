@@ -55,17 +55,43 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.greetingRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <View>
-            <Text style={[styles.greeting, isRTL && { textAlign: "right" }]}>{t("Welcome to", "مرحباً بك في")}</Text>
-            <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
-          </View>
-          <Image source={require("@/assets/images/logo.png")} style={styles.logoImage} />
-        </View>
+        <View style={styles.heroCard}>
+          <LinearGradient
+            colors={["#0D9488", "#0F766E", "#115E59"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroDecoRing1} />
+            <View style={styles.heroDecoRing2} />
+            <View style={styles.heroDecoDot1} />
+            <View style={styles.heroDecoDot2} />
+            <View style={styles.heroDecoDot3} />
 
-        <Text style={[styles.tagline, isRTL && { textAlign: "right" }]}>
-          {t("Your Active Healthcare Navigator", "مساعدك الصحي الذكي")}
-        </Text>
+            <View style={[styles.heroTop, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.heroLogoWrap}>
+                <Image source={require("@/assets/images/logo.png")} style={styles.heroLogo} />
+              </View>
+              <View style={styles.heroStatusPill}>
+                <View style={styles.heroStatusDot} />
+                <Text style={styles.heroStatusText}>{t("Ready", "جاهز")}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.heroTextBlock, isRTL && { alignItems: "flex-end" }]}>
+              <Text style={[styles.heroGreeting, isRTL && { textAlign: "right" }]}>
+                {t("Welcome to", "مرحباً بك في")}
+              </Text>
+              <Text style={[styles.heroAppName, isRTL && { textAlign: "right" }]}>
+                {t("Tabibi", "طبيبي")}
+              </Text>
+              <View style={styles.heroTaglineDivider} />
+              <Text style={[styles.heroTagline, isRTL && { textAlign: "right" }]}>
+                {t("Your Active Healthcare Navigator", "مساعدك الصحي الذكي")}
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
 
         <Pressable
           style={({ pressed }) => [
@@ -311,35 +337,136 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
   },
-  greetingRow: {
+  heroCard: {
+    marginBottom: 24,
+    borderRadius: 28,
+    overflow: "hidden",
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  heroGradient: {
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 28,
+    borderRadius: 28,
+    overflow: "hidden",
+  },
+  heroDecoRing1: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  heroDecoRing2: {
+    position: "absolute",
+    bottom: -50,
+    left: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  heroDecoDot1: {
+    position: "absolute",
+    top: 32,
+    right: 60,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  heroDecoDot2: {
+    position: "absolute",
+    bottom: 44,
+    right: 40,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  heroDecoDot3: {
+    position: "absolute",
+    top: 60,
+    left: 50,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
-    marginTop: 8,
+    marginBottom: 20,
   },
-  logoImage: {
-    width: 72,
-    height: 72,
+  heroLogoWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroLogo: {
+    width: 36,
+    height: 36,
     resizeMode: "contain" as const,
   },
-  greeting: {
-    fontSize: 15,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
-    marginBottom: 2,
+  heroStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
   },
-  appName: {
-    fontSize: 36,
+  heroStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#34D399",
+  },
+  heroStatusText: {
+    fontSize: 12,
+    fontFamily: "DMSans_500Medium",
+    color: "rgba(255,255,255,0.9)",
+  },
+  heroTextBlock: {
+    gap: 4,
+  },
+  heroGreeting: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 0.3,
+  },
+  heroAppName: {
+    fontSize: 34,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: "#FFFFFF",
     letterSpacing: -0.5,
   },
-  tagline: {
-    fontSize: 15,
+  heroTaglineDivider: {
+    width: 36,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginVertical: 6,
+  },
+  heroTagline: {
+    fontSize: 14,
     fontFamily: "DMSans_400Regular",
-    color: Colors.light.textLight,
-    marginBottom: 28,
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 20,
   },
   mainCTA: {
     marginBottom: 32,
