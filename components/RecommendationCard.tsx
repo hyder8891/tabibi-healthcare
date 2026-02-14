@@ -9,12 +9,14 @@ interface RecommendationCardProps {
   result: AssessmentResult;
   onFindPharmacy?: () => void;
   onFindLab?: () => void;
+  onOrderMedicine?: (med: { name: string; dosage: string; frequency: string }) => void;
 }
 
 export function RecommendationCard({
   result,
   onFindPharmacy,
   onFindLab,
+  onOrderMedicine,
 }: RecommendationCardProps) {
   const { t, isRTL } = useSettings();
 
@@ -95,6 +97,19 @@ export function RecommendationCard({
                   <Text style={styles.medWarning}>
                     {med.warnings.join(". ")}
                   </Text>
+                )}
+                {onOrderMedicine && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.orderMedBtn,
+                      isRTL && { flexDirection: "row-reverse" },
+                      pressed && { opacity: 0.8 },
+                    ]}
+                    onPress={() => onOrderMedicine({ name: med.name, dosage: med.dosage, frequency: med.frequency })}
+                  >
+                    <MaterialCommunityIcons name="truck-delivery-outline" size={16} color={Colors.light.primary} />
+                    <Text style={styles.orderMedBtnText}>{t("Order for Delivery", "اطلب للتوصيل")}</Text>
+                  </Pressable>
                 )}
               </View>
             ))}
@@ -316,6 +331,23 @@ const styles = StyleSheet.create({
     color: Colors.light.accent,
     marginTop: 6,
     fontStyle: "italic",
+  },
+  orderMedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.light.primarySurface,
+    borderWidth: 1,
+    borderColor: Colors.light.primaryLight,
+  },
+  orderMedBtnText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.light.primary,
   },
   testCard: {
     backgroundColor: Colors.light.background,

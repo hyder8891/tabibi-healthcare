@@ -1,4 +1,8 @@
 const FIREBASE_API_KEY = process.env.FIREBASE_API_KEY;
+if (!FIREBASE_API_KEY) {
+  throw new Error("FIREBASE_API_KEY environment variable is required");
+}
+
 const IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1";
 
 interface FirebaseUserInfo {
@@ -25,13 +29,18 @@ export async function verifyFirebaseToken(idToken: string): Promise<FirebaseUser
       },
     );
 
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`Firebase token verification failed: ${res.status} - ${errorText}`);
+      return null;
+    }
 
     const data = await res.json();
     const users = data.users;
     if (!users || users.length === 0) return null;
     return users[0] as FirebaseUserInfo;
-  } catch {
+  } catch (error) {
+    console.error("Firebase token verification error:", error instanceof Error ? error.message : "Unknown error");
     return null;
   }
 }

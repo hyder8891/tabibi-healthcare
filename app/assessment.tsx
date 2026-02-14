@@ -84,8 +84,8 @@ export default function AssessmentScreen() {
           id: "welcome",
           role: "assistant",
           content: settings.language === "ar"
-            ? "\u0645\u0631\u062d\u0628\u0627\u064b! \u0623\u0646\u0627 \u0637\u0628\u064a\u0628\u064a\u060c \u0645\u0633\u0627\u0639\u062f\u0643 \u0627\u0644\u0635\u062d\u064a. \u0635\u0641 \u0644\u064a \u0623\u0639\u0631\u0627\u0636\u0643 \u0648\u0633\u0623\u0633\u0627\u0639\u062f\u0643 \u0641\u064a \u062a\u0642\u064a\u064a\u0645 \u062d\u0627\u0644\u062a\u0643."
-            : "Hello! I'm Tabibi, your healthcare assistant. Please describe your symptoms and I'll help guide you through a health assessment.",
+            ? "\u0645\u0631\u062d\u0628\u0627\u064b! \u0635\u0641 \u0644\u064a \u0623\u0639\u0631\u0627\u0636\u0643 \u0648\u0633\u0623\u0633\u0627\u0639\u062f\u0643 \u0641\u064a \u062a\u0642\u064a\u064a\u0645 \u062d\u0627\u0644\u062a\u0643."
+            : "Hello! Please describe your symptoms and I'll help guide you through a health assessment.",
           timestamp: Date.now(),
         },
       ]);

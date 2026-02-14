@@ -20,6 +20,8 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `app/results.tsx` - Assessment results with care recommendations
 - `app/routing.tsx` - Nearby facility finder with capability filtering
 - `app/heart-rate.tsx` - rPPG heart rate monitor using front camera + POS algorithm
+- `app/order.tsx` - Multi-step pharmacy order flow (pharmacy selection → delivery details → confirmation)
+- `app/orders.tsx` - Order history and tracking with status badges
 - `components/` - MessageBubble, EmergencyOverlay, RecommendationCard, FacilityCard, AssessmentCard
 - `contexts/SettingsContext.tsx` - Language (EN/AR) and pediatric mode settings
 - `lib/storage.ts` - AsyncStorage helpers for assessments, profile, medications
@@ -33,6 +35,10 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `POST /api/analyze-medication` - Image-based medication OCR analysis
 - `POST /api/check-interactions` - Drug-drug interaction checking
 - `POST /api/process-rppg` - Heart rate estimation from RGB signals using POS algorithm + FFT
+- `POST /api/orders` - Create new medicine delivery order (authenticated)
+- `GET /api/orders` - Get user's order history (authenticated)
+- `GET /api/orders/:id` - Get single order details (authenticated)
+- `PATCH /api/orders/:id/cancel` - Cancel a pending order (authenticated)
 
 ### Authentication (Firebase Authentication)
 - **Email/Password**: Firebase JS SDK handles registration + login on frontend, backend verifies ID token via REST API
@@ -56,6 +62,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 7. Pediatric Mode (weight-based dosage calculations)
 8. Bilingual Support (English/Arabic)
 9. Non-Contact Heart Rate Monitor (rPPG via front camera, POS algorithm, FFT analysis)
+10. OTC Medicine Ordering (pharmacy selection via Google Places, delivery details, WhatsApp/call confirmation, order tracking)
 
 ## Color Palette
 - Primary: #0F766E (teal)
@@ -64,6 +71,8 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Feb 14, 2026: Added OTC medicine ordering feature - database orders table, backend API routes (CRUD + cancel), multi-step order flow UI (pharmacy selection → delivery details → confirmation with WhatsApp/call), order history/tracking screen with status badges, "Order for Delivery" buttons on assessment results, "My Orders" quick action on home screen.
+- Feb 14, 2026: Enhanced facility cards with phone numbers, WhatsApp/SMS/call buttons via Place Details API. Added photo proxy to hide API key. Added requireAuth middleware on AI endpoints. Added rate limiting, Zod input validation, sanitized error logging, session cookie security, DB pool config.
 - Feb 14, 2026: Migrated to full Firebase Authentication - email/password, Google sign-in, forgot password. Removed bcrypt/custom auth. Backend verifies Firebase ID tokens via REST API. Database schema updated with firebase_uid, photo_url, auth_provider fields.
 - Feb 13, 2026: Added non-contact heart rate monitor (rPPG) feature with POS algorithm, FFT-based BPM detection, pulse waveform visualization, confidence scoring
 - Feb 13, 2026: Initial build of Tabibi app with all core features

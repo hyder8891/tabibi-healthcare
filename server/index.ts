@@ -2,11 +2,20 @@ import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
 
+if (!process.env.SESSION_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("SESSION_SECRET environment variable is required in production");
+  }
+  console.warn("WARNING: SESSION_SECRET not set, using development fallback. Do not use in production.");
+}
+
 const app = express();
+app.set("trust proxy", 1);
 const log = console.log;
 
 declare module "http" {
@@ -35,14 +44,14 @@ function setupCors(app: express.Application) {
       });
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      origins.add("http://localhost:8081");
+      origins.add("http://127.0.0.1:8081");
+    }
+
     const origin = req.header("origin");
 
-    // Allow localhost origins for Expo web development (any port)
-    const isLocalhost =
-      origin?.startsWith("http://localhost:") ||
-      origin?.startsWith("http://127.0.0.1:");
-
-    if (origin && (origins.has(origin) || isLocalhost)) {
+    if (origin && origins.has(origin)) {
       res.header("Access-Control-Allow-Origin", origin);
       res.header(
         "Access-Control-Allow-Methods",
@@ -63,7 +72,7 @@ function setupCors(app: express.Application) {
 function setupBodyParsing(app: express.Application) {
   app.use(
     express.json({
-      limit: "50mb",
+      limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       },
@@ -73,10 +82,42 @@ function setupBodyParsing(app: express.Application) {
   app.use(express.urlencoded({ extended: false }));
 }
 
+function setupRateLimiting(app: express.Application) {
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 200,
+    message: { error: "Too many requests, please try again later" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const aiLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,
+    message: { error: "Too many AI requests, please slow down" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20,
+    message: { error: "Too many auth attempts, please try again later" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  app.use("/api/", apiLimiter);
+  app.use("/api/assess", aiLimiter);
+  app.use("/api/analyze-medication", aiLimiter);
+  app.use("/api/check-interactions", aiLimiter);
+  app.use("/api/auth/firebase", authLimiter);
+}
+
 function setupRequestLogging(app: express.Application) {
   app.use((req, res, next) => {
     const start = Date.now();
-    const path = req.path;
+    const reqPath = req.path;
     let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
     const originalResJson = res.json;
@@ -86,17 +127,23 @@ function setupRequestLogging(app: express.Application) {
     };
 
     res.on("finish", () => {
-      if (!path.startsWith("/api")) return;
+      if (!reqPath.startsWith("/api")) return;
 
       const duration = Date.now() - start;
 
-      let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
+      let logLine = `${req.method} ${reqPath} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        const sanitized = { ...capturedJsonResponse };
+        delete sanitized.idToken;
+        delete sanitized.password;
+        delete sanitized.messages;
+        delete sanitized.imageBase64;
+        delete sanitized.signals;
+        logLine += ` :: ${JSON.stringify(sanitized)}`;
       }
 
-      if (logLine.length > 80) {
-        logLine = logLine.slice(0, 79) + "…";
+      if (logLine.length > 120) {
+        logLine = logLine.slice(0, 119) + "\u2026";
       }
 
       log(logLine);
@@ -222,9 +269,9 @@ function setupErrorHandler(app: express.Application) {
     };
 
     const status = error.status || error.statusCode || 500;
-    const message = error.message || "Internal Server Error";
+    const message = status === 500 ? "Internal Server Error" : (error.message || "Internal Server Error");
 
-    console.error("Internal Server Error:", err);
+    console.error("Server error:", error.message || "Unknown error");
 
     if (res.headersSent) {
       return next(err);
@@ -235,6 +282,7 @@ function setupErrorHandler(app: express.Application) {
 }
 
 function setupSession(app: express.Application) {
+  const isProduction = process.env.NODE_ENV === "production";
   const PgStore = connectPgSimple(session);
   app.use(
     session({
@@ -242,14 +290,14 @@ function setupSession(app: express.Application) {
         conString: process.env.DATABASE_URL,
         createTableIfMissing: true,
       }),
-      secret: process.env.SESSION_SECRET || "tabibi-secret-key",
+      secret: process.env.SESSION_SECRET || "dev-only-secret-key",
       resave: false,
       saveUninitialized: false,
       cookie: {
         maxAge: 30 * 24 * 60 * 60 * 1000,
         httpOnly: true,
-        secure: false,
-        sameSite: "lax",
+        secure: isProduction,
+        sameSite: isProduction ? "strict" : "lax",
       },
     }),
   );
@@ -259,6 +307,7 @@ function setupSession(app: express.Application) {
   setupCors(app);
   setupBodyParsing(app);
   setupSession(app);
+  setupRateLimiting(app);
   setupRequestLogging(app);
 
   configureExpoAndLanding(app);

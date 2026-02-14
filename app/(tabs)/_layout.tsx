@@ -4,7 +4,7 @@ import { NativeTabs, Icon, Label } from "expo-router/unstable-native-tabs";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet, View } from "react-native";
 import React from "react";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import Colors from "@/constants/colors";
 
@@ -14,6 +14,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "heart.text.clipboard", selected: "heart.text.clipboard.fill" }} />
         <Label>الرئيسية</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="orders">
+        <Icon sf={{ default: "shippingbox", selected: "shippingbox.fill" }} />
+        <Label>طلباتي</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
         <Icon sf={{ default: "clock", selected: "clock.fill" }} />
@@ -83,6 +87,15 @@ function ClassicTabLayout() {
           title: "الرئيسية",
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? "heart" : "heart-outline"} size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="orders"
+        options={{
+          title: "طلباتي",
+          tabBarIcon: ({ color, focused }) => (
+            <MaterialCommunityIcons name={focused ? "package-variant" : "package-variant-closed"} size={24} color={color} />
           ),
         }}
       />

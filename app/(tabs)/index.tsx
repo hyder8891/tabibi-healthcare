@@ -55,46 +55,84 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.greetingRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-          <View>
-            <Text style={[styles.greeting, isRTL && { textAlign: "right" }]}>{t("Welcome to", "مرحباً بك في")}</Text>
-            <Text style={[styles.appName, isRTL && { textAlign: "right" }]}>{t("Tabibi", "طبيبي")}</Text>
-          </View>
-          <Image source={require("@/assets/images/logo.png")} style={styles.logoImage} />
-        </View>
+        <View style={styles.heroCard}>
+          <LinearGradient
+            colors={["#0D9488", "#0F766E", "#115E59"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.heroGradient}
+          >
+            <View style={styles.heroDecoRing1} />
+            <View style={styles.heroDecoRing2} />
+            <View style={styles.heroDecoDot1} />
+            <View style={styles.heroDecoDot2} />
+            <View style={styles.heroDecoDot3} />
 
-        <Text style={[styles.tagline, isRTL && { textAlign: "right" }]}>
-          {t("Your Active Healthcare Navigator", "مساعدك الصحي الذكي")}
-        </Text>
+            <View style={[styles.heroTop, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.heroLogoWrap}>
+                <Image source={require("@/assets/images/logo.png")} style={styles.heroLogo} />
+              </View>
+              <View style={styles.heroStatusPill}>
+                <View style={styles.heroStatusDot} />
+                <Text style={styles.heroStatusText}>{t("Ready", "جاهز")}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.heroTextBlock, isRTL && { alignItems: "flex-end" }]}>
+              <Text style={[styles.heroGreeting, isRTL && { textAlign: "right" }]}>
+                {t("Welcome to", "مرحباً بك في")}
+              </Text>
+              <Text style={[styles.heroAppName, isRTL && { textAlign: "right" }]}>
+                {t("Tabibi", "طبيبي")}
+              </Text>
+              <View style={styles.heroTaglineDivider} />
+              <Text style={[styles.heroTagline, isRTL && { textAlign: "right" }]}>
+                {t("Your Active Healthcare Navigator", "مساعدك الصحي الذكي")}
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
 
         <Pressable
           style={({ pressed }) => [
             styles.mainCTA,
-            pressed && { opacity: 0.95, transform: [{ scale: 0.98 }] },
+            pressed && { opacity: 0.95, transform: [{ scale: 0.97 }] },
           ]}
           onPress={startAssessment}
         >
           <LinearGradient
-            colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
+            colors={["#0D9488", "#0A7C72", "#07635B"]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.ctaGradient}
           >
-            <View style={styles.ctaDecoCircle1} />
-            <View style={styles.ctaDecoCircle2} />
-            <View style={[styles.ctaContent, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.ctaLeft}>
-                <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>{t("Start Assessment", "ابدأ التقييم")}</Text>
-                <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
-                  {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
-                </Text>
+            <View style={styles.ctaDecoArc} />
+            <View style={styles.ctaDecoGlow} />
+
+            <View style={[styles.ctaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.ctaIconWrap}>
+                <Ionicons name="chatbubbles" size={26} color={Colors.light.primary} />
               </View>
-              <View style={[styles.ctaIcon, isRTL ? { marginRight: 16, marginLeft: 0 } : {}]}>
-                <Ionicons name="chatbubbles" size={32} color="rgba(255,255,255,0.9)" />
+              <View style={styles.ctaChip}>
+                <View style={styles.ctaChipDot} />
+                <Text style={styles.ctaChipText}>{t("AI-Powered", "بالذكاء الاصطناعي")}</Text>
               </View>
             </View>
-            <View style={[styles.ctaArrow, isRTL && { alignSelf: "flex-start" }]}>
-              <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={20} color="#fff" />
+
+            <View style={[styles.ctaTextBlock, isRTL && { alignItems: "flex-end" }]}>
+              <Text style={[styles.ctaTitle, isRTL && { textAlign: "right" }]}>
+                {t("Start Assessment", "ابدأ التقييم")}
+              </Text>
+              <Text style={[styles.ctaSubtitle, isRTL && { textAlign: "right" }]}>
+                {t("Describe your symptoms and get personalized health guidance", "صف أعراضك واحصل على إرشادات صحية مخصصة")}
+              </Text>
+            </View>
+
+            <View style={[styles.ctaAction, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <Text style={styles.ctaActionText}>{t("Begin Now", "ابدأ الآن")}</Text>
+              <View style={styles.ctaArrow}>
+                <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color={Colors.light.primary} />
+              </View>
             </View>
           </LinearGradient>
         </Pressable>
@@ -117,9 +155,9 @@ export default function HomeScreen() {
                   color={Colors.light.accent}
                 />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Scan Medicine", "مسح الدواء")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Drug Interactions", "التداخلات الدوائية")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Check drug interactions", "تحقق من التداخلات الدوائية")}
+                {t("Check medicine safety", "تحقق من سلامة الأدوية")}
               </Text>
             </Pressable>
 
@@ -185,39 +223,58 @@ export default function HomeScreen() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/routing?type=lab");
+                router.push("/routing");
               }}
             >
               <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
-                <MaterialCommunityIcons name="flask" size={28} color="#7C3AED" />
+                <Ionicons name="medkit" size={28} color="#7C3AED" />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Lab", "ابحث عن مختبر")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Care", "ابحث عن رعاية")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Labs & imaging centers", "مختبرات ومراكز تصوير")}
+                {t("Clinics, labs & hospitals", "عيادات ومختبرات ومستشفيات")}
               </Text>
             </Pressable>
           </View>
+
         </View>
 
         <View style={styles.infoCards}>
           <View style={styles.infoCard}>
-            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Ionicons name="shield-checkmark" size={20} color={Colors.light.primary} />
-              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
+            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.infoCardIconWrap}>
+                <LinearGradient
+                  colors={[Colors.light.primary, "#14B8A6"]}
+                  style={styles.infoCardIconGradient}
+                >
+                  <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                </LinearGradient>
+              </View>
+              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
+                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
+                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+                  {t("Checks for emergency symptoms, drug interactions, and contraindications before any recommendation.", "يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-              {t("Tabibi checks for emergency symptoms, drug interactions, and contraindications before making any recommendation.", "طبيبي يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
-            </Text>
           </View>
 
-          <View style={[styles.infoCard, styles.infoCardAccent]}>
-            <View style={[styles.infoCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
-              <Ionicons name="navigate" size={20} color={Colors.light.accent} />
-              <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
+          <View style={styles.infoCard}>
+            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.infoCardIconWrap}>
+                <LinearGradient
+                  colors={[Colors.light.accent, "#FB923C"]}
+                  style={styles.infoCardIconGradient}
+                >
+                  <Ionicons name="navigate" size={20} color="#fff" />
+                </LinearGradient>
+              </View>
+              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
+                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
+                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
+                  {t("Find the nearest facility with exactly what you need \u2014 pharmacies, labs, or clinics.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه \u2014 صيدليات أو مختبرات أو عيادات.")}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-              {t("Find the nearest facility that has exactly what you need - from pharmacies with specific medicines to labs with MRI machines.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه - من صيدليات بأدوية محددة إلى مختبرات بأجهزة الرنين المغناطيسي.")}
-            </Text>
           </View>
         </View>
 
@@ -289,104 +346,242 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
   },
-  greetingRow: {
+  heroCard: {
+    marginBottom: 24,
+    borderRadius: 28,
+    overflow: "hidden",
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  heroGradient: {
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 28,
+    borderRadius: 28,
+    overflow: "hidden",
+  },
+  heroDecoRing1: {
+    position: "absolute",
+    top: -40,
+    right: -40,
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  heroDecoRing2: {
+    position: "absolute",
+    bottom: -50,
+    left: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.06)",
+  },
+  heroDecoDot1: {
+    position: "absolute",
+    top: 32,
+    right: 60,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  heroDecoDot2: {
+    position: "absolute",
+    bottom: 44,
+    right: 40,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.12)",
+  },
+  heroDecoDot3: {
+    position: "absolute",
+    top: 60,
+    left: 50,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 6,
-    marginTop: 8,
+    marginBottom: 20,
   },
-  logoImage: {
-    width: 72,
-    height: 72,
+  heroLogoWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroLogo: {
+    width: 36,
+    height: 36,
     resizeMode: "contain" as const,
   },
-  greeting: {
-    fontSize: 15,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
-    marginBottom: 2,
+  heroStatusPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
   },
-  appName: {
-    fontSize: 36,
+  heroStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#34D399",
+  },
+  heroStatusText: {
+    fontSize: 12,
+    fontFamily: "DMSans_500Medium",
+    color: "rgba(255,255,255,0.9)",
+  },
+  heroTextBlock: {
+    gap: 4,
+  },
+  heroGreeting: {
+    fontSize: 14,
+    fontFamily: "DMSans_400Regular",
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 0.3,
+  },
+  heroAppName: {
+    fontSize: 34,
     fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
+    color: "#FFFFFF",
     letterSpacing: -0.5,
   },
-  tagline: {
-    fontSize: 15,
+  heroTaglineDivider: {
+    width: 36,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    marginVertical: 6,
+  },
+  heroTagline: {
+    fontSize: 14,
     fontFamily: "DMSans_400Regular",
-    color: Colors.light.textLight,
-    marginBottom: 28,
+    color: "rgba(255,255,255,0.75)",
+    lineHeight: 20,
   },
   mainCTA: {
-    marginBottom: 32,
+    marginBottom: 28,
     borderRadius: 24,
     overflow: "hidden",
-    shadowColor: Colors.light.primary,
-    shadowOffset: { width: 0, height: 10 },
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowRadius: 28,
+    elevation: 14,
   },
   ctaGradient: {
-    padding: 28,
     borderRadius: 24,
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 22,
     overflow: "hidden",
   },
-  ctaDecoCircle1: {
+  ctaDecoArc: {
     position: "absolute",
-    top: -30,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.08)",
+    top: -60,
+    right: -40,
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: "rgba(255,255,255,0.06)",
   },
-  ctaDecoCircle2: {
+  ctaDecoGlow: {
     position: "absolute",
-    bottom: -20,
+    bottom: -30,
     left: -20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.05)",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(255,255,255,0.04)",
   },
-  ctaContent: {
+  ctaHeader: {
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 18,
   },
-  ctaLeft: {
-    flex: 1,
+  ctaIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FFFFFF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  ctaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  ctaChipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#34D399",
+  },
+  ctaChipText: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: "rgba(255,255,255,0.9)",
+  },
+  ctaTextBlock: {
+    marginBottom: 22,
+    gap: 6,
   },
   ctaTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontFamily: "DMSans_700Bold",
-    color: "#fff",
-    marginBottom: 8,
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
   },
   ctaSubtitle: {
     fontSize: 14,
     fontFamily: "DMSans_400Regular",
-    color: "rgba(255,255,255,0.85)",
+    color: "rgba(255,255,255,0.75)",
     lineHeight: 21,
   },
-  ctaIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.15)",
+  ctaAction: {
+    flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 10,
     justifyContent: "center",
-    marginLeft: 16,
+  },
+  ctaActionText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#FFFFFF",
   },
   ctaArrow: {
-    alignSelf: "flex-end",
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.2)",
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -418,6 +613,9 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
+  actionCardWide: {
+    flex: 1,
+  },
   actionIcon: {
     width: 48,
     height: 48,
@@ -439,40 +637,54 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   infoCards: {
-    gap: 14,
+    gap: 12,
     marginBottom: 28,
   },
   infoCard: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 18,
+    borderRadius: 20,
     padding: 18,
-    borderLeftWidth: 3,
-    borderLeftColor: Colors.light.primary,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  infoCardAccent: {
-    borderLeftColor: Colors.light.accent,
-  },
-  infoCardHeader: {
+  infoCardRow: {
     flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+  },
+  infoCardIconWrap: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
+    overflow: "hidden",
+  },
+  infoCardIconGradient: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: "center",
-    gap: 10,
-    marginBottom: 10,
+    justifyContent: "center",
+  },
+  infoCardContent: {
+    flex: 1,
+    gap: 4,
   },
   infoCardTitle: {
-    fontSize: 16,
-    fontFamily: "DMSans_600SemiBold",
+    fontSize: 15,
+    fontFamily: "DMSans_700Bold",
     color: Colors.light.text,
+    letterSpacing: -0.1,
   },
   infoCardText: {
     fontSize: 13,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
-    lineHeight: 20,
+    lineHeight: 19,
   },
   recentCard: {
     flexDirection: "row",

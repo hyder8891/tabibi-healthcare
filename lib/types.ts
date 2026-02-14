@@ -97,6 +97,31 @@ export interface Assessment {
   patientProfile: PatientProfile;
 }
 
+export interface MedicineOrder {
+  id: string;
+  userId: string;
+  pharmacyName: string;
+  pharmacyPhone?: string;
+  pharmacyAddress?: string;
+  pharmacyPlaceId?: string;
+  medicineName: string;
+  medicineDosage?: string;
+  medicineFrequency?: string;
+  quantity: number;
+  price?: number;
+  deliveryFee?: number;
+  totalPrice?: number;
+  deliveryAddress: string;
+  patientName: string;
+  patientPhone: string;
+  alWaseetOrderId?: string;
+  status: string;
+  pharmacyConfirmed?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface NearbyFacility {
   id: string;
   name: string;
@@ -109,7 +134,11 @@ export interface NearbyFacility {
   longitude: number;
   capabilities: string[];
   phone?: string;
+  internationalPhone?: string;
   openHours?: string;
+  openingHours?: string[];
+  website?: string;
+  googleMapsUrl?: string;
   placeId?: string;
   totalRatings?: number;
   photos?: string[];

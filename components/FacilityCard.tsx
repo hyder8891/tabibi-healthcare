@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable, Linking, Platform } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import type { NearbyFacility } from "@/lib/types";
@@ -29,6 +29,8 @@ export function FacilityCard({ facility }: FacilityCardProps) {
   const iconName = facilityIcons[facility.type] || "location";
   const color = facilityColors[facility.type] || Colors.light.primary;
 
+  const phoneNumber = facility.internationalPhone || facility.phone;
+
   const openNavigation = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const url = Platform.select({
@@ -40,8 +42,24 @@ export function FacilityCard({ facility }: FacilityCardProps) {
   };
 
   const callFacility = () => {
-    if (facility.phone && Platform.OS !== "web") {
-      Linking.openURL(`tel:${facility.phone}`);
+    if (phoneNumber) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Linking.openURL(`tel:${phoneNumber}`);
+    }
+  };
+
+  const openWhatsApp = () => {
+    if (phoneNumber) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      const cleaned = phoneNumber.replace(/[\s\-()]/g, "").replace(/^\+/, "");
+      Linking.openURL(`https://wa.me/${cleaned}`);
+    }
+  };
+
+  const openSMS = () => {
+    if (phoneNumber) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Linking.openURL(`sms:${phoneNumber}`);
     }
   };
 
@@ -55,7 +73,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
           <Text style={styles.name} numberOfLines={1}>
             {facility.name}
           </Text>
-          <Text style={styles.address} numberOfLines={1}>
+          <Text style={styles.address} numberOfLines={2}>
             {facility.address}
           </Text>
         </View>
@@ -72,6 +90,9 @@ export function FacilityCard({ facility }: FacilityCardProps) {
         <View style={styles.ratingContainer}>
           <Ionicons name="star" size={14} color="#F59E0B" />
           <Text style={styles.rating}>{facility.rating.toFixed(1)}</Text>
+          {facility.totalRatings ? (
+            <Text style={styles.totalRatings}>({facility.totalRatings})</Text>
+          ) : null}
         </View>
         <View
           style={[
@@ -103,23 +124,17 @@ export function FacilityCard({ facility }: FacilityCardProps) {
               },
             ]}
           >
-            {facility.isOpen ? t("Open Now", "مفتوح الآن") : t("Closed", "مغلق")}
+            {facility.isOpen ? t("Open Now", "\u0645\u0641\u062a\u0648\u062d \u0627\u0644\u0622\u0646") : t("Closed", "\u0645\u063a\u0644\u0642")}
           </Text>
         </View>
-        {facility.openHours && (
-          <Text style={styles.hours}>{facility.openHours}</Text>
-        )}
       </View>
 
-      {facility.capabilities.length > 0 && (
-        <View style={styles.capsRow}>
-          {facility.capabilities.slice(0, 4).map((cap, i) => (
-            <View key={i} style={styles.capBadge}>
-              <Text style={styles.capText}>{cap}</Text>
-            </View>
-          ))}
+      {phoneNumber ? (
+        <View style={styles.phoneRow}>
+          <Ionicons name="call-outline" size={15} color={Colors.light.textSecondary} />
+          <Text style={styles.phoneText}>{phoneNumber}</Text>
         </View>
-      )}
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable
@@ -130,19 +145,43 @@ export function FacilityCard({ facility }: FacilityCardProps) {
           onPress={openNavigation}
         >
           <Ionicons name="navigate" size={18} color="#fff" />
-          <Text style={styles.navButtonText}>{t("Navigate", "انتقل")}</Text>
+          <Text style={styles.navButtonText}>{t("Navigate", "\u0627\u0646\u062a\u0642\u0644")}</Text>
         </Pressable>
-        {facility.phone && (
-          <Pressable
-            style={({ pressed }) => [
-              styles.callButton,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={callFacility}
-          >
-            <Ionicons name="call" size={18} color={Colors.light.primary} />
-          </Pressable>
-        )}
+
+        {phoneNumber ? (
+          <>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.callButton,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={callFacility}
+            >
+              <Ionicons name="call" size={18} color={Colors.light.primary} />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.whatsappButton,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={openWhatsApp}
+            >
+              <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionButton,
+                styles.smsButton,
+                pressed && { opacity: 0.8 },
+              ]}
+              onPress={openSMS}
+            >
+              <Ionicons name="chatbubble-outline" size={18} color={Colors.light.accent} />
+            </Pressable>
+          </>
+        ) : null}
       </View>
     </View>
   );
@@ -187,12 +226,14 @@ const styles = StyleSheet.create({
   address: {
     fontSize: 13,
     color: Colors.light.textSecondary,
+    lineHeight: 18,
   },
   distanceBadge: {
     backgroundColor: Colors.light.primarySurface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 10,
+    marginLeft: 8,
   },
   distance: {
     fontSize: 13,
@@ -215,6 +256,10 @@ const styles = StyleSheet.create({
     fontWeight: "500" as const,
     color: Colors.light.text,
   },
+  totalRatings: {
+    fontSize: 11,
+    color: Colors.light.textTertiary,
+  },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -232,26 +277,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
   },
-  hours: {
-    fontSize: 12,
-    color: Colors.light.textTertiary,
-  },
-  capsRow: {
+  phoneRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
+    alignItems: "center",
     gap: 6,
     marginBottom: 12,
-  },
-  capBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     backgroundColor: Colors.light.background,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: 10,
   },
-  capText: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
+  phoneText: {
+    fontSize: 14,
     fontWeight: "500" as const,
+    color: Colors.light.text,
   },
   actions: {
     flexDirection: "row",
@@ -272,13 +311,23 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: "#fff",
   },
-  callButton: {
+  actionButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.light.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  callButton: {
+    borderWidth: 1.5,
+    borderColor: Colors.light.primary,
+  },
+  whatsappButton: {
+    borderWidth: 1.5,
+    borderColor: "#25D366",
+  },
+  smsButton: {
+    borderWidth: 1.5,
+    borderColor: Colors.light.accent,
   },
 });

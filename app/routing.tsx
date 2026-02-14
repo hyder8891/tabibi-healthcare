@@ -20,7 +20,7 @@ import type { NearbyFacility } from "@/lib/types";
 
 export default function RoutingScreen() {
   const insets = useSafeAreaInsets();
-  const { type = "pharmacy", capabilities } = useLocalSearchParams<{
+  const { type = "clinic", capabilities } = useLocalSearchParams<{
     type: string;
     capabilities?: string;
   }>();
@@ -32,7 +32,15 @@ export default function RoutingScreen() {
   const [selectedType, setSelectedType] = useState(type);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [filterOpenNow, setFilterOpenNow] = useState(false);
+  const [filterHighRated, setFilterHighRated] = useState(false);
+  const [sortBy, setSortBy] = useState<"distance" | "rating">("distance");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  const filteredFacilities = facilities
+    .filter((f) => (!filterOpenNow || f.isOpen))
+    .filter((f) => (!filterHighRated || f.rating >= 4.0))
+    .sort((a, b) => sortBy === "rating" ? b.rating - a.rating : a.distance - b.distance);
 
   useEffect(() => {
     loadFacilities();
@@ -210,6 +218,74 @@ export default function RoutingScreen() {
         ))}
       </View>
 
+      <View style={styles.filterRow}>
+        <Pressable
+          style={[
+            styles.filterChip,
+            filterOpenNow && styles.filterChipActive,
+          ]}
+          onPress={() => setFilterOpenNow(!filterOpenNow)}
+        >
+          <Ionicons
+            name="time-outline"
+            size={14}
+            color={filterOpenNow ? "#fff" : Colors.light.textSecondary}
+          />
+          <Text style={[styles.filterChipText, filterOpenNow && styles.filterChipTextActive]}>
+            {t("Open Now", "مفتوح الآن")}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.filterChip,
+            filterHighRated && styles.filterChipActive,
+          ]}
+          onPress={() => setFilterHighRated(!filterHighRated)}
+        >
+          <Ionicons
+            name="star"
+            size={14}
+            color={filterHighRated ? "#fff" : "#F59E0B"}
+          />
+          <Text style={[styles.filterChipText, filterHighRated && styles.filterChipTextActive]}>
+            {t("4+ Stars", "٤+ نجوم")}
+          </Text>
+        </Pressable>
+        <View style={styles.sortDivider} />
+        <Pressable
+          style={[
+            styles.filterChip,
+            sortBy === "distance" && styles.filterChipActive,
+          ]}
+          onPress={() => setSortBy("distance")}
+        >
+          <Ionicons
+            name="navigate-outline"
+            size={14}
+            color={sortBy === "distance" ? "#fff" : Colors.light.textSecondary}
+          />
+          <Text style={[styles.filterChipText, sortBy === "distance" && styles.filterChipTextActive]}>
+            {t("Nearest", "الأقرب")}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.filterChip,
+            sortBy === "rating" && styles.filterChipActive,
+          ]}
+          onPress={() => setSortBy("rating")}
+        >
+          <Ionicons
+            name="trophy-outline"
+            size={14}
+            color={sortBy === "rating" ? "#fff" : Colors.light.textSecondary}
+          />
+          <Text style={[styles.filterChipText, sortBy === "rating" && styles.filterChipTextActive]}>
+            {t("Top Rated", "الأعلى تقييماً")}
+          </Text>
+        </Pressable>
+      </View>
+
       {locationError && (
         <View style={[styles.errorBanner, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="location-outline" size={16} color={Colors.light.accent} />
@@ -226,14 +302,14 @@ export default function RoutingScreen() {
         </View>
       ) : (
         <FlatList
-          data={facilities}
+          data={filteredFacilities}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <FacilityCard facility={item} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <Text style={[styles.resultCount, isRTL && { textAlign: "right" as const }]}>
-              {facilities.length}{" "}
+              {filteredFacilities.length}{" "}
               {t("facilities found", "\u0645\u0631\u0627\u0641\u0642 \u062a\u0645 \u0627\u0644\u0639\u062b\u0648\u0631 \u0639\u0644\u064a\u0647\u0627")}
             </Text>
           }
@@ -311,6 +387,45 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
+  },
+  filterRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.light.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.borderLight,
+  },
+  filterChip: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    backgroundColor: Colors.light.surface,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  filterChipTextActive: {
+    color: "#fff",
+  },
+  sortDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: Colors.light.borderLight,
+    marginHorizontal: 2,
   },
   typeSelector: {
     flexDirection: "row",

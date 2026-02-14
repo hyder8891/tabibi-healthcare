@@ -1,8 +1,16 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 import { verifyFirebaseToken } from "./firebase-auth";
+import { z } from "zod";
+
+const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.userId) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  next();
+};
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -10,6 +18,52 @@ const ai = new GoogleGenAI({
     apiVersion: "",
     baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
   },
+});
+
+const messageSchema = z.object({
+  role: z.enum(["user", "assistant"]),
+  content: z.string().max(10000),
+  imageData: z.string().optional(),
+  mimeType: z.string().optional(),
+});
+
+const patientProfileSchema = z.object({
+  name: z.string().max(200).optional(),
+  age: z.number().min(0).max(150).optional(),
+  gender: z.string().max(50).optional(),
+  weight: z.number().min(0).max(500).optional(),
+  height: z.number().min(0).max(300).optional(),
+  bloodType: z.string().max(10).optional(),
+  isPediatric: z.boolean().optional(),
+  medications: z.array(z.string().max(200)).optional(),
+  conditions: z.array(z.string().max(200)).optional(),
+  allergies: z.array(z.string().max(200)).optional(),
+}).optional();
+
+const assessmentSchema = z.object({
+  messages: z.array(messageSchema).min(1).max(50),
+  patientProfile: patientProfileSchema,
+});
+
+const medicationAnalysisSchema = z.object({
+  imageBase64: z.string().min(1),
+  mimeType: z.string().optional(),
+});
+
+const interactionCheckSchema = z.object({
+  medications: z.array(z.string().max(200)).optional(),
+  currentMedications: z.array(z.string().max(200)).optional(),
+  newMedication: z.string().max(200).optional(),
+  language: z.enum(["en", "ar"]).optional(),
+});
+
+const rppgSchema = z.object({
+  signals: z.array(z.object({
+    r: z.number(),
+    g: z.number(),
+    b: z.number(),
+  })).min(30).max(1000),
+  fps: z.number().min(1).max(60).optional(),
 });
 
 const MEDICAL_SYSTEM_PROMPT = `You are Tabibi, an expert AI healthcare assessment assistant. Your role is to simulate the reasoning of an experienced diagnostician through a conversational, adaptive interview.
@@ -173,7 +227,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         authProvider: user.authProvider,
       });
     } catch (error) {
-      console.error("Firebase auth error:", error);
+      console.error("Firebase auth error:", error instanceof Error ? error.message : "Unknown error");
       return res.status(500).json({ message: "Authentication failed" });
     }
   });
@@ -206,13 +260,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.post("/api/assess", async (req: Request, res: Response) => {
+  app.post("/api/assess", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { messages, patientProfile } = req.body;
-
-      if (!messages || !Array.isArray(messages)) {
-        return res.status(400).json({ error: "Messages array is required" });
+      const validation = assessmentSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request data", details: validation.error.issues.map(i => i.message) });
       }
+      const { messages, patientProfile } = validation.data;
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
@@ -322,7 +376,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
       res.write(`data: ${JSON.stringify({ done: true, fullResponse })}\n\n`);
       res.end();
     } catch (error) {
-      console.error("Assessment error:", error);
+      console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");
       if (res.headersSent) {
         res.write(`data: ${JSON.stringify({ error: "Assessment failed" })}\n\n`);
         res.end();
@@ -332,13 +386,13 @@ Be thorough and specific. Provide your analysis in the same language the user is
     }
   });
 
-  app.post("/api/analyze-medication", async (req: Request, res: Response) => {
+  app.post("/api/analyze-medication", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { imageBase64, mimeType } = req.body;
-
-      if (!imageBase64) {
+      const validation = medicationAnalysisSchema.safeParse(req.body);
+      if (!validation.success) {
         return res.status(400).json({ error: "Image data is required" });
       }
+      const { imageBase64, mimeType } = validation.data;
 
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
@@ -395,14 +449,18 @@ Support both Arabic and English text on medication packaging.`,
 
       res.json({ medications });
     } catch (error) {
-      console.error("Medication analysis error:", error);
+      console.error("Medication analysis error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to analyze medication" });
     }
   });
 
-  app.post("/api/check-interactions", async (req: Request, res: Response) => {
+  app.post("/api/check-interactions", requireAuth, async (req: Request, res: Response) => {
     try {
-      const { medications, currentMedications, newMedication, language } = req.body;
+      const validation = interactionCheckSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request data" });
+      }
+      const { medications, currentMedications, newMedication, language } = validation.data;
 
       const lang = language === "en" ? "English" : "Arabic (العربية)";
       const langInstruction = `\n\nIMPORTANT: Write ALL text fields (description, recommendation, summary) in ${lang}. Drug names can remain in their original form, but all explanatory text MUST be in ${lang}.`;
@@ -480,7 +538,7 @@ Respond ONLY with JSON:
 
       res.json(result);
     } catch (error) {
-      console.error("Interaction check error:", error);
+      console.error("Interaction check error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to check interactions" });
     }
   });
@@ -529,7 +587,7 @@ Respond ONLY with JSON:
       const lat = parseFloat(latitude as string);
       const lng = parseFloat(longitude as string);
 
-      const facilities = (data.results || []).map((place: any, index: number) => {
+      const baseFacilities = (data.results || []).map((place: any, index: number) => {
         const placeLat = place.geometry?.location?.lat || lat;
         const placeLng = place.geometry?.location?.lng || lng;
         
@@ -556,96 +614,242 @@ Respond ONLY with JSON:
             !["point_of_interest", "establishment", "health", "store"].includes(t)
           ).slice(0, 4),
           phone: "",
+          internationalPhone: "",
           openHours: place.opening_hours?.open_now ? "Open" : "Closed",
           placeId: place.place_id,
           totalRatings: place.user_ratings_total || 0,
           photos: place.photos ? place.photos.slice(0, 1).map((p: any) => 
-            `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${p.photo_reference}&key=${apiKey}`
+            `/api/place-photo/${p.photo_reference}`
           ) : [],
         };
       });
 
-      facilities.sort((a: any, b: any) => a.distance - b.distance);
+      baseFacilities.sort((a: any, b: any) => a.distance - b.distance);
+
+      const detailsPromises = baseFacilities.map(async (facility: any) => {
+        if (!facility.placeId) return facility;
+        try {
+          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(facility.placeId)}&fields=formatted_phone_number,international_phone_number&key=${apiKey}`;
+          const detailsRes = await globalThis.fetch(detailsUrl);
+          const detailsData = await detailsRes.json();
+          if (detailsData.status === "OK" && detailsData.result) {
+            facility.phone = detailsData.result.formatted_phone_number || "";
+            facility.internationalPhone = detailsData.result.international_phone_number || "";
+          }
+        } catch {}
+        return facility;
+      });
+
+      const facilities = await Promise.all(detailsPromises);
 
       res.json({
         facilities,
         nextPageToken: data.next_page_token || null,
       });
     } catch (error) {
-      console.error("Nearby facilities error:", error);
+      console.error("Nearby facilities error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to fetch nearby facilities" });
     }
   });
 
-  app.post("/api/process-rppg", (req: Request, res: Response) => {
+  app.get("/api/place-photo/:photoRef", async (req: Request, res: Response) => {
     try {
-      const { signals, fps } = req.body;
+      const { photoRef } = req.params;
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Google Maps API key not configured" });
+      }
 
-      if (!signals || !Array.isArray(signals) || signals.length < 30) {
+      const ref = Array.isArray(photoRef) ? photoRef[0] : photoRef;
+      const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
+      const response = await globalThis.fetch(url);
+
+      if (!response.ok) {
+        return res.status(response.status).json({ error: "Failed to fetch photo" });
+      }
+
+      const buffer = await response.arrayBuffer();
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      res.set("Content-Type", contentType);
+      res.set("Cache-Control", "public, max-age=86400");
+      res.send(Buffer.from(buffer));
+    } catch (error) {
+      console.error("Place photo proxy error:", error instanceof Error ? error.message : "Unknown error");
+      res.status(500).json({ error: "Failed to fetch photo" });
+    }
+  });
+
+  app.get("/api/place-details/:placeId", async (req: Request, res: Response) => {
+    try {
+      const { placeId } = req.params;
+      const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ error: "Google Maps API key not configured" });
+      }
+
+      const id = Array.isArray(placeId) ? placeId[0] : placeId;
+      const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(id)}&fields=formatted_phone_number,international_phone_number,opening_hours,website,url&key=${apiKey}`;
+      const response = await globalThis.fetch(url);
+      const data = await response.json();
+
+      if (data.status !== "OK") {
+        return res.status(400).json({ error: `Place details error: ${data.status}` });
+      }
+
+      const result = data.result || {};
+      res.json({
+        phone: result.formatted_phone_number || "",
+        internationalPhone: result.international_phone_number || "",
+        website: result.website || "",
+        googleMapsUrl: result.url || "",
+        openingHours: result.opening_hours?.weekday_text || [],
+        isOpen: result.opening_hours?.open_now ?? null,
+      });
+    } catch (error) {
+      console.error("Place details error:", error instanceof Error ? error.message : "Unknown error");
+      res.status(500).json({ error: "Failed to fetch place details" });
+    }
+  });
+
+  app.post("/api/process-rppg", requireAuth, (req: Request, res: Response) => {
+    try {
+      const validation = rppgSchema.safeParse(req.body);
+      if (!validation.success) {
         return res.status(400).json({ 
           error: "At least 30 RGB signal samples are required (10+ seconds of data)" 
         });
       }
+      const { signals, fps } = validation.data;
 
-      const actualFps = fps || 3;
+      const actualFps = fps || 10;
       const n = signals.length;
+
+      if (n < 30) {
+        return res.status(400).json({ error: "Not enough samples for analysis" });
+      }
 
       const rRaw = signals.map((s: any) => s.r as number);
       const gRaw = signals.map((s: any) => s.g as number);
       const bRaw = signals.map((s: any) => s.b as number);
 
-      const rMean = rRaw.reduce((a: number, b: number) => a + b, 0) / n;
-      const gMean = gRaw.reduce((a: number, b: number) => a + b, 0) / n;
-      const bMean = bRaw.reduce((a: number, b: number) => a + b, 0) / n;
-
-      const rNorm = rRaw.map((v: number) => v / (rMean || 1));
-      const gNorm = gRaw.map((v: number) => v / (gMean || 1));
-      const bNorm = bRaw.map((v: number) => v / (bMean || 1));
-
-      const posSignal: number[] = [];
-      const windowSize = Math.min(Math.floor(actualFps * 1.6), n);
-      
-      for (let i = 0; i < n; i++) {
-        const start = Math.max(0, i - Math.floor(windowSize / 2));
-        const end = Math.min(n, i + Math.floor(windowSize / 2));
-        const len = end - start;
-
-        let lRMean = 0, lGMean = 0, lBMean = 0;
-        for (let j = start; j < end; j++) {
-          lRMean += rNorm[j];
-          lGMean += gNorm[j];
-          lBMean += bNorm[j];
+      function detrendSignal(sig: number[]): number[] {
+        const len = sig.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        for (let i = 0; i < len; i++) {
+          sumX += i;
+          sumY += sig[i];
+          sumXY += i * sig[i];
+          sumXX += i * i;
         }
-        lRMean /= len;
-        lGMean /= len;
-        lBMean /= len;
-
-        const xs = 3 * (rNorm[i] / (lRMean || 1)) - 2 * (gNorm[i] / (lGMean || 1));
-        const ys = 1.5 * (rNorm[i] / (lRMean || 1)) + (gNorm[i] / (lGMean || 1)) - 1.5 * (bNorm[i] / (lBMean || 1));
-
-        const stdXs = Math.sqrt(posSignal.reduce((sum, v) => sum + v * v, 0) / (posSignal.length || 1)) || 1;
-        const alpha = stdXs;
-        posSignal.push(xs + alpha * ys);
+        const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+        const intercept = (sumY - slope * sumX) / len;
+        return sig.map((v, i) => v - (slope * i + intercept));
       }
 
-      const minFreq = 0.7;
-      const maxFreq = 4.0;
+      function normalizeSignal(sig: number[]): number[] {
+        const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
+        const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
+        return sig.map(v => (v - mean) / std);
+      }
 
-      const mean = posSignal.reduce((a, b) => a + b, 0) / n;
-      const centered = posSignal.map(v => v - mean);
+      const rDetrend = detrendSignal(rRaw);
+      const gDetrend = detrendSignal(gRaw);
+      const bDetrend = detrendSignal(bRaw);
 
-      const hannWindow = centered.map((v, i) => v * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1))));
+      const rNorm = normalizeSignal(rDetrend);
+      const gNorm = normalizeSignal(gDetrend);
+      const bNorm = normalizeSignal(bDetrend);
 
-      const fftSize = Math.pow(2, Math.ceil(Math.log2(n)));
+      const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
+      const posSignal = new Array(n).fill(0);
+
+      for (let start = 0; start < n - windowSize; start += Math.floor(windowSize / 2)) {
+        const end = Math.min(start + windowSize, n);
+        const len = end - start;
+
+        const rWin = rNorm.slice(start, end);
+        const gWin = gNorm.slice(start, end);
+        const bWin = bNorm.slice(start, end);
+
+        const rMean = rWin.reduce((a, b) => a + b, 0) / len;
+        const gMean = gWin.reduce((a, b) => a + b, 0) / len;
+        const bMean = bWin.reduce((a, b) => a + b, 0) / len;
+        const rStd = Math.sqrt(rWin.reduce((s, v) => s + (v - rMean) ** 2, 0) / len) || 1;
+        const gStd = Math.sqrt(gWin.reduce((s, v) => s + (v - gMean) ** 2, 0) / len) || 1;
+        const bStd = Math.sqrt(bWin.reduce((s, v) => s + (v - bMean) ** 2, 0) / len) || 1;
+
+        const rN = rWin.map(v => (v - rMean) / rStd);
+        const gN = gWin.map(v => (v - gMean) / gStd);
+        const bN = bWin.map(v => (v - bMean) / bStd);
+
+        const xs = new Array(len);
+        const ys = new Array(len);
+        for (let i = 0; i < len; i++) {
+          xs[i] = 3 * rN[i] - 2 * gN[i];
+          ys[i] = 1.5 * rN[i] + gN[i] - 1.5 * bN[i];
+        }
+
+        const xsStd = Math.sqrt(xs.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+        const ysStd = Math.sqrt(ys.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+        const alpha = xsStd / ysStd;
+
+        for (let i = 0; i < len; i++) {
+          posSignal[start + i] += xs[i] + alpha * ys[i];
+        }
+      }
+
+      const posDetrended = detrendSignal(posSignal);
+
+      const minFreq = 0.75;
+      const maxFreq = 3.5;
+
+      function butterworthBandpass(sig: number[], sampleRate: number, lowFreq: number, highFreq: number): number[] {
+        const dt = 1.0 / sampleRate;
+        const lowRC = 1.0 / (2 * Math.PI * lowFreq);
+        const highRC = 1.0 / (2 * Math.PI * highFreq);
+        const alphaHigh = dt / (highRC + dt);
+        const alphaLow = lowRC / (lowRC + dt);
+
+        const highPassed = new Array(sig.length).fill(0);
+        highPassed[0] = sig[0];
+        for (let i = 1; i < sig.length; i++) {
+          highPassed[i] = alphaLow * (highPassed[i - 1] + sig[i] - sig[i - 1]);
+        }
+
+        const bandPassed = new Array(sig.length).fill(0);
+        bandPassed[0] = highPassed[0];
+        for (let i = 1; i < sig.length; i++) {
+          bandPassed[i] = bandPassed[i - 1] + alphaHigh * (highPassed[i] - bandPassed[i - 1]);
+        }
+
+        const result = new Array(sig.length).fill(0);
+        result[0] = bandPassed[0];
+        for (let i = 1; i < sig.length; i++) {
+          result[i] = alphaLow * (result[i - 1] + bandPassed[i] - bandPassed[i - 1]);
+        }
+        const finalResult = new Array(sig.length).fill(0);
+        finalResult[0] = result[0];
+        for (let i = 1; i < sig.length; i++) {
+          finalResult[i] = finalResult[i - 1] + alphaHigh * (result[i] - finalResult[i - 1]);
+        }
+
+        return finalResult;
+      }
+
+      const filtered = butterworthBandpass(posDetrended, actualFps, minFreq, maxFreq);
+
+      const zeroPadFactor = 4;
+      const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
       const real = new Array(fftSize).fill(0);
       const imag = new Array(fftSize).fill(0);
+
       for (let i = 0; i < n; i++) {
-        real[i] = hannWindow[i];
+        const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+        real[i] = filtered[i] * hannCoeff;
       }
 
       function fft(real: number[], imag: number[], n: number) {
         if (n <= 1) return;
-
         const halfN = n / 2;
         const evenReal = new Array(halfN);
         const evenImag = new Array(halfN);
@@ -666,10 +870,8 @@ Respond ONLY with JSON:
           const angle = -2 * Math.PI * k / n;
           const cos = Math.cos(angle);
           const sin = Math.sin(angle);
-
           const tReal = cos * oddReal[k] - sin * oddImag[k];
           const tImag = sin * oddReal[k] + cos * oddImag[k];
-
           real[k] = evenReal[k] + tReal;
           imag[k] = evenImag[k] + tImag;
           real[k + halfN] = evenReal[k] - tReal;
@@ -696,25 +898,38 @@ Respond ONLY with JSON:
         }
       }
 
-      const peakFreq = peakBin * actualFps / fftSize;
-      let heartRate = Math.round(peakFreq * 60);
+      let peakFreq: number;
+      if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
+        const alpha_val = magnitudes[peakBin - 1];
+        const beta = magnitudes[peakBin];
+        const gamma = magnitudes[peakBin + 1];
+        const delta = 0.5 * (alpha_val - gamma) / (alpha_val - 2 * beta + gamma);
+        peakFreq = (peakBin + delta) * actualFps / fftSize;
+      } else {
+        peakFreq = peakBin * actualFps / fftSize;
+      }
 
-      heartRate = Math.max(40, Math.min(200, heartRate));
+      let heartRate = Math.round(peakFreq * 60);
+      heartRate = Math.max(45, Math.min(180, heartRate));
 
       let totalPower = 0;
       let peakPower = 0;
       for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-        totalPower += magnitudes[i] * magnitudes[i];
-        if (Math.abs(i - peakBin) <= 1) {
-          peakPower += magnitudes[i] * magnitudes[i];
+        const power = magnitudes[i] * magnitudes[i];
+        totalPower += power;
+        if (Math.abs(i - peakBin) <= 2) {
+          peakPower += power;
         }
       }
       const snr = totalPower > 0 ? peakPower / totalPower : 0;
 
+      const signalVariance = filtered.reduce((s, v) => s + v * v, 0) / n;
+      const hasVariation = signalVariance > 1e-10;
+
       let confidence: "high" | "medium" | "low";
-      if (snr > 0.3 && n >= 60) {
+      if (snr > 0.25 && n >= 150 && hasVariation) {
         confidence = "high";
-      } else if (snr > 0.15 && n >= 30) {
+      } else if (snr > 0.12 && n >= 80 && hasVariation) {
         confidence = "medium";
       } else {
         confidence = "low";
@@ -723,8 +938,8 @@ Respond ONLY with JSON:
       const waveformLength = 100;
       const waveform: number[] = [];
       for (let i = 0; i < waveformLength; i++) {
-        const idx = Math.floor(i * posSignal.length / waveformLength);
-        waveform.push(posSignal[idx] || 0);
+        const idx = Math.floor(i * filtered.length / waveformLength);
+        waveform.push(filtered[idx] || 0);
       }
 
       const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
@@ -743,8 +958,87 @@ Respond ONLY with JSON:
             : "Weak signal - ensure face is well-lit and stay still",
       });
     } catch (error) {
-      console.error("rPPG processing error:", error);
+      console.error("rPPG processing error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to process heart rate data" });
+    }
+  });
+
+  const createOrderSchema = z.object({
+    pharmacyName: z.string(),
+    pharmacyPhone: z.string().optional(),
+    pharmacyAddress: z.string().optional(),
+    pharmacyPlaceId: z.string().optional(),
+    medicineName: z.string(),
+    medicineDosage: z.string().optional(),
+    medicineFrequency: z.string().optional(),
+    quantity: z.number().default(1),
+    deliveryAddress: z.string(),
+    patientName: z.string(),
+    patientPhone: z.string(),
+    notes: z.string().optional(),
+  });
+
+  app.post("/api/orders", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const validation = createOrderSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid order data", details: validation.error.issues.map(i => i.message) });
+      }
+      const order = await storage.createOrder({
+        ...validation.data,
+        userId: req.session.userId!,
+        status: "pending",
+      });
+      return res.status(201).json(order);
+    } catch (error) {
+      console.error("Create order error:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(500).json({ error: "Failed to create order" });
+    }
+  });
+
+  app.get("/api/orders", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const orders = await storage.getUserOrders(req.session.userId!);
+      return res.json(orders);
+    } catch (error) {
+      console.error("Get orders error:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  app.get("/api/orders/:id", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      if (order.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      return res.json(order);
+    } catch (error) {
+      console.error("Get order error:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
+  app.patch("/api/orders/:id/cancel", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const order = await storage.getOrder(req.params.id);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      if (order.userId !== req.session.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      if (order.status !== "pending") {
+        return res.status(400).json({ error: "Only pending orders can be cancelled" });
+      }
+      const updatedOrder = await storage.updateOrder(req.params.id, { status: "cancelled" });
+      return res.json(updatedOrder);
+    } catch (error) {
+      console.error("Cancel order error:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(500).json({ error: "Failed to cancel order" });
     }
   });
 

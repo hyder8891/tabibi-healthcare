@@ -27,9 +27,9 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { getApiUrl } from "@/lib/query-client";
 import { getProfile, saveProfile } from "@/lib/storage";
 
-const MEASUREMENT_DURATION = 25;
-const CAPTURE_FPS = 3;
-const MIN_SAMPLES = 30;
+const MEASUREMENT_DURATION = 30;
+const CAPTURE_FPS = 10;
+const MIN_SAMPLES = 150;
 
 type MeasurementState = "idle" | "measuring" | "processing" | "result";
 
@@ -41,23 +41,77 @@ interface RppgResult {
   message: string;
 }
 
-function extractRGBFromBase64(base64Data: string): { r: number; g: number; b: number } {
+function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: number; b: number }> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const size = 64;
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve({ r: 128, g: 128, b: 128 });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, size, size);
+        const roiX = Math.floor(size * 0.25);
+        const roiY = Math.floor(size * 0.25);
+        const roiW = Math.floor(size * 0.5);
+        const roiH = Math.floor(size * 0.5);
+        const imageData = ctx.getImageData(roiX, roiY, roiW, roiH);
+        const data = imageData.data;
+        let rSum = 0, gSum = 0, bSum = 0, count = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          rSum += data[i];
+          gSum += data[i + 1];
+          bSum += data[i + 2];
+          count++;
+        }
+        resolve({
+          r: count > 0 ? rSum / count : 128,
+          g: count > 0 ? gSum / count : 128,
+          b: count > 0 ? bSum / count : 128,
+        });
+      };
+      img.onerror = () => resolve({ r: 128, g: 128, b: 128 });
+      img.src = `data:image/jpeg;base64,${base64Data}`;
+    } catch {
+      resolve({ r: 128, g: 128, b: 128 });
+    }
+  });
+}
+
+function extractRGBFromBase64Native(base64Data: string): { r: number; g: number; b: number } {
   try {
     const raw = atob(base64Data);
     const len = raw.length;
-    const sampleSize = Math.min(len, 5000);
-    const step = Math.max(1, Math.floor(len / sampleSize));
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = raw.charCodeAt(i);
+    }
+
     let rSum = 0, gSum = 0, bSum = 0, count = 0;
-    
-    for (let i = Math.floor(len * 0.3); i < Math.floor(len * 0.7); i += step * 3) {
-      if (i + 2 < len) {
-        rSum += raw.charCodeAt(i);
-        gSum += raw.charCodeAt(i + 1);
-        bSum += raw.charCodeAt(i + 2);
-        count++;
+    for (let i = 0; i < len - 2; i++) {
+      const b1 = bytes[i];
+      const b2 = bytes[i + 1];
+      if (b1 === 0xFF && b2 === 0xC0) {
+        break;
       }
     }
-    
+
+    const quarter = Math.floor(len * 0.25);
+    const threeQuarter = Math.floor(len * 0.75);
+    const step = Math.max(1, Math.floor((threeQuarter - quarter) / 3000));
+
+    for (let i = quarter; i < threeQuarter - 2; i += step) {
+      rSum += bytes[i];
+      gSum += bytes[i + 1];
+      bSum += bytes[i + 2];
+      count++;
+    }
+
     return {
       r: count > 0 ? rSum / count : 128,
       g: count > 0 ? gSum / count : 128,
@@ -171,7 +225,12 @@ export default function HeartRateScreen() {
       });
       
       if (photo?.base64) {
-        const rgb = extractRGBFromBase64(photo.base64);
+        let rgb: { r: number; g: number; b: number };
+        if (Platform.OS === "web") {
+          rgb = await extractRGBFromBase64Web(photo.base64);
+        } else {
+          rgb = extractRGBFromBase64Native(photo.base64);
+        }
         signalsRef.current.push({
           ...rgb,
           timestamp: Date.now(),
@@ -206,6 +265,7 @@ export default function HeartRateScreen() {
           signals,
           fps: CAPTURE_FPS,
         }),
+        credentials: "include",
       });
 
       const data = await response.json();

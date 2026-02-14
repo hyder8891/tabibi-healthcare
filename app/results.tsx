@@ -132,6 +132,16 @@ export default function ResultsScreen() {
                 },
               })
             }
+            onOrderMedicine={(med) =>
+              router.push({
+                pathname: "/order",
+                params: {
+                  medicineName: med.name,
+                  medicineDosage: med.dosage,
+                  medicineFrequency: med.frequency,
+                },
+              })
+            }
           />
         )}
 
