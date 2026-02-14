@@ -587,7 +587,7 @@ Respond ONLY with JSON:
       const lat = parseFloat(latitude as string);
       const lng = parseFloat(longitude as string);
 
-      const facilities = (data.results || []).map((place: any, index: number) => {
+      const baseFacilities = (data.results || []).map((place: any, index: number) => {
         const placeLat = place.geometry?.location?.lat || lat;
         const placeLng = place.geometry?.location?.lng || lng;
         
@@ -614,6 +614,7 @@ Respond ONLY with JSON:
             !["point_of_interest", "establishment", "health", "store"].includes(t)
           ).slice(0, 4),
           phone: "",
+          internationalPhone: "",
           openHours: place.opening_hours?.open_now ? "Open" : "Closed",
           placeId: place.place_id,
           totalRatings: place.user_ratings_total || 0,
@@ -623,7 +624,23 @@ Respond ONLY with JSON:
         };
       });
 
-      facilities.sort((a: any, b: any) => a.distance - b.distance);
+      baseFacilities.sort((a: any, b: any) => a.distance - b.distance);
+
+      const detailsPromises = baseFacilities.map(async (facility: any) => {
+        if (!facility.placeId) return facility;
+        try {
+          const detailsUrl = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(facility.placeId)}&fields=formatted_phone_number,international_phone_number&key=${apiKey}`;
+          const detailsRes = await globalThis.fetch(detailsUrl);
+          const detailsData = await detailsRes.json();
+          if (detailsData.status === "OK" && detailsData.result) {
+            facility.phone = detailsData.result.formatted_phone_number || "";
+            facility.internationalPhone = detailsData.result.international_phone_number || "";
+          }
+        } catch {}
+        return facility;
+      });
+
+      const facilities = await Promise.all(detailsPromises);
 
       res.json({
         facilities,

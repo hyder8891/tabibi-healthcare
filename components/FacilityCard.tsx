@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, Linking, Platform, ActivityIndicator } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import React from "react";
+import { View, Text, StyleSheet, Pressable, Linking, Platform } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import Colors from "@/constants/colors";
 import type { NearbyFacility } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getApiUrl } from "@/lib/query-client";
 
 interface FacilityCardProps {
   facility: NearbyFacility;
@@ -25,46 +24,12 @@ const facilityColors: Record<string, string> = {
   hospital: Colors.light.emergency,
 };
 
-interface PlaceDetails {
-  phone: string;
-  internationalPhone: string;
-  website: string;
-  googleMapsUrl: string;
-  openingHours: string[];
-  isOpen: boolean | null;
-}
-
 export function FacilityCard({ facility }: FacilityCardProps) {
-  const { t, isRTL } = useSettings();
+  const { t } = useSettings();
   const iconName = facilityIcons[facility.type] || "location";
   const color = facilityColors[facility.type] || Colors.light.primary;
-  const [details, setDetails] = useState<PlaceDetails | null>(null);
-  const [loadingDetails, setLoadingDetails] = useState(false);
-  const [expanded, setExpanded] = useState(false);
 
-  const phoneNumber = details?.internationalPhone || details?.phone || facility.phone;
-
-  useEffect(() => {
-    if (expanded && !details && facility.placeId) {
-      fetchDetails();
-    }
-  }, [expanded]);
-
-  const fetchDetails = async () => {
-    if (!facility.placeId || loadingDetails) return;
-    setLoadingDetails(true);
-    try {
-      const apiUrl = getApiUrl();
-      const url = new URL(`/api/place-details/${facility.placeId}`, apiUrl);
-      const response = await fetch(url.toString());
-      if (response.ok) {
-        const data = await response.json();
-        setDetails(data);
-      }
-    } catch {} finally {
-      setLoadingDetails(false);
-    }
-  };
+  const phoneNumber = facility.internationalPhone || facility.phone;
 
   const openNavigation = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -87,8 +52,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
     if (phoneNumber) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       const cleaned = phoneNumber.replace(/[\s\-()]/g, "").replace(/^\+/, "");
-      const url = `https://wa.me/${cleaned}`;
-      Linking.openURL(url);
+      Linking.openURL(`https://wa.me/${cleaned}`);
     }
   };
 
@@ -99,13 +63,8 @@ export function FacilityCard({ facility }: FacilityCardProps) {
     }
   };
 
-  const toggleExpand = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setExpanded(!expanded);
-  };
-
   return (
-    <Pressable onPress={toggleExpand} style={styles.card}>
+    <View style={styles.card}>
       <View style={styles.topRow}>
         <View style={[styles.iconContainer, { backgroundColor: color + "15" }]}>
           <Ionicons name={iconName as any} size={22} color={color} />
@@ -168,60 +127,14 @@ export function FacilityCard({ facility }: FacilityCardProps) {
             {facility.isOpen ? t("Open Now", "\u0645\u0641\u062a\u0648\u062d \u0627\u0644\u0622\u0646") : t("Closed", "\u0645\u063a\u0644\u0642")}
           </Text>
         </View>
-        <Ionicons
-          name={expanded ? "chevron-up" : "chevron-down"}
-          size={16}
-          color={Colors.light.textTertiary}
-          style={{ marginLeft: "auto" }}
-        />
       </View>
 
-      {expanded && (
-        <View style={styles.expandedSection}>
-          {loadingDetails && (
-            <View style={styles.detailsLoading}>
-              <ActivityIndicator size="small" color={Colors.light.primary} />
-              <Text style={styles.loadingText}>{t("Loading details...", "\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0645\u064a\u0644...")}</Text>
-            </View>
-          )}
-
-          {phoneNumber ? (
-            <View style={styles.phoneRow}>
-              <Ionicons name="call-outline" size={16} color={Colors.light.textSecondary} />
-              <Text style={styles.phoneText}>{phoneNumber}</Text>
-            </View>
-          ) : details && !loadingDetails ? (
-            <View style={styles.phoneRow}>
-              <Ionicons name="call-outline" size={16} color={Colors.light.textTertiary} />
-              <Text style={[styles.phoneText, { color: Colors.light.textTertiary }]}>
-                {t("No phone available", "\u0644\u0627 \u064a\u0648\u062c\u062f \u0631\u0642\u0645 \u0647\u0627\u062a\u0641")}
-              </Text>
-            </View>
-          ) : null}
-
-          {details?.openingHours && details.openingHours.length > 0 && (
-            <View style={styles.hoursSection}>
-              <View style={styles.hoursTitleRow}>
-                <Ionicons name="time-outline" size={16} color={Colors.light.textSecondary} />
-                <Text style={styles.hoursTitle}>{t("Hours", "\u0627\u0644\u0633\u0627\u0639\u0627\u062a")}</Text>
-              </View>
-              {details.openingHours.map((line, i) => (
-                <Text key={i} style={styles.hoursLine}>{line}</Text>
-              ))}
-            </View>
-          )}
-
-          {facility.capabilities.length > 0 && (
-            <View style={styles.capsRow}>
-              {facility.capabilities.slice(0, 4).map((cap, i) => (
-                <View key={i} style={styles.capBadge}>
-                  <Text style={styles.capText}>{cap}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+      {phoneNumber ? (
+        <View style={styles.phoneRow}>
+          <Ionicons name="call-outline" size={15} color={Colors.light.textSecondary} />
+          <Text style={styles.phoneText}>{phoneNumber}</Text>
         </View>
-      )}
+      ) : null}
 
       <View style={styles.actions}>
         <Pressable
@@ -268,20 +181,9 @@ export function FacilityCard({ facility }: FacilityCardProps) {
               <Ionicons name="chatbubble-outline" size={18} color={Colors.light.accent} />
             </Pressable>
           </>
-        ) : !expanded ? (
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              styles.infoButton,
-              pressed && { opacity: 0.8 },
-            ]}
-            onPress={toggleExpand}
-          >
-            <Ionicons name="information-circle-outline" size={20} color={Colors.light.primary} />
-          </Pressable>
         ) : null}
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -342,7 +244,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   ratingContainer: {
     flexDirection: "row",
@@ -375,69 +277,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600" as const,
   },
-  expandedSection: {
-    marginBottom: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.borderLight,
-    paddingTop: 12,
-  },
-  detailsLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-  },
-  loadingText: {
-    fontSize: 13,
-    color: Colors.light.textTertiary,
-  },
   phoneRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
+    gap: 6,
+    marginBottom: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.light.background,
+    borderRadius: 10,
   },
   phoneText: {
     fontSize: 14,
     fontWeight: "500" as const,
     color: Colors.light.text,
-  },
-  hoursSection: {
-    marginBottom: 10,
-  },
-  hoursTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
-  hoursTitle: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.light.textSecondary,
-  },
-  hoursLine: {
-    fontSize: 12,
-    color: Colors.light.textSecondary,
-    lineHeight: 20,
-    paddingLeft: 22,
-  },
-  capsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    marginTop: 4,
-  },
-  capBadge: {
-    backgroundColor: Colors.light.background,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  capText: {
-    fontSize: 11,
-    color: Colors.light.textSecondary,
-    fontWeight: "500" as const,
   },
   actions: {
     flexDirection: "row",
@@ -476,9 +329,5 @@ const styles = StyleSheet.create({
   smsButton: {
     borderWidth: 1.5,
     borderColor: Colors.light.accent,
-  },
-  infoButton: {
-    borderWidth: 1.5,
-    borderColor: Colors.light.borderLight,
   },
 });
