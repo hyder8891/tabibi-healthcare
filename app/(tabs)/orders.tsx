@@ -36,6 +36,7 @@ export default function OrdersTabScreen() {
 
   const [orders, setOrders] = useState<MedicineOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -64,25 +65,17 @@ export default function OrdersTabScreen() {
   };
 
   const cancelOrder = async (orderId: string) => {
-    Alert.alert(
-      t("Cancel Order", "إلغاء الطلب"),
-      t("Are you sure you want to cancel this order?", "هل أنت متأكد من إلغاء هذا الطلب؟"),
-      [
-        { text: t("No", "لا"), style: "cancel" },
-        {
-          text: t("Yes, Cancel", "نعم، إلغاء"),
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest("PATCH", `/api/orders/${orderId}/cancel`);
-              loadOrders();
-            } catch (err) {
-              Alert.alert(t("Error", "خطأ"), t("Failed to cancel order.", "فشل في إلغاء الطلب."));
-            }
-          },
-        },
-      ],
-    );
+    if (cancellingId) return;
+    setCancellingId(orderId);
+    try {
+      await apiRequest("PATCH", `/api/orders/${orderId}/cancel`);
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: "cancelled" } : o));
+    } catch (err) {
+      console.error("Cancel error:", err);
+      Alert.alert(t("Error", "خطأ"), t("Failed to cancel order.", "فشل في إلغاء الطلب."));
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -160,10 +153,18 @@ export default function OrdersTabScreen() {
               </Pressable>
             ) : null}
             <Pressable
-              style={[styles.actionSmallBtn, styles.cancelSmallBtn]}
+              style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
               onPress={() => cancelOrder(item.id)}
+              disabled={cancellingId === item.id}
             >
-              <Ionicons name="close" size={16} color={Colors.light.emergency} />
+              {cancellingId === item.id ? (
+                <ActivityIndicator size="small" color={Colors.light.emergency} />
+              ) : (
+                <>
+                  <Ionicons name="close-circle-outline" size={16} color={Colors.light.emergency} />
+                  <Text style={styles.cancelBtnText}>{t("Cancel", "إلغاء")}</Text>
+                </>
+              )}
             </Pressable>
           </View>
         )}
@@ -333,5 +334,22 @@ const styles = StyleSheet.create({
   cancelSmallBtn: {
     backgroundColor: Colors.light.emergencyLight,
     borderColor: "#FECACA",
+  },
+  cancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.emergencyLight,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.emergency,
   },
 });
