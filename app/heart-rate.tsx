@@ -24,7 +24,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { getProfile, saveProfile } from "@/lib/storage";
 
 const MEASUREMENT_DURATION = 30;
@@ -257,15 +257,15 @@ export default function HeartRateScreen() {
 
       const apiUrl = getApiUrl();
       const url = new URL("/api/process-rppg", apiUrl);
+      const authHeaders = await getAuthHeaders();
       
       const response = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           signals,
           fps: CAPTURE_FPS,
         }),
-        credentials: "include",
       });
 
       const data = await response.json();
