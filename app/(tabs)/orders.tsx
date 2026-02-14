@@ -16,7 +16,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { apiRequest, getApiUrl, getAuthHeaders } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
 import type { MedicineOrder } from "@/lib/types";
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; labelEn: string; labelAr: string; icon: string }> = {
@@ -68,10 +67,20 @@ export default function OrdersTabScreen() {
     if (cancellingId) return;
     setCancellingId(orderId);
     try {
-      await apiRequest("PATCH", `/api/orders/${orderId}/cancel`);
+      const authHeaders = await getAuthHeaders();
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/orders/${orderId}/cancel`, baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: authHeaders,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Cancel failed");
+      }
       setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: "cancelled" } : o));
-    } catch (err) {
-      console.error("Cancel error:", err);
+    } catch (err: any) {
+      console.error("Cancel error:", err?.message || err);
       Alert.alert(t("Error", "خطأ"), t("Failed to cancel order.", "فشل في إلغاء الطلب."));
     } finally {
       setCancellingId(null);
