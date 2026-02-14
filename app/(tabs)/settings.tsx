@@ -338,9 +338,24 @@ export default function SettingsScreen() {
                 color={Colors.light.textSecondary}
               />
               <Text style={[styles.fieldLabel, { marginLeft: 8, flex: 1 }]}>
-                {user.email || user.phone}
+                {user.email || user.phone || user.name}
               </Text>
             </View>
+            {user.authProvider && user.authProvider !== "password" && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.fieldRow}>
+                  <MaterialCommunityIcons
+                    name={user.authProvider === "google.com" ? "google" : "shield-check"}
+                    size={18}
+                    color={Colors.light.textSecondary}
+                  />
+                  <Text style={[styles.fieldLabel, { marginLeft: 8, flex: 1 }]}>
+                    {user.authProvider === "google.com" ? "Google" : user.authProvider}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         )}
 

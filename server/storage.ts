@@ -1,5 +1,5 @@
-import { type User, type InsertUser, users, verificationCodes } from "@shared/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { type User, type InsertUser, users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool } from "@neondatabase/serverless";
 
@@ -10,11 +10,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPhone(phone: string): Promise<User | undefined>;
+  getUserByFirebaseUid(uid: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  createVerificationCode(identifier: string, identifierType: string, code: string, firebaseIdToken?: string): Promise<void>;
-  getVerificationCode(identifier: string, code: string): Promise<any | undefined>;
-  markVerified(identifier: string): Promise<void>;
-  isVerified(identifier: string): Promise<boolean>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -33,56 +31,19 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByFirebaseUid(uid: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.firebaseUid, uid));
+    return user;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
   }
 
-  async createVerificationCode(identifier: string, identifierType: string, code: string, firebaseIdToken?: string): Promise<void> {
-    await db.delete(verificationCodes).where(eq(verificationCodes.identifier, identifier));
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    await db.insert(verificationCodes).values({
-      identifier,
-      identifierType,
-      code,
-      firebaseIdToken: firebaseIdToken || null,
-      expiresAt,
-      verified: false,
-    });
-  }
-
-  async getVerificationCode(identifier: string, code: string): Promise<any | undefined> {
-    const [record] = await db
-      .select()
-      .from(verificationCodes)
-      .where(
-        and(
-          eq(verificationCodes.identifier, identifier),
-          eq(verificationCodes.code, code),
-          gt(verificationCodes.expiresAt, new Date()),
-        ),
-      );
-    return record;
-  }
-
-  async markVerified(identifier: string): Promise<void> {
-    await db
-      .update(verificationCodes)
-      .set({ verified: true })
-      .where(eq(verificationCodes.identifier, identifier));
-  }
-
-  async isVerified(identifier: string): Promise<boolean> {
-    const [record] = await db
-      .select()
-      .from(verificationCodes)
-      .where(
-        and(
-          eq(verificationCodes.identifier, identifier),
-          eq(verificationCodes.verified, true),
-        ),
-      );
-    return !!record;
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User> {
+    const [user] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return user;
   }
 }
 

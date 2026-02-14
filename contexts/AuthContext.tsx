@@ -2,6 +2,18 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
+import {
+  auth,
+  onAuthStateChanged,
+  firebaseSignOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signInWithPopup,
+  googleProvider,
+  type FirebaseUser,
+} from "@/lib/firebase";
+import { Platform } from "react-native";
 
 const AUTH_USER_KEY = "@tabibi_auth_user";
 
@@ -10,40 +22,18 @@ interface AuthUser {
   email: string | null;
   phone: string | null;
   name: string | null;
-}
-
-interface LoginParams {
-  email?: string;
-  phone?: string;
-  password: string;
-}
-
-interface SignupParams {
-  email?: string;
-  phone?: string;
-  password: string;
-  name?: string;
-}
-
-interface VerificationResult {
-  success: boolean;
-  method: "email" | "phone";
-  identifier: string;
-  refreshToken?: string;
-  devCode?: string;
-  message: string;
+  photoUrl: string | null;
+  authProvider: string | null;
 }
 
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (params: LoginParams) => Promise<void>;
-  signup: (params: SignupParams) => Promise<void>;
+  loginWithEmail: (email: string, password: string) => Promise<void>;
+  signupWithEmail: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
-  sendVerification: (params: { email?: string; phone?: string; password: string }) => Promise<VerificationResult>;
-  verifyPhoneOTP: (identifier: string, code: string) => Promise<boolean>;
-  checkEmailVerified: (identifier: string, refreshToken?: string) => Promise<boolean>;
-  resendVerification: (params: { email?: string; phone?: string; password: string }) => Promise<VerificationResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -51,10 +41,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
 
   const persistUser = async (userData: AuthUser | null) => {
     try {
@@ -66,43 +52,104 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {}
   };
 
-  const checkAuth = async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/auth/me", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-        await persistUser(data);
-        setIsLoading(false);
-        return;
-      }
-    } catch {}
-    try {
-      const stored = await AsyncStorage.getItem(AUTH_USER_KEY);
-      if (stored) {
-        setUser(JSON.parse(stored));
-      }
-    } catch {}
-    setIsLoading(false);
+  const syncWithBackend = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
+    const idToken = await firebaseUser.getIdToken();
+    const res = await apiRequest("POST", "/api/auth/firebase", { idToken });
+    const data = await res.json();
+    return data as AuthUser;
   };
 
-  const login = useCallback(async (params: LoginParams) => {
-    const res = await apiRequest("POST", "/api/auth/login", params);
-    const data = await res.json();
-    setUser(data);
-    await persistUser(data);
+  useEffect(() => {
+    let mounted = true;
+
+    const loadCached = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(AUTH_USER_KEY);
+        if (stored && mounted) {
+          setUser(JSON.parse(stored));
+        }
+      } catch {}
+    };
+    loadCached();
+
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!mounted) return;
+
+      if (firebaseUser) {
+        try {
+          const backendUser = await syncWithBackend(firebaseUser);
+          if (mounted) {
+            setUser(backendUser);
+            await persistUser(backendUser);
+          }
+        } catch (err) {
+          console.error("Backend sync failed:", err);
+          try {
+            const baseUrl = getApiUrl();
+            const url = new URL("/api/auth/me", baseUrl);
+            const meRes = await fetch(url.toString(), { credentials: "include" });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              if (mounted) {
+                setUser(meData);
+                await persistUser(meData);
+              }
+            }
+          } catch {}
+        }
+      } else {
+        if (mounted) {
+          setUser(null);
+          await persistUser(null);
+        }
+      }
+      if (mounted) setIsLoading(false);
+    });
+
+    const timeout = setTimeout(() => {
+      if (mounted) setIsLoading(false);
+    }, 5000);
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
-  const signup = useCallback(async (params: SignupParams) => {
-    const res = await apiRequest("POST", "/api/auth/signup", params);
-    const data = await res.json();
-    setUser(data);
-    await persistUser(data);
+  const loginWithEmail = useCallback(async (email: string, password: string) => {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    const backendUser = await syncWithBackend(cred.user);
+    setUser(backendUser);
+    await persistUser(backendUser);
+  }, []);
+
+  const signupWithEmail = useCallback(async (email: string, password: string) => {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const backendUser = await syncWithBackend(cred.user);
+    setUser(backendUser);
+    await persistUser(backendUser);
+  }, []);
+
+  const loginWithGoogle = useCallback(async () => {
+    if (Platform.OS === "web") {
+      const cred = await signInWithPopup(auth, googleProvider);
+      const backendUser = await syncWithBackend(cred.user);
+      setUser(backendUser);
+      await persistUser(backendUser);
+    } else {
+      throw new Error("Google sign-in on native requires additional setup");
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
   }, []);
 
   const logout = useCallback(async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch {}
     try {
       await apiRequest("POST", "/api/auth/logout");
     } catch {}
@@ -110,33 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistUser(null);
   }, []);
 
-  const sendVerification = useCallback(async (params: { email?: string; phone?: string; password: string }): Promise<VerificationResult> => {
-    const res = await apiRequest("POST", "/api/auth/send-verification", params);
-    const data = await res.json();
-    return data as VerificationResult;
-  }, []);
-
-  const verifyPhoneOTP = useCallback(async (identifier: string, code: string): Promise<boolean> => {
-    const res = await apiRequest("POST", "/api/auth/verify-phone-otp", { identifier, code });
-    const data = await res.json();
-    return data.verified === true;
-  }, []);
-
-  const checkEmailVerified = useCallback(async (identifier: string, refreshToken?: string): Promise<boolean> => {
-    const res = await apiRequest("POST", "/api/auth/check-email-verified", { identifier, refreshToken });
-    const data = await res.json();
-    return data.verified === true;
-  }, []);
-
-  const resendVerification = useCallback(async (params: { email?: string; phone?: string; password: string }): Promise<VerificationResult> => {
-    const res = await apiRequest("POST", "/api/auth/resend-verification", params);
-    const data = await res.json();
-    return data as VerificationResult;
-  }, []);
-
   const value = useMemo(
-    () => ({ user, isLoading, login, signup, logout, sendVerification, verifyPhoneOTP, checkEmailVerified, resendVerification }),
-    [user, isLoading, login, signup, logout, sendVerification, verifyPhoneOTP, checkEmailVerified, resendVerification],
+    () => ({ user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, logout }),
+    [user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, resetPassword, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
