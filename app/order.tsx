@@ -208,7 +208,7 @@ export default function OrderScreen() {
           },
           {
             text: t("My Orders", "طلباتي"),
-            onPress: () => router.replace("/orders"),
+            onPress: () => router.replace("/(tabs)/orders"),
           },
         ],
       );

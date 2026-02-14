@@ -115,13 +115,6 @@ function RootLayoutNav() {
           animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen
-        name="orders"
-        options={{
-          headerShown: false,
-          animation: "slide_from_right",
-        }}
-      />
     </Stack>
   );
 }
