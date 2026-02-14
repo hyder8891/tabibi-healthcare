@@ -22,14 +22,15 @@ import Animated, {
   Easing,
   cancelAnimation,
 } from "react-native-reanimated";
+import * as ImageManipulator from "expo-image-manipulator";
+import pako from "pako";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { getProfile, saveProfile } from "@/lib/storage";
 
-const MEASUREMENT_DURATION = 30;
+const MEASUREMENT_DURATION = 15;
 const CAPTURE_FPS = 10;
-const MIN_SAMPLES = 150;
+const MIN_SAMPLES = 60;
 
 type MeasurementState = "idle" | "measuring" | "processing" | "result";
 
@@ -83,43 +84,373 @@ function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: nu
   });
 }
 
-function extractRGBFromBase64Native(base64Data: string): { r: number; g: number; b: number } {
+function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  let width = 0;
+  let height = 0;
+  let pos = 8;
+  while (pos < bytes.length) {
+    const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+    const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+    if (type === "IHDR") {
+      width = (bytes[pos+8] << 24) | (bytes[pos+9] << 16) | (bytes[pos+10] << 8) | bytes[pos+11];
+      height = (bytes[pos+12] << 24) | (bytes[pos+13] << 16) | (bytes[pos+14] << 8) | bytes[pos+15];
+    }
+    pos += 12 + length;
+  }
+
+  pos = 8;
+  const idatChunks: Uint8Array[] = [];
+  while (pos < bytes.length) {
+    const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+    const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+    if (type === "IDAT") {
+      idatChunks.push(bytes.slice(pos + 8, pos + 8 + length));
+    }
+    pos += 12 + length;
+  }
+
+  const totalLen = idatChunks.reduce((s, c) => s + c.length, 0);
+  const idatData = new Uint8Array(totalLen);
+  let offset = 0;
+  for (const chunk of idatChunks) {
+    idatData.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  let decompressed: Uint8Array;
   try {
-    const raw = atob(base64Data);
-    const len = raw.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = raw.charCodeAt(i);
-    }
-
-    let rSum = 0, gSum = 0, bSum = 0, count = 0;
-    for (let i = 0; i < len - 2; i++) {
-      const b1 = bytes[i];
-      const b2 = bytes[i + 1];
-      if (b1 === 0xFF && b2 === 0xC0) {
-        break;
-      }
-    }
-
-    const quarter = Math.floor(len * 0.25);
-    const threeQuarter = Math.floor(len * 0.75);
-    const step = Math.max(1, Math.floor((threeQuarter - quarter) / 3000));
-
-    for (let i = quarter; i < threeQuarter - 2; i += step) {
-      rSum += bytes[i];
-      gSum += bytes[i + 1];
-      bSum += bytes[i + 2];
-      count++;
-    }
-
-    return {
-      r: count > 0 ? rSum / count : 128,
-      g: count > 0 ? gSum / count : 128,
-      b: count > 0 ? bSum / count : 128,
-    };
+    decompressed = pako.inflate(idatData);
   } catch {
     return { r: 128, g: 128, b: 128 };
   }
+
+  const bpp = 4;
+  const rowBytes = width * bpp;
+  const pixels = new Uint8Array(width * height * bpp);
+
+  for (let y = 0; y < height; y++) {
+    const filterType = decompressed[y * (rowBytes + 1)];
+    const rowStart = y * (rowBytes + 1) + 1;
+    const pixelRowStart = y * rowBytes;
+
+    for (let x = 0; x < rowBytes; x++) {
+      const raw = decompressed[rowStart + x];
+      let left = 0;
+      let up = 0;
+      let upLeft = 0;
+
+      if (x >= bpp) left = pixels[pixelRowStart + x - bpp];
+      if (y > 0) up = pixels[(y - 1) * rowBytes + x];
+      if (x >= bpp && y > 0) upLeft = pixels[(y - 1) * rowBytes + x - bpp];
+
+      let val = raw;
+      switch (filterType) {
+        case 0: val = raw; break;
+        case 1: val = (raw + left) & 0xff; break;
+        case 2: val = (raw + up) & 0xff; break;
+        case 3: val = (raw + Math.floor((left + up) / 2)) & 0xff; break;
+        case 4: {
+          const p = left + up - upLeft;
+          const pa = Math.abs(p - left);
+          const pb = Math.abs(p - up);
+          const pc = Math.abs(p - upLeft);
+          const paeth = (pa <= pb && pa <= pc) ? left : (pb <= pc ? up : upLeft);
+          val = (raw + paeth) & 0xff;
+          break;
+        }
+      }
+      pixels[pixelRowStart + x] = val;
+    }
+  }
+
+  let rSum = 0, gSum = 0, bSum = 0, count = 0;
+  for (let i = 0; i < width * height; i++) {
+    rSum += pixels[i * 4];
+    gSum += pixels[i * 4 + 1];
+    bSum += pixels[i * 4 + 2];
+    count++;
+  }
+
+  return {
+    r: count > 0 ? rSum / count : 128,
+    g: count > 0 ? gSum / count : 128,
+    b: count > 0 ? bSum / count : 128,
+  };
+}
+
+async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
+  try {
+    const cropX = Math.floor(photoWidth * 0.25);
+    const cropY = Math.floor(photoHeight * 0.25);
+    const cropW = Math.floor(photoWidth * 0.5);
+    const cropH = Math.floor(photoHeight * 0.5);
+
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [
+        { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
+        { resize: { width: 4, height: 4 } },
+      ],
+      { base64: true, format: ImageManipulator.SaveFormat.PNG }
+    );
+
+    if (result.base64) {
+      return parsePNGPixels(result.base64);
+    }
+    return { r: 128, g: 128, b: 128 };
+  } catch {
+    return { r: 128, g: 128, b: 128 };
+  }
+}
+
+function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fps: number): RppgResult {
+  const actualFps = fps || 10;
+  const n = signals.length;
+
+  if (n < 30) {
+    return {
+      heartRate: 0,
+      confidence: "low",
+      waveform: [],
+      signalQuality: 0,
+      message: "Not enough samples for analysis",
+    };
+  }
+
+  const rRaw = signals.map(s => s.r);
+  const gRaw = signals.map(s => s.g);
+  const bRaw = signals.map(s => s.b);
+
+  function detrendSignal(sig: number[]) {
+    const len = sig.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (let i = 0; i < len; i++) {
+      sumX += i;
+      sumY += sig[i];
+      sumXY += i * sig[i];
+      sumXX += i * i;
+    }
+    const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / len;
+    return sig.map((v, i) => v - (slope * i + intercept));
+  }
+
+  function normalizeSignal(sig: number[]) {
+    const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
+    const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
+    return sig.map(v => (v - mean) / std);
+  }
+
+  const rDetrend = detrendSignal(rRaw);
+  const gDetrend = detrendSignal(gRaw);
+  const bDetrend = detrendSignal(bRaw);
+
+  const rNorm = normalizeSignal(rDetrend);
+  const gNorm = normalizeSignal(gDetrend);
+  const bNorm = normalizeSignal(bDetrend);
+
+  const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
+  const posSignal = new Array(n).fill(0);
+
+  for (let start = 0; start < n - windowSize; start += Math.floor(windowSize / 2)) {
+    const end = Math.min(start + windowSize, n);
+    const len = end - start;
+
+    const rWin = rNorm.slice(start, end);
+    const gWin = gNorm.slice(start, end);
+    const bWin = bNorm.slice(start, end);
+
+    const rMean = rWin.reduce((a, b) => a + b, 0) / len;
+    const gMean = gWin.reduce((a, b) => a + b, 0) / len;
+    const bMean = bWin.reduce((a, b) => a + b, 0) / len;
+    const rStd = Math.sqrt(rWin.reduce((s, v) => s + (v - rMean) ** 2, 0) / len) || 1;
+    const gStd = Math.sqrt(gWin.reduce((s, v) => s + (v - gMean) ** 2, 0) / len) || 1;
+    const bStd = Math.sqrt(bWin.reduce((s, v) => s + (v - bMean) ** 2, 0) / len) || 1;
+
+    const rN = rWin.map(v => (v - rMean) / rStd);
+    const gN = gWin.map(v => (v - gMean) / gStd);
+    const bN = bWin.map(v => (v - bMean) / bStd);
+
+    const xs = new Array(len);
+    const ys = new Array(len);
+    for (let i = 0; i < len; i++) {
+      xs[i] = 3 * rN[i] - 2 * gN[i];
+      ys[i] = 1.5 * rN[i] + gN[i] - 1.5 * bN[i];
+    }
+
+    const xsStd = Math.sqrt(xs.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+    const ysStd = Math.sqrt(ys.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+    const alpha = xsStd / ysStd;
+
+    for (let i = 0; i < len; i++) {
+      posSignal[start + i] += xs[i] + alpha * ys[i];
+    }
+  }
+
+  const posDetrended = detrendSignal(posSignal);
+
+  const minFreq = 0.75;
+  const maxFreq = 3.5;
+
+  function butterworthBandpass(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+    const dt = 1.0 / sampleRate;
+    const lowRC = 1.0 / (2 * Math.PI * lowFreq);
+    const highRC = 1.0 / (2 * Math.PI * highFreq);
+    const alphaHigh = dt / (highRC + dt);
+    const alphaLow = lowRC / (lowRC + dt);
+
+    const highPassed = new Array(sig.length).fill(0);
+    highPassed[0] = sig[0];
+    for (let i = 1; i < sig.length; i++) {
+      highPassed[i] = alphaLow * (highPassed[i - 1] + sig[i] - sig[i - 1]);
+    }
+
+    const bandPassed = new Array(sig.length).fill(0);
+    bandPassed[0] = highPassed[0];
+    for (let i = 1; i < sig.length; i++) {
+      bandPassed[i] = bandPassed[i - 1] + alphaHigh * (highPassed[i] - bandPassed[i - 1]);
+    }
+
+    const resultSig = new Array(sig.length).fill(0);
+    resultSig[0] = bandPassed[0];
+    for (let i = 1; i < sig.length; i++) {
+      resultSig[i] = alphaLow * (resultSig[i - 1] + bandPassed[i] - bandPassed[i - 1]);
+    }
+    const finalResult = new Array(sig.length).fill(0);
+    finalResult[0] = resultSig[0];
+    for (let i = 1; i < sig.length; i++) {
+      finalResult[i] = finalResult[i - 1] + alphaHigh * (resultSig[i] - finalResult[i - 1]);
+    }
+
+    return finalResult;
+  }
+
+  const filtered = butterworthBandpass(posDetrended, actualFps, minFreq, maxFreq);
+
+  const zeroPadFactor = 4;
+  const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
+  const real = new Array(fftSize).fill(0);
+  const imag = new Array(fftSize).fill(0);
+
+  for (let i = 0; i < n; i++) {
+    const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+    real[i] = filtered[i] * hannCoeff;
+  }
+
+  function fft(re: number[], im: number[], sz: number) {
+    if (sz <= 1) return;
+    const halfN = sz / 2;
+    const evenReal = new Array(halfN);
+    const evenImag = new Array(halfN);
+    const oddReal = new Array(halfN);
+    const oddImag = new Array(halfN);
+
+    for (let i = 0; i < halfN; i++) {
+      evenReal[i] = re[2 * i];
+      evenImag[i] = im[2 * i];
+      oddReal[i] = re[2 * i + 1];
+      oddImag[i] = im[2 * i + 1];
+    }
+
+    fft(evenReal, evenImag, halfN);
+    fft(oddReal, oddImag, halfN);
+
+    for (let k = 0; k < halfN; k++) {
+      const angle = -2 * Math.PI * k / sz;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const tReal = cos * oddReal[k] - sin * oddImag[k];
+      const tImag = sin * oddReal[k] + cos * oddImag[k];
+      re[k] = evenReal[k] + tReal;
+      im[k] = evenImag[k] + tImag;
+      re[k + halfN] = evenReal[k] - tReal;
+      im[k + halfN] = evenImag[k] - tImag;
+    }
+  }
+
+  fft(real, imag, fftSize);
+
+  const magnitudes: number[] = [];
+  for (let i = 0; i < fftSize / 2; i++) {
+    magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
+  }
+
+  const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
+  const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
+
+  let peakBin = scaledMinBin;
+  let peakMag = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    if (magnitudes[i] > peakMag) {
+      peakMag = magnitudes[i];
+      peakBin = i;
+    }
+  }
+
+  let peakFreq;
+  if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
+    const alphaVal = magnitudes[peakBin - 1];
+    const beta = magnitudes[peakBin];
+    const gamma = magnitudes[peakBin + 1];
+    const delta = 0.5 * (alphaVal - gamma) / (alphaVal - 2 * beta + gamma);
+    peakFreq = (peakBin + delta) * actualFps / fftSize;
+  } else {
+    peakFreq = peakBin * actualFps / fftSize;
+  }
+
+  let heartRate = Math.round(peakFreq * 60);
+  heartRate = Math.max(45, Math.min(180, heartRate));
+
+  let totalPower = 0;
+  let peakPower = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    const power = magnitudes[i] * magnitudes[i];
+    totalPower += power;
+    if (Math.abs(i - peakBin) <= 2) {
+      peakPower += power;
+    }
+  }
+  const snr = totalPower > 0 ? peakPower / totalPower : 0;
+
+  const signalVariance = filtered.reduce((s, v) => s + v * v, 0) / n;
+  const hasVariation = signalVariance > 1e-10;
+
+  let confidence: "high" | "medium" | "low";
+  if (snr > 0.25 && n >= 150 && hasVariation) {
+    confidence = "high";
+  } else if (snr > 0.12 && n >= 80 && hasVariation) {
+    confidence = "medium";
+  } else {
+    confidence = "low";
+  }
+
+  const waveformLength = 100;
+  const waveform: number[] = [];
+  for (let i = 0; i < waveformLength; i++) {
+    const idx = Math.floor(i * filtered.length / waveformLength);
+    waveform.push(filtered[idx] || 0);
+  }
+
+  const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
+  const normalizedWaveform = waveform.map(v => v / maxWave);
+
+  return {
+    heartRate,
+    confidence,
+    waveform: normalizedWaveform,
+    signalQuality: Math.round(snr * 100),
+    message: confidence === "high"
+      ? "Strong signal detected"
+      : confidence === "medium"
+        ? "Moderate signal quality - try holding still in good lighting"
+        : "Weak signal - ensure face is well-lit and stay still",
+  };
 }
 
 function PulseWaveform({ waveform, color }: { waveform: number[]; color: string }) {
@@ -171,6 +502,7 @@ export default function HeartRateScreen() {
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const processingRef = useRef(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const pulseScale = useSharedValue(1);
@@ -216,34 +548,40 @@ export default function HeartRateScreen() {
   }, []);
 
   const captureFrame = useCallback(async () => {
-    if (!cameraRef.current) return;
+    if (!cameraRef.current || processingRef.current) return;
+    processingRef.current = true;
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.1,
-        base64: true,
+        base64: Platform.OS === "web",
         skipProcessing: true,
       });
-      
-      if (photo?.base64) {
+
+      if (photo) {
         let rgb: { r: number; g: number; b: number };
         if (Platform.OS === "web") {
-          rgb = await extractRGBFromBase64Web(photo.base64);
+          if (photo.base64) {
+            rgb = await extractRGBFromBase64Web(photo.base64);
+          } else {
+            return;
+          }
         } else {
-          rgb = extractRGBFromBase64Native(photo.base64);
+          rgb = await extractRGBFromPhotoNative(photo.uri, photo.width, photo.height);
         }
         signalsRef.current.push({
           ...rgb,
           timestamp: Date.now(),
         });
       }
-    } catch (err) {
-      // silently skip failed frame captures
+    } catch {
+    } finally {
+      processingRef.current = false;
     }
   }, []);
 
   const processSignals = useCallback(async () => {
     setState("processing");
-    
+
     try {
       const signals = signalsRef.current;
       if (signals.length < MIN_SAMPLES) {
@@ -255,26 +593,17 @@ export default function HeartRateScreen() {
         return;
       }
 
-      const apiUrl = getApiUrl();
-      const url = new URL("/api/process-rppg", apiUrl);
-      const authHeaders = await getAuthHeaders();
-      
-      const response = await fetch(url.toString(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({
-          signals,
-          fps: CAPTURE_FPS,
-        }),
-      });
-
-      const data = await response.json();
-      
-      if (data.error) {
-        setError(data.error);
-        setState("idle");
-        return;
+      const timestamps = signals.map(s => s.timestamp);
+      let actualFps = CAPTURE_FPS;
+      if (timestamps.length > 1 && timestamps[0] > 0) {
+        const totalDuration = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+        if (totalDuration > 0) {
+          actualFps = (timestamps.length - 1) / totalDuration;
+        }
       }
+
+      const rgbSignals = signals.map(s => ({ r: s.r, g: s.g, b: s.b }));
+      const data = processRppgClient(rgbSignals, actualFps);
 
       setResult(data);
       setState("result");
