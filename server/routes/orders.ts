@@ -27,7 +27,7 @@ export function registerOrderRoutes(app: Express): void {
       }
       const order = await storage.createOrder({
         ...validation.data,
-        userId: req.session.userId!,
+        userId: req.userId!,
         status: "pending",
       });
       return res.status(201).json(order);
@@ -39,7 +39,7 @@ export function registerOrderRoutes(app: Express): void {
 
   app.get("/api/orders", requireAuth, async (req: Request, res: Response) => {
     try {
-      const orders = await storage.getUserOrders(req.session.userId!);
+      const orders = await storage.getUserOrders(req.userId!);
       return res.json(orders);
     } catch (error) {
       console.error("Get orders error:", error instanceof Error ? error.message : "Unknown error");
@@ -54,7 +54,7 @@ export function registerOrderRoutes(app: Express): void {
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
-      if (order.userId !== req.session.userId) {
+      if (order.userId !== req.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       return res.json(order);
@@ -71,7 +71,7 @@ export function registerOrderRoutes(app: Express): void {
       if (!order) {
         return res.status(404).json({ error: "Order not found" });
       }
-      if (order.userId !== req.session.userId) {
+      if (order.userId !== req.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
       if (order.status !== "pending") {
