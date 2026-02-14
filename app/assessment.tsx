@@ -44,7 +44,7 @@ import Colors from "@/constants/colors";
 import { MessageBubble, TypingIndicator } from "@/components/MessageBubble";
 import { EmergencyOverlay } from "@/components/EmergencyOverlay";
 import { RecommendationCard } from "@/components/RecommendationCard";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { saveAssessment, getProfile, getAssessment, updateAssessment } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
 import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment } from "@/lib/types";
@@ -232,9 +232,10 @@ export default function AssessmentScreen() {
           return msg;
         });
 
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           messages: apiMessages,
           patientProfile: {

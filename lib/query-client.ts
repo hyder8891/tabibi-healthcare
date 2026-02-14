@@ -7,7 +7,7 @@ export function setAuthTokenGetter(getter: () => Promise<string | null>) {
   getAuthToken = getter;
 }
 
-async function getAuthHeaders(): Promise<Record<string, string>> {
+export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (!getAuthToken) return {};
   const token = await getAuthToken();
   if (!token) return {};
