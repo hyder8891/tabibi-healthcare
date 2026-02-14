@@ -19,7 +19,7 @@ import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile } from "@/lib/storage";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
 import type { NearbyFacility, PatientProfile } from "@/lib/types";
 import * as Location from "expo-location";
@@ -79,13 +79,44 @@ export default function OrderScreen() {
         accuracy: Location.Accuracy.Balanced,
       });
       const baseUrl = getApiUrl();
+      const authHeaders = await getAuthHeaders();
       const url = new URL(
         `/api/nearby-facilities?latitude=${location.coords.latitude}&longitude=${location.coords.longitude}&type=pharmacy`,
         baseUrl,
       );
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await fetch(url.toString(), {
+        headers: authHeaders,
+      });
       const data = await res.json();
-      setPharmacies(data.facilities || []);
+      const facilities: NearbyFacility[] = data.facilities || [];
+      setPharmacies(facilities);
+
+      const enriched = await Promise.all(
+        facilities.map(async (f) => {
+          if (!f.placeId) return f;
+          try {
+            const detailUrl = new URL(`/api/place-details/${f.placeId}`, baseUrl);
+            const detailRes = await fetch(detailUrl.toString(), {
+              headers: authHeaders,
+            });
+            if (detailRes.ok) {
+              const details = await detailRes.json();
+              return {
+                ...f,
+                phone: details.phone || f.phone,
+                internationalPhone: details.internationalPhone || f.internationalPhone,
+              };
+            }
+          } catch {}
+          return f;
+        }),
+      );
+      setPharmacies(enriched);
+      setSelectedPharmacy((prev) => {
+        if (!prev) return prev;
+        const updated = enriched.find((p) => p.id === prev.id);
+        return updated || prev;
+      });
     } catch (err) {
       console.error("Failed to load pharmacies:", err);
     } finally {
@@ -93,8 +124,14 @@ export default function OrderScreen() {
     }
   };
 
+  const getPharmacyWithPhone = (pharmacy: NearbyFacility): NearbyFacility => {
+    const latest = pharmacies.find((p) => p.id === pharmacy.id);
+    return latest || pharmacy;
+  };
+
   const openWhatsApp = (pharmacy: NearbyFacility) => {
-    const phone = (pharmacy.internationalPhone || pharmacy.phone || "").replace(/[\s\-\(\)]/g, "");
+    const p = getPharmacyWithPhone(pharmacy);
+    const phone = (p.internationalPhone || p.phone || "").replace(/[\s\-\(\)]/g, "");
     if (!phone) {
       Alert.alert(t("No Phone", "لا يوجد رقم"), t("This pharmacy has no phone number listed.", "لا يوجد رقم هاتف لهذه الصيدلية."));
       return;
@@ -105,17 +142,24 @@ export default function OrderScreen() {
         ? `مرحباً، أود طلب الدواء التالي:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nالكمية: ${quantity}\n\nهل هو متوفر لديكم؟`
         : `Hello, I'd like to order the following medicine:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nQuantity: ${quantity}\n\nIs it available?`,
     );
-    Linking.openURL(`https://wa.me/${cleanPhone}?text=${message}`);
+    Linking.openURL(`https://wa.me/${cleanPhone}?text=${message}`).catch(() => {
+      Alert.alert(t("Error", "خطأ"), t("Could not open WhatsApp. Make sure it is installed.", "تعذر فتح واتساب. تأكد من تثبيته."));
+    });
   };
 
   const callPharmacy = (pharmacy: NearbyFacility) => {
-    const phone = pharmacy.internationalPhone || pharmacy.phone || "";
+    const p = getPharmacyWithPhone(pharmacy);
+    const phone = p.internationalPhone || p.phone || "";
     if (!phone) {
       Alert.alert(t("No Phone", "لا يوجد رقم"), t("This pharmacy has no phone number listed.", "لا يوجد رقم هاتف لهذه الصيدلية."));
       return;
     }
-    Linking.openURL(`tel:${phone}`);
+    Linking.openURL(`tel:${phone}`).catch(() => {
+      Alert.alert(t("Error", "خطأ"), t("Could not make the call.", "تعذر إجراء المكالمة."));
+    });
   };
+
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   const submitOrder = async () => {
     if (!selectedPharmacy || !patientName.trim() || !patientPhone.trim() || !deliveryAddress.trim()) {
@@ -127,13 +171,15 @@ export default function OrderScreen() {
     }
 
     setSubmitting(true);
+    setOrderError(null);
     try {
+      const pharmacy = getPharmacyWithPhone(selectedPharmacy);
       const res = await apiRequest("POST", "/api/orders", {
-        pharmacyName: selectedPharmacy.name,
-        pharmacyPhone: selectedPharmacy.internationalPhone || selectedPharmacy.phone || "",
-        pharmacyAddress: selectedPharmacy.address,
-        pharmacyPlaceId: selectedPharmacy.placeId || "",
-        medicineName,
+        pharmacyName: pharmacy.name,
+        pharmacyPhone: pharmacy.internationalPhone || pharmacy.phone || "",
+        pharmacyAddress: pharmacy.address,
+        pharmacyPlaceId: pharmacy.placeId || "",
+        medicineName: medicineName || "Unnamed Medicine",
         medicineDosage: medicineDosage || "",
         medicineFrequency: medicineFrequency || "",
         quantity,
@@ -166,12 +212,11 @@ export default function OrderScreen() {
           },
         ],
       );
-    } catch (err) {
+    } catch (err: any) {
       console.error("Order error:", err);
-      Alert.alert(
-        t("Error", "خطأ"),
-        t("Failed to place order. Please try again.", "فشل في تقديم الطلب. يرجى المحاولة مرة أخرى."),
-      );
+      const errorMsg = t("Failed to place order. Please try again.", "فشل في تقديم الطلب. يرجى المحاولة مرة أخرى.");
+      setOrderError(errorMsg);
+      Alert.alert(t("Error", "خطأ"), errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -390,7 +435,7 @@ export default function OrderScreen() {
 
       <View style={styles.contactRow}>
         <Pressable
-          style={[styles.contactBtn, styles.whatsappBtn]}
+          style={({ pressed }) => [styles.contactBtn, styles.whatsappBtn, pressed && { opacity: 0.8 }]}
           onPress={() => selectedPharmacy && openWhatsApp(selectedPharmacy)}
         >
           <Ionicons name="logo-whatsapp" size={20} color="#fff" />
@@ -400,7 +445,7 @@ export default function OrderScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.contactBtn, styles.callBtn]}
+          style={({ pressed }) => [styles.contactBtn, styles.callBtn, pressed && { opacity: 0.8 }]}
           onPress={() => selectedPharmacy && callPharmacy(selectedPharmacy)}
         >
           <Ionicons name="call" size={20} color={Colors.light.primary} />
@@ -409,6 +454,14 @@ export default function OrderScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {orderError ? (
+        <View style={{ backgroundColor: "#FEF2F2", padding: 12, borderRadius: 10, marginTop: 12 }}>
+          <Text style={{ color: Colors.light.emergency, fontSize: 13, fontFamily: "DMSans_500Medium", textAlign: isRTL ? "right" : "left" }}>
+            {orderError}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 
