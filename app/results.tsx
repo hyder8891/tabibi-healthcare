@@ -17,14 +17,17 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { getAssessment } from "@/lib/storage";
 import type { Assessment } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAvicenna } from "@/contexts/AvicennaContext";
 
 export default function ResultsScreen() {
   const insets = useSafeAreaInsets();
   const { assessmentId } = useLocalSearchParams<{ assessmentId: string }>();
   const { t, isRTL } = useSettings();
+  const { recordAssessmentOutcome, trackEvent } = useAvicenna();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
+  const [outcomeTracked, setOutcomeTracked] = useState(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   useEffect(() => {
@@ -37,6 +40,28 @@ export default function ResultsScreen() {
       setLoading(false);
     }
   }, [assessmentId]);
+
+  useEffect(() => {
+    if (assessment?.result && !outcomeTracked) {
+      setOutcomeTracked(true);
+      recordAssessmentOutcome({
+        chiefComplaint: assessment.chiefComplaint || "unknown",
+        condition: assessment.result.assessment?.condition,
+        severity: assessment.result.assessment?.severity,
+        medicines: assessment.result.recommendations?.pathwayA?.medicines?.map(m => ({
+          name: m.name,
+          localBrand: m.localBrand,
+          activeIngredient: m.activeIngredient,
+        })),
+        pathway: assessment.result.pathway,
+      }).catch(() => {});
+
+      trackEvent("assessment_viewed", "assessment", {
+        assessmentId: assessment.id,
+        condition: assessment.result.assessment?.condition,
+      }, [assessment.result.assessment?.condition || "unknown"].filter(Boolean)).catch(() => {});
+    }
+  }, [assessment?.result, outcomeTracked]);
 
   if (loading) {
     return (

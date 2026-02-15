@@ -27,6 +27,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import pako from "pako";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAvicenna } from "@/contexts/AvicennaContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
 const MEASUREMENT_DURATION = 20;
@@ -568,6 +569,7 @@ function PulseWaveform({ waveform, color }: { waveform: number[]; color: string 
 export default function HeartRateScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL } = useSettings();
+  const { recordVital } = useAvicenna();
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<MeasurementState>("idle");
   const [countdown, setCountdown] = useState(MEASUREMENT_DURATION);
@@ -694,6 +696,7 @@ export default function HeartRateScreen() {
         getProfile().then((profile) => {
           saveProfile({ ...profile, lastBpm: data.heartRate, lastBpmDate: Date.now() });
         });
+        recordVital("heart_rate", data.heartRate, data.confidence, true).catch(() => {});
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }

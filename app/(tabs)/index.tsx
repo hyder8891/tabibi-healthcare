@@ -17,6 +17,8 @@ import Colors from "@/constants/colors";
 import { getAssessments, getProfile } from "@/lib/storage";
 import type { Assessment, PatientProfile } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAvicenna } from "@/contexts/AvicennaContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,11 +26,24 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const { t, isRTL } = useSettings();
+  const { user } = useAuth();
+  const { insights, syncProfile } = useAvicenna();
 
   useEffect(() => {
     loadRecent();
-    getProfile().then(setProfile);
-  }, []);
+    getProfile().then((p) => {
+      setProfile(p);
+      if (user && p) {
+        syncProfile({
+          medications: p.medications,
+          conditions: p.conditions,
+          allergies: p.allergies,
+          age: p.age,
+          gender: p.gender,
+        }).catch(() => {});
+      }
+    });
+  }, [user]);
 
   const loadRecent = async () => {
     const assessments = await getAssessments();
@@ -237,6 +252,177 @@ export default function HomeScreen() {
           </View>
 
         </View>
+
+        {insights && insights.nudges.length > 0 && (
+          <>
+            <View style={[styles.avicennaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.avicennaHeaderLeft}>
+                <LinearGradient
+                  colors={["#7C3AED", "#A78BFA"]}
+                  style={styles.avicennaIconGradient}
+                >
+                  <MaterialCommunityIcons name="brain" size={16} color="#fff" />
+                </LinearGradient>
+                <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>
+                  {t("Health Insights", "رؤى صحية")}
+                </Text>
+              </View>
+            </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.nudgesScroll}
+              style={styles.nudgesContainer}
+            >
+              {insights.nudges.slice(0, 5).map((nudge, idx) => (
+                <Pressable
+                  key={`${nudge.type}-${idx}`}
+                  style={({ pressed }) => [
+                    styles.nudgeCard,
+                    pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (nudge.type === "onboarding") router.push("/assessment");
+                    else if (nudge.type === "vital_check") router.push("/heart-rate");
+                    else if (nudge.type === "recurring_condition") router.push("/assessment");
+                    else if (nudge.type === "vital_alert") router.push("/heart-rate");
+                  }}
+                >
+                  <View style={[styles.nudgeIconWrap, {
+                    backgroundColor:
+                      nudge.type === "vital_alert" ? Colors.light.emergencyLight :
+                      nudge.type === "recurring_condition" ? Colors.light.warningLight :
+                      nudge.type === "seasonal" ? "#EDE9FE" :
+                      nudge.type === "vital_check" ? Colors.light.emergencyLight :
+                      Colors.light.primarySurface
+                  }]}>
+                    <Ionicons
+                      name={
+                        nudge.type === "vital_alert" ? "heart" :
+                        nudge.type === "recurring_condition" ? "refresh" :
+                        nudge.type === "seasonal" ? "cloudy" :
+                        nudge.type === "vital_check" ? "heart-outline" :
+                        "sparkles"
+                      }
+                      size={20}
+                      color={
+                        nudge.type === "vital_alert" ? Colors.light.emergency :
+                        nudge.type === "recurring_condition" ? Colors.light.warning :
+                        nudge.type === "seasonal" ? "#7C3AED" :
+                        nudge.type === "vital_check" ? Colors.light.emergency :
+                        Colors.light.primary
+                      }
+                    />
+                  </View>
+                  <Text style={[styles.nudgeTitle, isRTL && { textAlign: "right" }]} numberOfLines={2}>
+                    {t(nudge.titleEn, nudge.titleAr)}
+                  </Text>
+                  <Text style={[styles.nudgeDesc, isRTL && { textAlign: "right" }]} numberOfLines={3}>
+                    {t(nudge.descEn, nudge.descAr)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+        {insights?.healthSummary && insights.healthSummary.totalAssessments > 0 && (
+          <View style={styles.healthSummaryCard}>
+            <LinearGradient
+              colors={["#F0FDFA", "#ECFDF5"]}
+              style={styles.healthSummaryGradient}
+            >
+              <View style={[styles.healthSummaryHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                <View style={styles.healthSummaryHeaderLeft}>
+                  <Ionicons name="analytics" size={18} color={Colors.light.primary} />
+                  <Text style={styles.healthSummaryTitle}>
+                    {t("Your Health Profile", "ملفك الصحي")}
+                  </Text>
+                </View>
+                <View style={[styles.riskBadge, {
+                  backgroundColor:
+                    insights.healthSummary.riskLevel === "high" ? Colors.light.emergencyLight :
+                    insights.healthSummary.riskLevel === "moderate" ? Colors.light.warningLight :
+                    Colors.light.successLight
+                }]}>
+                  <View style={[styles.riskDot, {
+                    backgroundColor:
+                      insights.healthSummary.riskLevel === "high" ? Colors.light.emergency :
+                      insights.healthSummary.riskLevel === "moderate" ? Colors.light.warning :
+                      Colors.light.success
+                  }]} />
+                  <Text style={[styles.riskText, {
+                    color:
+                      insights.healthSummary.riskLevel === "high" ? Colors.light.emergency :
+                      insights.healthSummary.riskLevel === "moderate" ? Colors.light.warning :
+                      Colors.light.success
+                  }]}>
+                    {t(
+                      insights.healthSummary.riskLevel === "high" ? "High Risk" :
+                      insights.healthSummary.riskLevel === "moderate" ? "Moderate" : "Low Risk",
+                      insights.healthSummary.riskLevel === "high" ? "خطر عالي" :
+                      insights.healthSummary.riskLevel === "moderate" ? "متوسط" : "خطر منخفض"
+                    )}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.healthStatsRow}>
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.totalAssessments}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Assessments", "تقييمات")}</Text>
+                </View>
+                <View style={styles.healthStatDivider} />
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.medicationCount}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Medications", "أدوية")}</Text>
+                </View>
+                <View style={styles.healthStatDivider} />
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.recentVitals.length}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Vitals", "مؤشرات")}</Text>
+                </View>
+              </View>
+
+              {insights.healthSummary.recentConditions.length > 0 && (
+                <View style={styles.recentConditionsRow}>
+                  {insights.healthSummary.recentConditions.slice(0, 3).map((condition, idx) => (
+                    <View key={idx} style={styles.conditionChip}>
+                      <Text style={styles.conditionChipText} numberOfLines={1}>{condition}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </LinearGradient>
+          </View>
+        )}
+
+        {insights?.seasonalAlerts && insights.seasonalAlerts.length > 0 && (
+          <>
+            <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>
+              {t("Seasonal Health Alerts", "تنبيهات صحية موسمية")}
+            </Text>
+            {insights.seasonalAlerts.slice(0, 2).map((alert, idx) => (
+              <View key={idx} style={styles.seasonalCard}>
+                <View style={[styles.seasonalRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <View style={styles.seasonalIconWrap}>
+                    <Ionicons name="warning" size={18} color="#7C3AED" />
+                  </View>
+                  <View style={styles.seasonalContent}>
+                    <Text style={[styles.seasonalTitle, isRTL && { textAlign: "right" }]}>
+                      {t(alert.nameEn, alert.nameAr)}
+                    </Text>
+                    <Text style={[styles.seasonalDesc, isRTL && { textAlign: "right" }]} numberOfLines={3}>
+                      {alert.description}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </>
+        )}
 
         <View style={styles.infoCards}>
           <View style={styles.infoCard}>
@@ -731,5 +917,195 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textTertiary,
+  },
+  avicennaHeader: {
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  avicennaHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  avicennaIconGradient: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nudgesContainer: {
+    marginBottom: 24,
+    marginHorizontal: -20,
+  },
+  nudgesScroll: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  nudgeCard: {
+    width: 200,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  nudgeIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  nudgeTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 4,
+    lineHeight: 19,
+  },
+  nudgeDesc: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 17,
+  },
+  healthSummaryCard: {
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  healthSummaryGradient: {
+    padding: 18,
+    borderRadius: 20,
+  },
+  healthSummaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  healthSummaryHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  healthSummaryTitle: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+  },
+  riskBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 5,
+  },
+  riskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  riskText: {
+    fontSize: 11,
+    fontFamily: "DMSans_600SemiBold",
+  },
+  healthStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginBottom: 14,
+  },
+  healthStat: {
+    alignItems: "center",
+    flex: 1,
+  },
+  healthStatValue: {
+    fontSize: 22,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.primary,
+  },
+  healthStatLabel: {
+    fontSize: 11,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textTertiary,
+    marginTop: 2,
+  },
+  healthStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.light.borderLight,
+  },
+  recentConditionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  conditionChip: {
+    backgroundColor: Colors.light.primarySurface,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(13, 148, 136, 0.12)",
+  },
+  conditionChipText: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
+  },
+  seasonalCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    borderLeftWidth: 3,
+    borderLeftColor: "#7C3AED",
+  },
+  seasonalRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  seasonalIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#EDE9FE",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  seasonalContent: {
+    flex: 1,
+    gap: 4,
+  },
+  seasonalTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+  },
+  seasonalDesc: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 17,
   },
 });

@@ -23,6 +23,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { getMedications, saveMedications, getProfile, saveProfile } from "@/lib/storage";
 import type { ScannedMedication } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAvicenna } from "@/contexts/AvicennaContext";
 
 interface InteractionResult {
   drug1: string;
@@ -59,6 +60,7 @@ async function uriToBase64(uri: string): Promise<string> {
 export default function ScanScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL, settings } = useSettings();
+  const { trackEvent } = useAvicenna();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isCheckingInteractions, setIsCheckingInteractions] = useState(false);
   const [medicationList, setMedicationList] = useState<ScannedMedication[]>([]);
@@ -154,6 +156,14 @@ export default function ScanScreen() {
         const newMedNames = data.medications.map((m: ScannedMedication) => m.name);
         const allMeds = [...new Set([...profile.medications, ...newMedNames])];
         await saveProfile({ ...profile, medications: allMeds });
+
+        for (const med of newMeds) {
+          trackEvent("medication_scanned", "scan", {
+            name: med.name,
+            genericName: med.genericName,
+            dosage: med.dosage,
+          }, [med.name, med.genericName || ""].filter(Boolean)).catch(() => {});
+        }
       } else {
         setError(
           data.medications?.[0]?.error ||
