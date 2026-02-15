@@ -35,8 +35,8 @@ const MEASUREMENT_DURATION = IS_MOBILE ? 15 : 20;
 const CAPTURE_INTERVAL_MS = IS_MOBILE ? 100 : 125;
 const MIN_SAMPLES = IS_MOBILE ? 40 : 30;
 const FINGER_DETECT_INTERVAL_MS = 300;
-const FINGER_RED_THRESHOLD = 140;
-const FINGER_GREEN_MAX = 120;
+const FINGER_RED_THRESHOLD = 80;
+const FINGER_GREEN_MAX = 180;
 const FINGER_VARIANCE_MAX = 40;
 const FINGER_CONFIRM_FRAMES = 3;
 
@@ -250,7 +250,11 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
 }
 
 function isFingerCovering(r: number, g: number, b: number): boolean {
-  return r > FINGER_RED_THRESHOLD && g < FINGER_GREEN_MAX && r > g * 1.4 && r > b * 1.3;
+  if (r > 120 && r > g * 1.3 && r > b * 1.2) return true;
+  if (r > FINGER_RED_THRESHOLD && g < FINGER_GREEN_MAX && r > g && r > b) return true;
+  const brightness = (r + g + b) / 3;
+  if (brightness < 60 && r >= g && r >= b) return true;
+  return false;
 }
 
 function processFingerSignals(redValues: number[], timestamps: number[]): HeartRateResult {
@@ -711,13 +715,16 @@ export default function HeartRateScreen() {
   }, []);
 
   useEffect(() => {
-    if (IS_MOBILE && state === "idle" && permission?.granted) {
-      setTimeout(() => setTorchOn(true), 200);
+    if (IS_MOBILE && permission?.granted && (state === "idle" || state === "waiting_finger" || state === "measuring")) {
+      setTorchOn(false);
+      const t1 = setTimeout(() => setTorchOn(true), 150);
+      const t2 = setTimeout(() => {
+        setTorchOn(false);
+        setTimeout(() => setTorchOn(true), 50);
+      }, 500);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
     }
-    return () => {
-      if (state === "idle") setTorchOn(false);
-    };
-  }, [state, permission?.granted]);
+  }, [permission?.granted]);
 
   const captureFrameFinger = useCallback(async () => {
     if (!cameraRef.current || processingRef.current) return;
@@ -793,18 +800,22 @@ export default function HeartRateScreen() {
       });
       if (photo) {
         const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
-        if (rgb.r >= 0 && isFingerCovering(rgb.r, rgb.g, rgb.b)) {
-          fingerConfirmCount.current++;
-          if (fingerConfirmCount.current >= FINGER_CONFIRM_FRAMES) {
-            setFingerDetected(true);
-            if (!measurementStartedRef.current) {
-              measurementStartedRef.current = true;
-              startFingerMeasurement();
+        if (rgb.r >= 0) {
+          const detected = isFingerCovering(rgb.r, rgb.g, rgb.b);
+          console.log(`FingerCheck: r=${rgb.r.toFixed(0)} g=${rgb.g.toFixed(0)} b=${rgb.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
+          if (detected) {
+            fingerConfirmCount.current++;
+            if (fingerConfirmCount.current >= FINGER_CONFIRM_FRAMES) {
+              setFingerDetected(true);
+              if (!measurementStartedRef.current) {
+                measurementStartedRef.current = true;
+                startFingerMeasurement();
+              }
             }
+          } else {
+            fingerConfirmCount.current = 0;
+            setFingerDetected(false);
           }
-        } else {
-          fingerConfirmCount.current = 0;
-          setFingerDetected(false);
         }
       }
     } catch {} finally {
@@ -917,7 +928,15 @@ export default function HeartRateScreen() {
     measurementStartedRef.current = false;
     setFingerDetected(false);
     setState("waiting_finger");
-    setTorchOn(true);
+
+    setTorchOn(false);
+    setTimeout(() => {
+      setTorchOn(true);
+      setTimeout(() => {
+        setTorchOn(false);
+        setTimeout(() => setTorchOn(true), 50);
+      }, 300);
+    }, 100);
 
     fingerCheckRef.current = setInterval(checkFingerPresence, FINGER_DETECT_INTERVAL_MS);
   }, [checkFingerPresence]);
@@ -1000,7 +1019,13 @@ export default function HeartRateScreen() {
     setLiveBpm(0);
     setCountdown(MEASUREMENT_DURATION);
     setFingerDetected(false);
-    if (IS_MOBILE) setTimeout(() => setTorchOn(true), 200);
+    if (IS_MOBILE) {
+      setTorchOn(false);
+      setTimeout(() => {
+        setTorchOn(true);
+        setTimeout(() => { setTorchOn(false); setTimeout(() => setTorchOn(true), 50); }, 300);
+      }, 100);
+    }
   }, []);
 
   if (!permission) {
@@ -1062,56 +1087,56 @@ export default function HeartRateScreen() {
       {state !== "result" ? (
         <View style={styles.cameraSection}>
           {IS_MOBILE ? (
-            <View style={styles.fingerCameraContainer}>
-              <CameraView
-                ref={cameraRef}
-                style={styles.fingerCamera}
-                facing="back"
-                enableTorch={torchOn}
-                animateShutter={false}
-              />
-              <View style={styles.fingerOverlay}>
+            <View style={styles.fingerCircleOuter}>
+              <View style={styles.fingerCircleClip}>
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.fingerCameraFill}
+                  facing="back"
+                  enableTorch={torchOn}
+                  animateShutter={false}
+                />
                 <View style={[
-                  styles.fingerCircle,
+                  styles.fingerCircleBorder,
                   fingerDetected ? styles.fingerCircleDetected : styles.fingerCircleWaiting,
                 ]}>
                   {state === "measuring" && fingerDetected ? (
                     <View style={styles.fingerInnerPulse}>
-                      <Ionicons name="heart" size={32} color={Colors.light.emergency} />
+                      <Ionicons name="heart" size={36} color={Colors.light.emergency} />
                       {liveBpm > 0 && (
                         <Text style={styles.liveBpmText}>{liveBpm}</Text>
                       )}
                     </View>
                   ) : state === "measuring" && !fingerDetected ? (
                     <View style={styles.fingerLostInner}>
-                      <Ionicons name="finger-print" size={32} color={Colors.light.emergency} />
+                      <Ionicons name="finger-print" size={36} color={Colors.light.emergency} />
                       <Text style={styles.fingerLostText}>
                         {t("Replace finger", "أعد وضع الإصبع")}
                       </Text>
                     </View>
                   ) : fingerDetected ? (
                     <View style={styles.fingerDetectedInner}>
-                      <Ionicons name="checkmark-circle" size={32} color={Colors.light.success} />
+                      <Ionicons name="checkmark-circle" size={36} color={Colors.light.success} />
                       <Text style={styles.fingerDetectedText}>
                         {t("Finger detected", "تم اكتشاف الإصبع")}
                       </Text>
                     </View>
                   ) : (
                     <View style={styles.fingerWaitInner}>
-                      <Ionicons name="finger-print" size={36} color="rgba(255,255,255,0.8)" />
+                      <Ionicons name="finger-print" size={44} color="rgba(255,255,255,0.8)" />
                     </View>
                   )}
                 </View>
               </View>
               {state === "measuring" && (
-                <View style={styles.countdownOverlay}>
-                  <Text style={styles.countdownText}>{countdown}s</Text>
-                  <View style={styles.progressBarBg}>
-                    <View style={[styles.progressBarFill, {
+                <View style={styles.fingerCountdownRow}>
+                  <Text style={styles.fingerCountdownText}>{countdown}s</Text>
+                  <View style={styles.fingerProgressBg}>
+                    <View style={[styles.fingerProgressFill, {
                       width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
                     }]} />
                   </View>
-                  <Text style={styles.sampleCountText}>
+                  <Text style={styles.fingerSampleText}>
                     {sampleCount} {t("frames", "إطار")}
                   </Text>
                 </View>
@@ -1460,39 +1485,61 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  fingerCameraContainer: {
-    width: "100%",
-    aspectRatio: 1,
-    maxHeight: "50%",
-    borderRadius: 24,
+  fingerCircleOuter: {
+    alignSelf: "center",
+    alignItems: "center",
+    gap: 16,
+  },
+  fingerCircleClip: {
+    width: 220,
+    height: 220,
+    borderRadius: 110,
     overflow: "hidden",
     backgroundColor: "#1a1a1a",
-    alignSelf: "center",
   },
-  fingerCamera: {
-    flex: 1,
+  fingerCameraFill: {
+    width: "100%",
+    height: "100%",
   },
-  fingerOverlay: {
+  fingerCircleBorder: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-  fingerCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 4,
+    borderRadius: 110,
+    borderWidth: 5,
     justifyContent: "center",
     alignItems: "center",
   },
   fingerCircleWaiting: {
     borderColor: Colors.light.emergency,
-    backgroundColor: "rgba(220, 38, 38, 0.15)",
   },
   fingerCircleDetected: {
     borderColor: Colors.light.success,
-    backgroundColor: "rgba(34, 197, 94, 0.15)",
+  },
+  fingerCountdownRow: {
+    alignItems: "center",
+    width: 220,
+  },
+  fingerCountdownText: {
+    fontSize: 20,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+    marginBottom: 6,
+  },
+  fingerProgressBg: {
+    width: "100%",
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.light.borderLight,
+  },
+  fingerProgressFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.light.primary,
+  },
+  fingerSampleText: {
+    fontSize: 11,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textTertiary,
+    marginTop: 4,
   },
   fingerWaitInner: {
     alignItems: "center",
