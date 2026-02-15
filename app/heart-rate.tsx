@@ -30,13 +30,19 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useAvicenna } from "@/contexts/AvicennaContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
-const MEASUREMENT_DURATION = 20;
-const CAPTURE_FPS = Platform.OS === "web" ? 8 : 4;
-const MIN_SAMPLES = 30;
+const IS_MOBILE = Platform.OS !== "web";
+const MEASUREMENT_DURATION = IS_MOBILE ? 15 : 20;
+const CAPTURE_INTERVAL_MS = IS_MOBILE ? 100 : 125;
+const MIN_SAMPLES = IS_MOBILE ? 40 : 30;
+const FINGER_DETECT_INTERVAL_MS = 300;
+const FINGER_RED_THRESHOLD = 140;
+const FINGER_GREEN_MAX = 120;
+const FINGER_VARIANCE_MAX = 40;
+const FINGER_CONFIRM_FRAMES = 3;
 
-type MeasurementState = "idle" | "measuring" | "processing" | "result";
+type MeasurementState = "idle" | "waiting_finger" | "measuring" | "processing" | "result";
 
-interface RppgResult {
+interface HeartRateResult {
   heartRate: number;
   confidence: "high" | "medium" | "low";
   waveform: number[];
@@ -79,9 +85,7 @@ function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: nu
           b: count > 0 ? bSum / count : -1,
         });
       };
-      img.onerror = () => {
-        resolve({ r: -1, g: -1, b: -1 });
-      };
+      img.onerror = () => resolve({ r: -1, g: -1, b: -1 });
       const imgSrc = base64Data.startsWith("data:")
         ? base64Data
         : `data:image/png;base64,${base64Data}`;
@@ -200,22 +204,13 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
   }
 }
 
-async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
+async function extractRGBNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
   try {
-    const cropX = Math.floor(photoWidth * 0.2);
-    const cropY = Math.floor(photoHeight * 0.3);
-    const cropW = Math.floor(photoWidth * 0.6);
-    const cropH = Math.floor(photoHeight * 0.4);
-
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [
-        { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-        { resize: { width: 4, height: 4 } },
-      ],
+      [{ resize: { width: 4, height: 4 } }],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
-
     if (result.base64) {
       const rawBase64 = result.base64.startsWith("data:")
         ? result.base64.replace(/^data:image\/\w+;base64,/, "")
@@ -228,11 +223,38 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
   }
 }
 
-function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fps: number): RppgResult {
-  const actualFps = fps || 10;
-  const n = signals.length;
+async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
+  try {
+    const cropX = Math.floor(photoWidth * 0.2);
+    const cropY = Math.floor(photoHeight * 0.3);
+    const cropW = Math.floor(photoWidth * 0.6);
+    const cropH = Math.floor(photoHeight * 0.4);
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [
+        { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
+        { resize: { width: 4, height: 4 } },
+      ],
+      { base64: true, format: ImageManipulator.SaveFormat.PNG }
+    );
+    if (result.base64) {
+      const rawBase64 = result.base64.startsWith("data:")
+        ? result.base64.replace(/^data:image\/\w+;base64,/, "")
+        : result.base64;
+      return parsePNGPixels(rawBase64);
+    }
+    return { r: -1, g: -1, b: -1 };
+  } catch {
+    return { r: -1, g: -1, b: -1 };
+  }
+}
 
-  const invalidResult: RppgResult = {
+function isFingerCovering(r: number, g: number, b: number): boolean {
+  return r > FINGER_RED_THRESHOLD && g < FINGER_GREEN_MAX && r > g * 1.4 && r > b * 1.3;
+}
+
+function processFingerSignals(redValues: number[], timestamps: number[]): HeartRateResult {
+  const invalidResult: HeartRateResult = {
     heartRate: 0,
     confidence: "low",
     waveform: [],
@@ -241,37 +263,24 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
     validReading: false,
   };
 
+  const n = redValues.length;
   if (n < 30) {
     return { ...invalidResult, message: "Not enough samples for analysis" };
   }
 
-  const validSignals = signals.filter(s => s.r >= 0 && s.g >= 0 && s.b >= 0);
-  if (validSignals.length < 30) {
-    return { ...invalidResult, message: "Too many failed frame captures" };
+  let actualFps = 10;
+  if (timestamps.length > 1) {
+    const totalDuration = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+    if (totalDuration > 0) {
+      actualFps = (timestamps.length - 1) / totalDuration;
+    }
   }
-
-  const gValues = validSignals.map(s => s.g);
-  const gMin = Math.min(...gValues);
-  const gMax = Math.max(...gValues);
-  const gRange = gMax - gMin;
-
-  if (gRange < 0.3) {
-    return { ...invalidResult, message: "No color variation detected - ensure face is visible and well-lit" };
-  }
-
-  const rRaw = validSignals.map(s => s.r);
-  const gRaw = validSignals.map(s => s.g);
-  const bRaw = validSignals.map(s => s.b);
-  const vn = validSignals.length;
 
   function detrendSignal(sig: number[]) {
     const len = sig.length;
     let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
     for (let i = 0; i < len; i++) {
-      sumX += i;
-      sumY += sig[i];
-      sumXY += i * sig[i];
-      sumXX += i * i;
+      sumX += i; sumY += sig[i]; sumXY += i * sig[i]; sumXX += i * i;
     }
     const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
     const intercept = (sumY - slope * sumX) / len;
@@ -284,63 +293,13 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
     return sig.map(v => (v - mean) / std);
   }
 
-  const rDetrend = detrendSignal(rRaw);
-  const gDetrend = detrendSignal(gRaw);
-  const bDetrend = detrendSignal(bRaw);
-
-  const rNorm = normalizeSignal(rDetrend);
-  const gNorm = normalizeSignal(gDetrend);
-  const bNorm = normalizeSignal(bDetrend);
-
-  const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
-  const posSignal = new Array(vn).fill(0);
-
-  for (let start = 0; start < vn - windowSize; start += Math.floor(windowSize / 2)) {
-    const end = Math.min(start + windowSize, vn);
-    const len = end - start;
-
-    const rWin = rNorm.slice(start, end);
-    const gWin = gNorm.slice(start, end);
-    const bWin = bNorm.slice(start, end);
-
-    const rMean = rWin.reduce((a, b) => a + b, 0) / len;
-    const gMean = gWin.reduce((a, b) => a + b, 0) / len;
-    const bMean = bWin.reduce((a, b) => a + b, 0) / len;
-    const rStd = Math.sqrt(rWin.reduce((s, v) => s + (v - rMean) ** 2, 0) / len) || 1;
-    const gStd = Math.sqrt(gWin.reduce((s, v) => s + (v - gMean) ** 2, 0) / len) || 1;
-    const bStd = Math.sqrt(bWin.reduce((s, v) => s + (v - bMean) ** 2, 0) / len) || 1;
-
-    const rN = rWin.map(v => (v - rMean) / rStd);
-    const gN = gWin.map(v => (v - gMean) / gStd);
-    const bN = bWin.map(v => (v - bMean) / bStd);
-
-    const xs = new Array(len);
-    const ys = new Array(len);
-    for (let i = 0; i < len; i++) {
-      xs[i] = 3 * rN[i] - 2 * gN[i];
-      ys[i] = 1.5 * rN[i] + gN[i] - 1.5 * bN[i];
-    }
-
-    const xsStd = Math.sqrt(xs.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
-    const ysStd = Math.sqrt(ys.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
-    const alpha = xsStd / ysStd;
-
-    for (let i = 0; i < len; i++) {
-      posSignal[start + i] += xs[i] + alpha * ys[i];
-    }
-  }
-
-  const posDetrended = detrendSignal(posSignal);
-
-  const greenDetrended = detrendSignal(gRaw);
-  const greenNormalized = normalizeSignal(greenDetrended);
+  const detrended = detrendSignal(redValues);
+  const normalized = normalizeSignal(detrended);
 
   const minFreq = 0.75;
   const maxFreq = 3.0;
 
   function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
-    const result = new Array(sig.length);
-
     const hpRC = 1.0 / (2 * Math.PI * lowFreq);
     const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
     const hp = new Array(sig.length);
@@ -353,178 +312,309 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
     for (let i = 1; i < sig.length; i++) {
       hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
     }
-
     const lpRC = 1.0 / (2 * Math.PI * highFreq);
     const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
-    result[0] = hp2[0];
+    const lp = new Array(sig.length);
+    lp[0] = hp2[0];
     for (let i = 1; i < sig.length; i++) {
-      result[i] = result[i - 1] + lpAlpha * (hp2[i] - result[i - 1]);
+      lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
     }
     const lp2 = new Array(sig.length);
-    lp2[0] = result[0];
+    lp2[0] = lp[0];
     for (let i = 1; i < sig.length; i++) {
-      lp2[i] = lp2[i - 1] + lpAlpha * (result[i] - lp2[i - 1]);
+      lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
     }
-
     return lp2;
   }
 
-  const filteredPOS = bandpassFilter(posDetrended, actualFps, minFreq, maxFreq);
-  const filteredGreen = bandpassFilter(greenNormalized, actualFps, minFreq, maxFreq);
+  const filtered = bandpassFilter(normalized, actualFps, minFreq, maxFreq);
 
-  function computeFFTBpm(filtered: number[], sigLen: number) {
-    const zeroPadFactor = 4;
-    const fftSize = Math.pow(2, Math.ceil(Math.log2(sigLen * zeroPadFactor)));
-    const real = new Array(fftSize).fill(0);
-    const imag = new Array(fftSize).fill(0);
+  const zeroPadFactor = 4;
+  const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
+  const real = new Array(fftSize).fill(0);
+  const imag = new Array(fftSize).fill(0);
+  for (let i = 0; i < n; i++) {
+    const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+    real[i] = filtered[i] * hannCoeff;
+  }
 
-    for (let i = 0; i < sigLen; i++) {
-      const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (sigLen - 1));
-      real[i] = filtered[i] * hannCoeff;
+  function fft(re: number[], im: number[], sz: number) {
+    if (sz <= 1) return;
+    const halfN = sz / 2;
+    const evenReal = new Array(halfN);
+    const evenImag = new Array(halfN);
+    const oddReal = new Array(halfN);
+    const oddImag = new Array(halfN);
+    for (let i = 0; i < halfN; i++) {
+      evenReal[i] = re[2 * i]; evenImag[i] = im[2 * i];
+      oddReal[i] = re[2 * i + 1]; oddImag[i] = im[2 * i + 1];
     }
-
-    function fft(re: number[], im: number[], sz: number) {
-      if (sz <= 1) return;
-      const halfN = sz / 2;
-      const evenReal = new Array(halfN);
-      const evenImag = new Array(halfN);
-      const oddReal = new Array(halfN);
-      const oddImag = new Array(halfN);
-
-      for (let i = 0; i < halfN; i++) {
-        evenReal[i] = re[2 * i];
-        evenImag[i] = im[2 * i];
-        oddReal[i] = re[2 * i + 1];
-        oddImag[i] = im[2 * i + 1];
-      }
-
-      fft(evenReal, evenImag, halfN);
-      fft(oddReal, oddImag, halfN);
-
-      for (let k = 0; k < halfN; k++) {
-        const angle = -2 * Math.PI * k / sz;
-        const cos = Math.cos(angle);
-        const sin = Math.sin(angle);
-        const tReal = cos * oddReal[k] - sin * oddImag[k];
-        const tImag = sin * oddReal[k] + cos * oddImag[k];
-        re[k] = evenReal[k] + tReal;
-        im[k] = evenImag[k] + tImag;
-        re[k + halfN] = evenReal[k] - tReal;
-        im[k + halfN] = evenImag[k] - tImag;
-      }
+    fft(evenReal, evenImag, halfN);
+    fft(oddReal, oddImag, halfN);
+    for (let k = 0; k < halfN; k++) {
+      const angle = -2 * Math.PI * k / sz;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+      const tReal = cos * oddReal[k] - sin * oddImag[k];
+      const tImag = sin * oddReal[k] + cos * oddImag[k];
+      re[k] = evenReal[k] + tReal;
+      im[k] = evenImag[k] + tImag;
+      re[k + halfN] = evenReal[k] - tReal;
+      im[k + halfN] = evenImag[k] - tImag;
     }
+  }
 
-    fft(real, imag, fftSize);
+  fft(real, imag, fftSize);
 
-    const magnitudes: number[] = [];
-    for (let i = 0; i < fftSize / 2; i++) {
-      magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
+  const magnitudes: number[] = [];
+  for (let i = 0; i < fftSize / 2; i++) {
+    magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
+  }
+
+  const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
+  const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
+
+  let peakBin = scaledMinBin;
+  let peakMag = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    if (magnitudes[i] > peakMag) {
+      peakMag = magnitudes[i];
+      peakBin = i;
     }
+  }
 
-    const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
-    const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
-
-    let peakBin = scaledMinBin;
-    let peakMag = 0;
-    for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-      if (magnitudes[i] > peakMag) {
-        peakMag = magnitudes[i];
-        peakBin = i;
-      }
-    }
-
-    let peakFreq: number;
-    if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
-      const alphaVal = magnitudes[peakBin - 1];
-      const beta = magnitudes[peakBin];
-      const gamma = magnitudes[peakBin + 1];
-      const denom = alphaVal - 2 * beta + gamma;
-      if (Math.abs(denom) > 1e-10) {
-        const delta = 0.5 * (alphaVal - gamma) / denom;
-        peakFreq = (peakBin + delta) * actualFps / fftSize;
-      } else {
-        peakFreq = peakBin * actualFps / fftSize;
-      }
+  let peakFreq: number;
+  if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
+    const alphaVal = magnitudes[peakBin - 1];
+    const beta = magnitudes[peakBin];
+    const gamma = magnitudes[peakBin + 1];
+    const denom = alphaVal - 2 * beta + gamma;
+    if (Math.abs(denom) > 1e-10) {
+      const delta = 0.5 * (alphaVal - gamma) / denom;
+      peakFreq = (peakBin + delta) * actualFps / fftSize;
     } else {
       peakFreq = peakBin * actualFps / fftSize;
     }
-
-    let totalPower = 0;
-    let peakPower = 0;
-    for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-      const power = magnitudes[i] * magnitudes[i];
-      totalPower += power;
-      if (Math.abs(i - peakBin) <= 2) {
-        peakPower += power;
-      }
-    }
-    const snr = totalPower > 0 ? peakPower / totalPower : 0;
-
-    return { bpm: Math.round(peakFreq * 60), snr, peakMag };
-  }
-
-  const posResult = computeFFTBpm(filteredPOS, vn);
-  const greenResult = computeFFTBpm(filteredGreen, vn);
-
-  let bestBpm: number;
-  let bestSnr: number;
-  let usedMethod: string;
-
-  if (posResult.snr >= greenResult.snr && posResult.snr > 0.05) {
-    bestBpm = posResult.bpm;
-    bestSnr = posResult.snr;
-    usedMethod = "POS";
-  } else if (greenResult.snr > 0.05) {
-    bestBpm = greenResult.bpm;
-    bestSnr = greenResult.snr;
-    usedMethod = "Green";
   } else {
-    bestBpm = posResult.snr >= greenResult.snr ? posResult.bpm : greenResult.bpm;
-    bestSnr = Math.max(posResult.snr, greenResult.snr);
-    usedMethod = "fallback";
+    peakFreq = peakBin * actualFps / fftSize;
   }
 
-  const signalVariance = filteredPOS.reduce((s, v) => s + v * v, 0) / vn;
+  let totalPower = 0;
+  let peakPower = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    const power = magnitudes[i] * magnitudes[i];
+    totalPower += power;
+    if (Math.abs(i - peakBin) <= 2) peakPower += power;
+  }
+  const snr = totalPower > 0 ? peakPower / totalPower : 0;
+  const bpm = Math.round(peakFreq * 60);
+
+  const signalVariance = filtered.reduce((s, v) => s + v * v, 0) / n;
   const hasVariation = signalVariance > 1e-10;
-
-  const isValidBpm = bestBpm >= 45 && bestBpm <= 180;
-  const isValidSignal = bestSnr > 0.08 && hasVariation;
+  const isValidBpm = bpm >= 45 && bpm <= 180;
+  const isValidSignal = snr > 0.06 && hasVariation;
   const validReading = isValidBpm && isValidSignal;
-
-  const heartRate = validReading ? Math.max(45, Math.min(180, bestBpm)) : 0;
+  const heartRate = validReading ? Math.max(45, Math.min(180, bpm)) : 0;
 
   let confidence: "high" | "medium" | "low";
-  if (bestSnr > 0.18 && vn >= 60 && hasVariation && validReading) {
-    confidence = "high";
-  } else if (bestSnr > 0.10 && vn >= 40 && hasVariation && validReading) {
-    confidence = "medium";
-  } else {
-    confidence = "low";
-  }
+  if (snr > 0.15 && n >= 60 && validReading) confidence = "high";
+  else if (snr > 0.08 && n >= 40 && validReading) confidence = "medium";
+  else confidence = "low";
 
-  const displayFiltered = posResult.snr >= greenResult.snr ? filteredPOS : filteredGreen;
   const waveformLength = 100;
   const waveform: number[] = [];
   for (let i = 0; i < waveformLength; i++) {
-    const idx = Math.floor(i * displayFiltered.length / waveformLength);
-    waveform.push(displayFiltered[idx] || 0);
+    const idx = Math.floor(i * filtered.length / waveformLength);
+    waveform.push(filtered[idx] || 0);
   }
-
   const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
   const normalizedWaveform = waveform.map(v => v / maxWave);
 
-  console.log(`rPPG: ${vn} valid samples, fps=${actualFps.toFixed(1)}, POS(bpm=${posResult.bpm},snr=${posResult.snr.toFixed(3)}), Green(bpm=${greenResult.bpm},snr=${greenResult.snr.toFixed(3)}), used=${usedMethod}, valid=${validReading}`);
+  console.log(`HeartRate: ${n} samples, fps=${actualFps.toFixed(1)}, bpm=${bpm}, snr=${snr.toFixed(3)}, valid=${validReading}`);
 
   return {
     heartRate,
     confidence,
     waveform: normalizedWaveform,
-    signalQuality: Math.round(bestSnr * 100),
+    signalQuality: Math.round(snr * 100),
     validReading,
     message: validReading
-      ? (confidence === "high"
-        ? "Strong signal detected"
-        : "Moderate signal - try better lighting next time")
+      ? (confidence === "high" ? "Strong signal detected" : "Moderate signal - try holding still next time")
+      : "Could not detect a reliable heart rate - press finger firmly and stay still",
+  };
+}
+
+function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, fps: number): HeartRateResult {
+  const actualFps = fps || 10;
+  const n = signals.length;
+
+  const invalidResult: HeartRateResult = {
+    heartRate: 0, confidence: "low", waveform: [], signalQuality: 0,
+    message: "Could not detect heart rate", validReading: false,
+  };
+
+  if (n < 30) return { ...invalidResult, message: "Not enough samples for analysis" };
+
+  const validSignals = signals.filter(s => s.r >= 0 && s.g >= 0 && s.b >= 0);
+  if (validSignals.length < 30) return { ...invalidResult, message: "Too many failed frame captures" };
+
+  const gValues = validSignals.map(s => s.g);
+  const gMin = Math.min(...gValues);
+  const gMax = Math.max(...gValues);
+  if (gMax - gMin < 0.3) return { ...invalidResult, message: "No color variation detected - ensure face is visible and well-lit" };
+
+  const rRaw = validSignals.map(s => s.r);
+  const gRaw = validSignals.map(s => s.g);
+  const bRaw = validSignals.map(s => s.b);
+  const vn = validSignals.length;
+
+  function detrendSignal(sig: number[]) {
+    const len = sig.length;
+    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    for (let i = 0; i < len; i++) { sumX += i; sumY += sig[i]; sumXY += i * sig[i]; sumXX += i * i; }
+    const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / len;
+    return sig.map((v, i) => v - (slope * i + intercept));
+  }
+
+  function normalizeSignal(sig: number[]) {
+    const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
+    const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
+    return sig.map(v => (v - mean) / std);
+  }
+
+  const rNorm = normalizeSignal(detrendSignal(rRaw));
+  const gNorm = normalizeSignal(detrendSignal(gRaw));
+  const bNorm = normalizeSignal(detrendSignal(bRaw));
+
+  const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
+  const posSignal = new Array(vn).fill(0);
+
+  for (let start = 0; start < vn - windowSize; start += Math.floor(windowSize / 2)) {
+    const end = Math.min(start + windowSize, vn);
+    const len = end - start;
+    const rWin = rNorm.slice(start, end);
+    const gWin = gNorm.slice(start, end);
+    const bWin = bNorm.slice(start, end);
+    const rMean = rWin.reduce((a, b) => a + b, 0) / len;
+    const gMean = gWin.reduce((a, b) => a + b, 0) / len;
+    const bMean = bWin.reduce((a, b) => a + b, 0) / len;
+    const rStd = Math.sqrt(rWin.reduce((s, v) => s + (v - rMean) ** 2, 0) / len) || 1;
+    const gStd = Math.sqrt(gWin.reduce((s, v) => s + (v - gMean) ** 2, 0) / len) || 1;
+    const bStd = Math.sqrt(bWin.reduce((s, v) => s + (v - bMean) ** 2, 0) / len) || 1;
+    const rN = rWin.map(v => (v - rMean) / rStd);
+    const gN = gWin.map(v => (v - gMean) / gStd);
+    const bN = bWin.map(v => (v - bMean) / bStd);
+    const xs = new Array(len);
+    const ys = new Array(len);
+    for (let i = 0; i < len; i++) {
+      xs[i] = 3 * rN[i] - 2 * gN[i];
+      ys[i] = 1.5 * rN[i] + gN[i] - 1.5 * bN[i];
+    }
+    const xsStd = Math.sqrt(xs.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+    const ysStd = Math.sqrt(ys.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
+    const alpha = xsStd / ysStd;
+    for (let i = 0; i < len; i++) posSignal[start + i] += xs[i] + alpha * ys[i];
+  }
+
+  const minFreq = 0.75;
+  const maxFreq = 3.0;
+
+  function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+    const hpRC = 1.0 / (2 * Math.PI * lowFreq);
+    const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
+    const hp = new Array(sig.length);
+    hp[0] = sig[0];
+    for (let i = 1; i < sig.length; i++) hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
+    const hp2 = new Array(sig.length);
+    hp2[0] = hp[0];
+    for (let i = 1; i < sig.length; i++) hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
+    const lpRC = 1.0 / (2 * Math.PI * highFreq);
+    const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
+    const lp = new Array(sig.length);
+    lp[0] = hp2[0];
+    for (let i = 1; i < sig.length; i++) lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
+    const lp2 = new Array(sig.length);
+    lp2[0] = lp[0];
+    for (let i = 1; i < sig.length; i++) lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
+    return lp2;
+  }
+
+  const filteredPOS = bandpassFilter(detrendSignal(posSignal), actualFps, minFreq, maxFreq);
+  const filteredGreen = bandpassFilter(normalizeSignal(detrendSignal(gRaw)), actualFps, minFreq, maxFreq);
+
+  function computeFFTBpm(sig: number[], sigLen: number) {
+    const zeroPadFactor = 4;
+    const fftSize = Math.pow(2, Math.ceil(Math.log2(sigLen * zeroPadFactor)));
+    const real = new Array(fftSize).fill(0);
+    const imag = new Array(fftSize).fill(0);
+    for (let i = 0; i < sigLen; i++) {
+      real[i] = sig[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (sigLen - 1)));
+    }
+    function fftInner(re: number[], im: number[], sz: number) {
+      if (sz <= 1) return;
+      const halfN = sz / 2;
+      const eR = new Array(halfN), eI = new Array(halfN), oR = new Array(halfN), oI = new Array(halfN);
+      for (let i = 0; i < halfN; i++) { eR[i] = re[2*i]; eI[i] = im[2*i]; oR[i] = re[2*i+1]; oI[i] = im[2*i+1]; }
+      fftInner(eR, eI, halfN); fftInner(oR, oI, halfN);
+      for (let k = 0; k < halfN; k++) {
+        const angle = -2 * Math.PI * k / sz;
+        const c = Math.cos(angle), s = Math.sin(angle);
+        const tR = c * oR[k] - s * oI[k], tI = s * oR[k] + c * oI[k];
+        re[k] = eR[k] + tR; im[k] = eI[k] + tI;
+        re[k + halfN] = eR[k] - tR; im[k + halfN] = eI[k] - tI;
+      }
+    }
+    fftInner(real, imag, fftSize);
+    const mags: number[] = [];
+    for (let i = 0; i < fftSize / 2; i++) mags.push(Math.sqrt(real[i]*real[i] + imag[i]*imag[i]));
+    const lo = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
+    const hi = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
+    let pk = lo, pkM = 0;
+    for (let i = lo; i <= hi; i++) { if (mags[i] > pkM) { pkM = mags[i]; pk = i; } }
+    let pf: number;
+    if (pk > lo && pk < hi) {
+      const a = mags[pk-1], b = mags[pk], c = mags[pk+1];
+      const d = a - 2*b + c;
+      pf = Math.abs(d) > 1e-10 ? (pk + 0.5*(a-c)/d) * actualFps/fftSize : pk * actualFps/fftSize;
+    } else pf = pk * actualFps / fftSize;
+    let tp = 0, pp = 0;
+    for (let i = lo; i <= hi; i++) { const p = mags[i]*mags[i]; tp += p; if (Math.abs(i-pk) <= 2) pp += p; }
+    return { bpm: Math.round(pf * 60), snr: tp > 0 ? pp/tp : 0 };
+  }
+
+  const posResult = computeFFTBpm(filteredPOS, vn);
+  const greenResult = computeFFTBpm(filteredGreen, vn);
+
+  let bestBpm: number, bestSnr: number;
+  if (posResult.snr >= greenResult.snr && posResult.snr > 0.05) {
+    bestBpm = posResult.bpm; bestSnr = posResult.snr;
+  } else if (greenResult.snr > 0.05) {
+    bestBpm = greenResult.bpm; bestSnr = greenResult.snr;
+  } else {
+    bestBpm = posResult.snr >= greenResult.snr ? posResult.bpm : greenResult.bpm;
+    bestSnr = Math.max(posResult.snr, greenResult.snr);
+  }
+
+  const isValid = bestBpm >= 45 && bestBpm <= 180 && bestSnr > 0.08;
+  const heartRate = isValid ? bestBpm : 0;
+  let confidence: "high" | "medium" | "low";
+  if (bestSnr > 0.18 && vn >= 60 && isValid) confidence = "high";
+  else if (bestSnr > 0.10 && vn >= 40 && isValid) confidence = "medium";
+  else confidence = "low";
+
+  const display = posResult.snr >= greenResult.snr ? filteredPOS : filteredGreen;
+  const waveform: number[] = [];
+  for (let i = 0; i < 100; i++) waveform.push(display[Math.floor(i * display.length / 100)] || 0);
+  const mx = Math.max(...waveform.map(Math.abs)) || 1;
+
+  return {
+    heartRate, confidence,
+    waveform: waveform.map(v => v / mx),
+    signalQuality: Math.round(bestSnr * 100),
+    validReading: isValid,
+    message: isValid
+      ? (confidence === "high" ? "Strong signal detected" : "Moderate signal - try better lighting next time")
       : "Could not detect a reliable heart rate - ensure good lighting and stay very still",
   };
 }
@@ -533,13 +623,10 @@ function PulseWaveform({ waveform, color }: { waveform: number[]; color: string 
   const width = Dimensions.get("window").width - 64;
   const height = 80;
   const points = waveform.length;
-  
   if (points === 0) return null;
-
   const stepX = width / (points - 1);
   const midY = height / 2;
   const amplitude = height * 0.4;
-
   return (
     <View style={{ width, height, overflow: "hidden" }}>
       {waveform.map((val, i) => {
@@ -547,19 +634,10 @@ function PulseWaveform({ waveform, color }: { waveform: number[]; color: string 
         const x = i * stepX;
         const y = midY - val * amplitude;
         return (
-          <View
-            key={i}
-            style={{
-              position: "absolute",
-              left: x - 1.5,
-              top: y - 1.5,
-              width: 3,
-              height: 3,
-              borderRadius: 1.5,
-              backgroundColor: color,
-              opacity: 0.8,
-            }}
-          />
+          <View key={i} style={{
+            position: "absolute", left: x - 1.5, top: y - 1.5, width: 3, height: 3,
+            borderRadius: 1.5, backgroundColor: color, opacity: 0.8,
+          }} />
         );
       })}
     </View>
@@ -574,13 +652,21 @@ export default function HeartRateScreen() {
   const [state, setState] = useState<MeasurementState>("idle");
   const [countdown, setCountdown] = useState(MEASUREMENT_DURATION);
   const [sampleCount, setSampleCount] = useState(0);
-  const [result, setResult] = useState<RppgResult | null>(null);
+  const [result, setResult] = useState<HeartRateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fingerDetected, setFingerDetected] = useState(false);
+  const [liveBpm, setLiveBpm] = useState(0);
+  const [torchOn, setTorchOn] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
+  const fingerRedRef = useRef<number[]>([]);
+  const fingerTimestampsRef = useRef<number[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fingerCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const processingRef = useRef(false);
+  const fingerConfirmCount = useRef(0);
+  const measurementStartedRef = useRef(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const pulseScale = useSharedValue(1);
@@ -596,17 +682,11 @@ export default function HeartRateScreen() {
       withSequence(
         withTiming(1.15, { duration: 400, easing: Easing.out(Easing.ease) }),
         withTiming(1, { duration: 400, easing: Easing.in(Easing.ease) })
-      ),
-      -1,
-      false
+      ), -1, false
     );
     pulseOpacity.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 400 }),
-        withTiming(0.6, { duration: 400 })
-      ),
-      -1,
-      false
+      withSequence(withTiming(1, { duration: 400 }), withTiming(0.6, { duration: 400 })),
+      -1, false
     );
   }, []);
 
@@ -617,15 +697,66 @@ export default function HeartRateScreen() {
     pulseOpacity.value = 0.6;
   }, []);
 
+  const clearAllTimers = useCallback(() => {
+    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
+    if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
+  }, []);
+
   useEffect(() => {
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
+      clearAllTimers();
       stopPulseAnimation();
     };
   }, []);
 
-  const captureFrame = useCallback(async () => {
+  useEffect(() => {
+    if (IS_MOBILE && state === "idle" && permission?.granted) {
+      setTimeout(() => setTorchOn(true), 200);
+    }
+    return () => {
+      if (state === "idle") setTorchOn(false);
+    };
+  }, [state, permission?.granted]);
+
+  const captureFrameFinger = useCallback(async () => {
+    if (!cameraRef.current || processingRef.current) return;
+    processingRef.current = true;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.1,
+        base64: false,
+        skipProcessing: true,
+      });
+      if (photo) {
+        const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+        if (rgb.r >= 0) {
+          const now = Date.now();
+          if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
+            fingerRedRef.current.push(rgb.r);
+            fingerTimestampsRef.current.push(now);
+            setSampleCount(fingerRedRef.current.length);
+
+            if (fingerRedRef.current.length >= 20 && fingerRedRef.current.length % 10 === 0) {
+              const recent = fingerRedRef.current.slice(-30);
+              const recentTs = fingerTimestampsRef.current.slice(-30);
+              const quickResult = processFingerSignals(recent, recentTs);
+              if (quickResult.validReading) {
+                setLiveBpm(quickResult.heartRate);
+              }
+            }
+          } else {
+            setFingerDetected(false);
+            fingerConfirmCount.current = 0;
+          }
+        }
+      }
+    } catch {} finally {
+      processingRef.current = false;
+    }
+  }, []);
+
+  const captureFrameFace = useCallback(async () => {
     if (!cameraRef.current || processingRef.current) return;
     processingRef.current = true;
     try {
@@ -634,60 +765,207 @@ export default function HeartRateScreen() {
         base64: true,
         skipProcessing: true,
       });
-
       if (photo) {
         let rgb: { r: number; g: number; b: number };
-        if (Platform.OS === "web") {
-          if (photo.base64) {
-            rgb = await extractRGBFromBase64Web(photo.base64);
-          } else if (photo.uri) {
-            rgb = await extractRGBFromBase64Web(photo.uri);
-          } else {
-            return;
-          }
-        } else {
-          rgb = await extractRGBFromPhotoNative(photo.uri, photo.width, photo.height);
-        }
+        if (photo.base64) {
+          rgb = await extractRGBFromBase64Web(photo.base64);
+        } else if (photo.uri) {
+          rgb = await extractRGBFromBase64Web(photo.uri);
+        } else return;
         if (rgb.r >= 0 && rgb.g >= 0 && rgb.b >= 0) {
-          signalsRef.current.push({
-            ...rgb,
-            timestamp: Date.now(),
-          });
+          signalsRef.current.push({ ...rgb, timestamp: Date.now() });
           setSampleCount(signalsRef.current.length);
         }
       }
-    } catch {
-    } finally {
+    } catch {} finally {
       processingRef.current = false;
     }
   }, []);
 
-  const processSignals = useCallback(async () => {
-    setState("processing");
+  const checkFingerPresence = useCallback(async () => {
+    if (!cameraRef.current || processingRef.current) return;
+    processingRef.current = true;
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.1,
+        base64: false,
+        skipProcessing: true,
+      });
+      if (photo) {
+        const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+        if (rgb.r >= 0 && isFingerCovering(rgb.r, rgb.g, rgb.b)) {
+          fingerConfirmCount.current++;
+          if (fingerConfirmCount.current >= FINGER_CONFIRM_FRAMES) {
+            setFingerDetected(true);
+            if (!measurementStartedRef.current) {
+              measurementStartedRef.current = true;
+              startFingerMeasurement();
+            }
+          }
+        } else {
+          fingerConfirmCount.current = 0;
+          setFingerDetected(false);
+        }
+      }
+    } catch {} finally {
+      processingRef.current = false;
+    }
+  }, []);
 
+  const startFingerMeasurement = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
+
+    fingerRedRef.current = [];
+    fingerTimestampsRef.current = [];
+    setSampleCount(0);
+    setLiveBpm(0);
+    setState("measuring");
+    setCountdown(MEASUREMENT_DURATION);
+
+    const captureLoop = async () => {
+      if (!cameraRef.current || processingRef.current) return;
+      processingRef.current = true;
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.1,
+          base64: false,
+          skipProcessing: true,
+        });
+        if (photo) {
+          const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+          if (rgb.r >= 0) {
+            if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
+              setFingerDetected(true);
+              fingerRedRef.current.push(rgb.r);
+              fingerTimestampsRef.current.push(Date.now());
+              setSampleCount(fingerRedRef.current.length);
+
+              if (fingerRedRef.current.length >= 25 && fingerRedRef.current.length % 8 === 0) {
+                const quickResult = processFingerSignals(
+                  fingerRedRef.current.slice(-40),
+                  fingerTimestampsRef.current.slice(-40)
+                );
+                if (quickResult.validReading) setLiveBpm(quickResult.heartRate);
+              }
+            } else {
+              setFingerDetected(false);
+            }
+          }
+        }
+      } catch {} finally {
+        processingRef.current = false;
+      }
+    };
+
+    intervalRef.current = setInterval(captureLoop, CAPTURE_INTERVAL_MS);
+
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          processFingerResult();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  const processFingerResult = useCallback(() => {
+    setState("processing");
+    try {
+      const redVals = fingerRedRef.current;
+      const timestamps = fingerTimestampsRef.current;
+      if (redVals.length < MIN_SAMPLES) {
+        setError(t(
+          "Not enough data collected. Press your finger firmly over the camera and flash.",
+          "لم يتم جمع بيانات كافية. اضغط إصبعك بقوة على الكاميرا والفلاش."
+        ));
+        setState("idle");
+        measurementStartedRef.current = false;
+        return;
+      }
+      const data = processFingerSignals(redVals, timestamps);
+      setResult(data);
+      setState("result");
+      setTorchOn(false);
+      if (data.validReading) {
+        startPulseAnimation();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        getProfile().then((profile) => {
+          saveProfile({ ...profile, lastBpm: data.heartRate, lastBpmDate: Date.now() });
+        });
+        recordVital("heart_rate", data.heartRate, data.confidence, true).catch(() => {});
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+    } catch {
+      setError(t("Failed to process data. Please try again.", "فشل في المعالجة. يرجى المحاولة مرة أخرى."));
+      setState("idle");
+      measurementStartedRef.current = false;
+    }
+  }, []);
+
+  const startWaitingForFinger = useCallback(() => {
+    setError(null);
+    setResult(null);
+    setSampleCount(0);
+    setLiveBpm(0);
+    fingerConfirmCount.current = 0;
+    measurementStartedRef.current = false;
+    setFingerDetected(false);
+    setState("waiting_finger");
+    setTorchOn(true);
+
+    fingerCheckRef.current = setInterval(checkFingerPresence, FINGER_DETECT_INTERVAL_MS);
+  }, [checkFingerPresence]);
+
+  const startFaceMeasurement = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setError(null);
+    setResult(null);
+    setSampleCount(0);
+    signalsRef.current = [];
+    setState("measuring");
+    setCountdown(MEASUREMENT_DURATION);
+
+    intervalRef.current = setInterval(captureFrameFace, CAPTURE_INTERVAL_MS);
+
+    countdownRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          processFaceResult();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [captureFrameFace]);
+
+  const processFaceResult = useCallback(() => {
+    setState("processing");
     try {
       const signals = signalsRef.current;
       if (signals.length < MIN_SAMPLES) {
         setError(t(
-          "Not enough data collected. Please try again with better lighting and hold the phone steady.",
-          "لم يتم جمع بيانات كافية. يرجى المحاولة مرة أخرى في إضاءة أفضل مع تثبيت الهاتف."
+          "Not enough data collected. Try again with better lighting.",
+          "لم يتم جمع بيانات كافية. حاول مرة أخرى في إضاءة أفضل."
         ));
         setState("idle");
         return;
       }
-
       const timestamps = signals.map(s => s.timestamp);
-      let actualFps = CAPTURE_FPS;
-      if (timestamps.length > 1 && timestamps[0] > 0) {
-        const totalDuration = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
-        if (totalDuration > 0) {
-          actualFps = (timestamps.length - 1) / totalDuration;
-        }
+      let fps = 8;
+      if (timestamps.length > 1) {
+        const dur = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
+        if (dur > 0) fps = (timestamps.length - 1) / dur;
       }
-
       const rgbSignals = signals.map(s => ({ r: s.r, g: s.g, b: s.b }));
-      const data = processRppgClient(rgbSignals, actualFps);
-
+      const data = processFaceSignals(rgbSignals, fps);
       setResult(data);
       setState("result");
       if (data.validReading) {
@@ -700,50 +978,29 @@ export default function HeartRateScreen() {
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
-    } catch (err) {
-      setError(t(
-        "Failed to process heart rate data. Please try again.",
-        "فشل في معالجة بيانات معدل ضربات القلب. يرجى المحاولة مرة أخرى."
-      ));
+    } catch {
+      setError(t("Failed to process data.", "فشل في المعالجة."));
       setState("idle");
     }
   }, []);
 
-  const startMeasurement = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setError(null);
-    setResult(null);
-    setSampleCount(0);
-    signalsRef.current = [];
-    setState("measuring");
-    setCountdown(MEASUREMENT_DURATION);
-
-    intervalRef.current = setInterval(captureFrame, Math.round(1000 / CAPTURE_FPS));
-
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          processSignals();
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [captureFrame, processSignals]);
-
   const resetMeasurement = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
+    clearAllTimers();
     stopPulseAnimation();
     signalsRef.current = [];
+    fingerRedRef.current = [];
+    fingerTimestampsRef.current = [];
+    measurementStartedRef.current = false;
+    fingerConfirmCount.current = 0;
     setState("idle");
     setResult(null);
     setError(null);
     setSampleCount(0);
+    setLiveBpm(0);
     setCountdown(MEASUREMENT_DURATION);
+    setFingerDetected(false);
+    if (IS_MOBILE) setTimeout(() => setTorchOn(true), 200);
   }, []);
 
   if (!permission) {
@@ -765,10 +1022,15 @@ export default function HeartRateScreen() {
             {t("Camera Access Required", "مطلوب الوصول إلى الكاميرا")}
           </Text>
           <Text style={styles.permissionText}>
-            {t(
-              "The heart rate monitor uses your front camera to detect subtle color changes in your face caused by blood flow. Please allow camera access to continue.",
-              "يستخدم مقياس نبضات القلب الكاميرا الأمامية للكشف عن تغييرات اللون الدقيقة في وجهك الناتجة عن تدفق الدم. يرجى السماح بالوصول إلى الكاميرا للاستمرار."
-            )}
+            {IS_MOBILE
+              ? t(
+                  "Place your finger over the back camera and flash to measure your heart rate. Please allow camera access to continue.",
+                  "ضع إصبعك على الكاميرا الخلفية والفلاش لقياس نبضات قلبك. يرجى السماح بالوصول إلى الكاميرا للاستمرار."
+                )
+              : t(
+                  "The heart rate monitor uses your front camera to detect subtle color changes in your face. Please allow camera access.",
+                  "يستخدم مقياس النبض الكاميرا الأمامية لاكتشاف تغييرات اللون في وجهك. يرجى السماح بالوصول."
+                )}
           </Text>
           <Pressable style={styles.permissionButton} onPress={requestPermission}>
             <Text style={styles.permissionButtonText}>
@@ -781,16 +1043,14 @@ export default function HeartRateScreen() {
   }
 
   const confidenceColor =
-    result?.confidence === "high"
-      ? Colors.light.success
-      : result?.confidence === "medium"
-        ? Colors.light.warning
+    result?.confidence === "high" ? Colors.light.success
+      : result?.confidence === "medium" ? Colors.light.warning
         : Colors.light.emergency;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
+        <Pressable onPress={() => { setTorchOn(false); setTimeout(() => router.back(), 50); }} hitSlop={12} style={styles.headerButton}>
           <Ionicons name="close" size={24} color={Colors.light.text} />
         </Pressable>
         <Text style={styles.headerTitle}>
@@ -801,64 +1061,148 @@ export default function HeartRateScreen() {
 
       {state !== "result" ? (
         <View style={styles.cameraSection}>
-          <View style={styles.cameraContainer}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing="front"
-              animateShutter={false}
-            />
-            <View style={styles.cameraOverlay}>
-              <View style={styles.faceGuide}>
-                <View style={[styles.cornerTL, styles.corner]} />
-                <View style={[styles.cornerTR, styles.corner]} />
-                <View style={[styles.cornerBL, styles.corner]} />
-                <View style={[styles.cornerBR, styles.corner]} />
-              </View>
-            </View>
-            {state === "measuring" && (
-              <View style={styles.countdownOverlay}>
-                <Text style={styles.countdownText}>{countdown}s</Text>
-                <View style={styles.progressBarBg}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      {
-                        width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
-                      },
-                    ]}
-                  />
+          {IS_MOBILE ? (
+            <View style={styles.fingerCameraContainer}>
+              <CameraView
+                ref={cameraRef}
+                style={styles.fingerCamera}
+                facing="back"
+                enableTorch={torchOn}
+                animateShutter={false}
+              />
+              <View style={styles.fingerOverlay}>
+                <View style={[
+                  styles.fingerCircle,
+                  fingerDetected ? styles.fingerCircleDetected : styles.fingerCircleWaiting,
+                ]}>
+                  {state === "measuring" && fingerDetected ? (
+                    <View style={styles.fingerInnerPulse}>
+                      <Ionicons name="heart" size={32} color={Colors.light.emergency} />
+                      {liveBpm > 0 && (
+                        <Text style={styles.liveBpmText}>{liveBpm}</Text>
+                      )}
+                    </View>
+                  ) : state === "measuring" && !fingerDetected ? (
+                    <View style={styles.fingerLostInner}>
+                      <Ionicons name="finger-print" size={32} color={Colors.light.emergency} />
+                      <Text style={styles.fingerLostText}>
+                        {t("Replace finger", "أعد وضع الإصبع")}
+                      </Text>
+                    </View>
+                  ) : fingerDetected ? (
+                    <View style={styles.fingerDetectedInner}>
+                      <Ionicons name="checkmark-circle" size={32} color={Colors.light.success} />
+                      <Text style={styles.fingerDetectedText}>
+                        {t("Finger detected", "تم اكتشاف الإصبع")}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.fingerWaitInner}>
+                      <Ionicons name="finger-print" size={36} color="rgba(255,255,255,0.8)" />
+                    </View>
+                  )}
                 </View>
-                <Text style={styles.sampleCountText}>
-                  {sampleCount} {t("frames", "إطار")}
-                </Text>
               </View>
-            )}
-          </View>
+              {state === "measuring" && (
+                <View style={styles.countdownOverlay}>
+                  <Text style={styles.countdownText}>{countdown}s</Text>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, {
+                      width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
+                    }]} />
+                  </View>
+                  <Text style={styles.sampleCountText}>
+                    {sampleCount} {t("frames", "إطار")}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.cameraContainer}>
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing="front"
+                animateShutter={false}
+              />
+              <View style={styles.cameraOverlay}>
+                <View style={styles.faceGuide}>
+                  <View style={[styles.cornerTL, styles.corner]} />
+                  <View style={[styles.cornerTR, styles.corner]} />
+                  <View style={[styles.cornerBL, styles.corner]} />
+                  <View style={[styles.cornerBR, styles.corner]} />
+                </View>
+              </View>
+              {state === "measuring" && (
+                <View style={styles.countdownOverlay}>
+                  <Text style={styles.countdownText}>{countdown}s</Text>
+                  <View style={styles.progressBarBg}>
+                    <View style={[styles.progressBarFill, {
+                      width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
+                    }]} />
+                  </View>
+                  <Text style={styles.sampleCountText}>
+                    {sampleCount} {t("frames", "إطار")}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
 
           <View style={styles.instructionSection}>
             {state === "idle" && (
               <>
                 <Text style={[styles.instructionTitle, isRTL && { textAlign: "right" }]}>
-                  {t("Position Your Face", "ضع وجهك")}
+                  {IS_MOBILE
+                    ? t("Place Your Finger", "ضع إصبعك")
+                    : t("Position Your Face", "ضع وجهك")}
                 </Text>
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
-                  {t(
-                    "Hold your phone steady and look at the camera. Ensure good, natural lighting on your face. Stay very still during measurement.",
-                    "امسك هاتفك ثابتاً وانظر إلى الكاميرا. تأكد من الإضاءة الطبيعية الجيدة على وجهك. ابقَ ثابتاً تماماً أثناء القياس."
-                  )}
+                  {IS_MOBILE
+                    ? t(
+                        "Cover the back camera and flash completely with your fingertip. The circle will turn green when your finger is properly placed.",
+                        "غطِّ الكاميرا الخلفية والفلاش بالكامل بطرف إصبعك. ستتحول الدائرة إلى اللون الأخضر عندما يكون إصبعك موضوعاً بشكل صحيح."
+                      )
+                    : t(
+                        "Hold your phone steady and look at the camera. Ensure good, natural lighting on your face. Stay very still during measurement.",
+                        "امسك هاتفك ثابتاً وانظر إلى الكاميرا. تأكد من الإضاءة الطبيعية الجيدة على وجهك."
+                      )}
                 </Text>
                 <Pressable
                   style={({ pressed }) => [
                     styles.startButton,
                     pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
                   ]}
-                  onPress={startMeasurement}
+                  onPress={IS_MOBILE ? startWaitingForFinger : startFaceMeasurement}
                 >
                   <Ionicons name="heart" size={20} color="#fff" />
                   <Text style={styles.startButtonText}>
-                    {t("Start Measurement", "بدء القياس")}
+                    {IS_MOBILE
+                      ? t("Start", "ابدأ")
+                      : t("Start Measurement", "بدء القياس")}
                   </Text>
+                </Pressable>
+              </>
+            )}
+
+            {state === "waiting_finger" && (
+              <>
+                <View style={styles.measuringRow}>
+                  <View style={[styles.pulsingDot, { backgroundColor: fingerDetected ? Colors.light.success : Colors.light.warning }]} />
+                  <Text style={styles.measuringText}>
+                    {fingerDetected
+                      ? t("Finger detected, starting...", "تم اكتشاف الإصبع، جاري البدء...")
+                      : t("Waiting for finger...", "في انتظار الإصبع...")}
+                  </Text>
+                </View>
+                <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
+                  {t(
+                    "Press your fingertip firmly over the camera lens and flash light.",
+                    "اضغط طرف إصبعك بقوة على عدسة الكاميرا وضوء الفلاش."
+                  )}
+                </Text>
+                <Pressable style={styles.cancelButton} onPress={resetMeasurement}>
+                  <Text style={styles.cancelButtonText}>{t("Cancel", "إلغاء")}</Text>
                 </Pressable>
               </>
             )}
@@ -866,18 +1210,26 @@ export default function HeartRateScreen() {
             {state === "measuring" && (
               <>
                 <View style={styles.measuringRow}>
-                  <View style={styles.pulsingDot} />
+                  <View style={[styles.pulsingDot, { backgroundColor: fingerDetected || !IS_MOBILE ? Colors.light.success : Colors.light.emergency }]} />
                   <Text style={styles.measuringText}>
-                    {t("Measuring...", "جاري القياس...")}
+                    {IS_MOBILE && !fingerDetected
+                      ? t("Finger lost!", "فقد الإصبع!")
+                      : t("Measuring...", "جاري القياس...")}
                   </Text>
                 </View>
+                {IS_MOBILE && liveBpm > 0 && (
+                  <View style={styles.liveBpmRow}>
+                    <Ionicons name="heart" size={16} color={Colors.light.emergency} />
+                    <Text style={styles.liveBpmDisplay}>~{liveBpm} BPM</Text>
+                  </View>
+                )}
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
-                  {t("Stay still and breathe normally", "ابقَ ثابتاً وتنفس بشكل طبيعي")}
+                  {IS_MOBILE && !fingerDetected
+                    ? t("Place your finger back on the camera", "أعد وضع إصبعك على الكاميرا")
+                    : t("Stay still and breathe normally", "ابقَ ثابتاً وتنفس بشكل طبيعي")}
                 </Text>
                 <Pressable style={styles.cancelButton} onPress={resetMeasurement}>
-                  <Text style={styles.cancelButtonText}>
-                    {t("Cancel", "إلغاء")}
-                  </Text>
+                  <Text style={styles.cancelButtonText}>{t("Cancel", "إلغاء")}</Text>
                 </Pressable>
               </>
             )}
@@ -901,7 +1253,6 @@ export default function HeartRateScreen() {
                 <Text style={styles.bpmValue}>{result.heartRate}</Text>
                 <Text style={styles.bpmLabel}>BPM</Text>
               </Animated.View>
-
               <View style={[styles.confidenceBadge, { backgroundColor: confidenceColor + "20" }]}>
                 <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
                 <Text style={[styles.confidenceText, { color: confidenceColor }]}>
@@ -916,7 +1267,7 @@ export default function HeartRateScreen() {
           ) : (
             <View style={styles.noReadingCircle}>
               <Ionicons name="heart-dislike-outline" size={32} color={Colors.light.textTertiary} />
-              <Text style={styles.noReadingText}>—</Text>
+              <Text style={styles.noReadingText}>{"\u2014"}</Text>
               <Text style={styles.noReadingLabel}>BPM</Text>
             </View>
           )}
@@ -924,17 +1275,20 @@ export default function HeartRateScreen() {
           <Text style={[styles.resultMessage, isRTL && { textAlign: "right" }]}>
             {result.validReading
               ? result.message
-              : t(
-                  "Could not detect a reliable heart rate. Try again with better lighting, hold very still, and make sure your face is clearly visible.",
-                  "لم يتمكن من اكتشاف نبضات قلب موثوقة. حاول مرة أخرى مع إضاءة أفضل، ابقَ ثابتاً تماماً، وتأكد من أن وجهك واضح."
-                )}
+              : IS_MOBILE
+                ? t(
+                    "Could not detect a reliable heart rate. Press your finger more firmly over the camera and flash, and stay completely still.",
+                    "لم يتمكن من اكتشاف نبضات قلب موثوقة. اضغط إصبعك بقوة أكبر على الكاميرا والفلاش، وابقَ ثابتاً تماماً."
+                  )
+                : t(
+                    "Could not detect a reliable heart rate. Try again with better lighting, hold very still, and make sure your face is clearly visible.",
+                    "لم يتمكن من اكتشاف نبضات قلب موثوقة. حاول مرة أخرى مع إضاءة أفضل وابقَ ثابتاً."
+                  )}
           </Text>
 
           {result.validReading && result.waveform && result.waveform.length > 0 && (
             <View style={styles.waveformContainer}>
-              <Text style={styles.waveformLabel}>
-                {t("Pulse Waveform", "موجة النبض")}
-              </Text>
+              <Text style={styles.waveformLabel}>{t("Pulse Waveform", "موجة النبض")}</Text>
               <PulseWaveform waveform={result.waveform} color={Colors.light.emergency} />
             </View>
           )}
@@ -947,10 +1301,8 @@ export default function HeartRateScreen() {
               </View>
               <View style={styles.statCard}>
                 <Text style={styles.statValue}>
-                  {result.heartRate < 60
-                    ? t("Low", "منخفض")
-                    : result.heartRate > 100
-                      ? t("High", "مرتفع")
+                  {result.heartRate < 60 ? t("Low", "منخفض")
+                    : result.heartRate > 100 ? t("High", "مرتفع")
                       : t("Normal", "طبيعي")}
                 </Text>
                 <Text style={styles.statLabel}>{t("Range", "النطاق")}</Text>
@@ -963,38 +1315,52 @@ export default function HeartRateScreen() {
               <Text style={[styles.tipsTitle, isRTL && { textAlign: "right" }]}>
                 {t("Tips for better results:", "نصائح لنتائج أفضل:")}
               </Text>
-              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Ionicons name="sunny-outline" size={16} color={Colors.light.primary} />
-                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
-                  {t("Use natural, even lighting on your face", "استخدم إضاءة طبيعية متساوية على وجهك")}
-                </Text>
-              </View>
-              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Ionicons name="phone-portrait-outline" size={16} color={Colors.light.primary} />
-                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
-                  {t("Hold the phone completely still", "أمسك الهاتف ثابتاً تماماً")}
-                </Text>
-              </View>
-              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
-                <Ionicons name="person-outline" size={16} color={Colors.light.primary} />
-                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
-                  {t("Keep your face centered and still", "ابقِ وجهك في المنتصف وثابتاً")}
-                </Text>
-              </View>
+              {IS_MOBILE ? (
+                <>
+                  <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="finger-print" size={16} color={Colors.light.primary} />
+                    <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                      {t("Press finger firmly over camera AND flash", "اضغط الإصبع بقوة على الكاميرا والفلاش")}
+                    </Text>
+                  </View>
+                  <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="hand-left-outline" size={16} color={Colors.light.primary} />
+                    <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                      {t("Keep your hand completely still", "أبقِ يدك ثابتة تماماً")}
+                    </Text>
+                  </View>
+                  <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="flash-outline" size={16} color={Colors.light.primary} />
+                    <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                      {t("Make sure the flash light is on and visible through your finger", "تأكد أن ضوء الفلاش مضاء ومرئي عبر إصبعك")}
+                    </Text>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="sunny-outline" size={16} color={Colors.light.primary} />
+                    <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                      {t("Use natural, even lighting on your face", "استخدم إضاءة طبيعية متساوية على وجهك")}
+                    </Text>
+                  </View>
+                  <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <Ionicons name="phone-portrait-outline" size={16} color={Colors.light.primary} />
+                    <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                      {t("Hold the phone completely still", "أمسك الهاتف ثابتاً تماماً")}
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
           )}
 
           <Pressable
-            style={({ pressed }) => [
-              styles.retryButton,
-              pressed && { opacity: 0.9 },
-            ]}
+            style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.9 }]}
             onPress={resetMeasurement}
           >
             <Ionicons name="refresh" size={18} color={Colors.light.primary} />
-            <Text style={styles.retryButtonText}>
-              {t("Measure Again", "قياس مرة أخرى")}
-            </Text>
+            <Text style={styles.retryButtonText}>{t("Measure Again", "قياس مرة أخرى")}</Text>
           </Pressable>
 
           <View style={styles.disclaimer}>
@@ -1094,6 +1460,73 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  fingerCameraContainer: {
+    width: "100%",
+    aspectRatio: 1,
+    maxHeight: "50%",
+    borderRadius: 24,
+    overflow: "hidden",
+    backgroundColor: "#1a1a1a",
+    alignSelf: "center",
+  },
+  fingerCamera: {
+    flex: 1,
+  },
+  fingerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.3)",
+  },
+  fingerCircle: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 4,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fingerCircleWaiting: {
+    borderColor: Colors.light.emergency,
+    backgroundColor: "rgba(220, 38, 38, 0.15)",
+  },
+  fingerCircleDetected: {
+    borderColor: Colors.light.success,
+    backgroundColor: "rgba(34, 197, 94, 0.15)",
+  },
+  fingerWaitInner: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fingerDetectedInner: {
+    alignItems: "center",
+    gap: 4,
+  },
+  fingerDetectedText: {
+    fontSize: 11,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.success,
+    textAlign: "center",
+  },
+  fingerInnerPulse: {
+    alignItems: "center",
+    gap: 2,
+  },
+  liveBpmText: {
+    fontSize: 22,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.emergency,
+  },
+  fingerLostInner: {
+    alignItems: "center",
+    gap: 4,
+  },
+  fingerLostText: {
+    fontSize: 11,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.emergency,
+    textAlign: "center",
+  },
   cameraContainer: {
     aspectRatio: 3 / 4,
     width: "100%",
@@ -1114,44 +1547,20 @@ const styles = StyleSheet.create({
   faceGuide: {
     width: 180,
     height: 220,
-    position: "relative",
+    position: "relative" as const,
   },
   corner: {
-    position: "absolute",
+    position: "absolute" as const,
     width: 30,
     height: 30,
     borderColor: "rgba(255,255,255,0.7)",
   },
-  cornerTL: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 12,
-  },
-  cornerTR: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 12,
-  },
-  cornerBL: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 12,
-  },
-  cornerBR: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 12,
-  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 12 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 12 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 12 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 12 },
   countdownOverlay: {
-    position: "absolute",
+    position: "absolute" as const,
     bottom: 16,
     left: 16,
     right: 16,
@@ -1240,6 +1649,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.text,
+  },
+  liveBpmRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: Colors.light.emergencyLight,
+    borderRadius: 12,
+  },
+  liveBpmDisplay: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.emergency,
   },
   cancelButton: {
     paddingHorizontal: 24,
@@ -1455,7 +1879,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   errorBanner: {
-    position: "absolute",
+    position: "absolute" as const,
     bottom: 40,
     left: 16,
     right: 16,
