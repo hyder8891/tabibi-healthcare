@@ -399,37 +399,6 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {insights?.seasonalAlerts && insights.seasonalAlerts.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>
-              {t("Seasonal Health Alerts", "تنبيهات صحية موسمية")}
-            </Text>
-            {insights.seasonalAlerts.slice(0, 2).map((alert, idx) => (
-              <View key={idx} style={styles.infoCard}>
-                <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  <View style={styles.infoCardIconWrap}>
-                    <LinearGradient
-                      colors={["#7C3AED", "#A78BFA"]}
-                      style={styles.infoCardIconGradient}
-                    >
-                      <Ionicons name="alert-circle" size={20} color="#fff" />
-                    </LinearGradient>
-                  </View>
-                  <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
-                    <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>
-                      {t(alert.nameEn, alert.nameAr)}
-                    </Text>
-                    <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]} numberOfLines={3}>
-                      {t(alert.description, alert.descriptionAr)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </>
-        )}
-
-
         {recentAssessments.length > 0 && (
           <>
             <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Recent Assessments", "التقييمات الأخيرة")}</Text>
@@ -787,52 +756,6 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     lineHeight: 17,
-  },
-  infoCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  infoCardRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-  },
-  infoCardIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    overflow: "hidden",
-  },
-  infoCardIconGradient: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoCardContent: {
-    flex: 1,
-    gap: 4,
-  },
-  infoCardTitle: {
-    fontSize: 15,
-    fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
-    letterSpacing: -0.1,
-  },
-  infoCardText: {
-    fontSize: 13,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
-    lineHeight: 19,
   },
   recentCard: {
     flexDirection: "row",
