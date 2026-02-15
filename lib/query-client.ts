@@ -51,6 +51,22 @@ export async function apiRequest(
     body: data ? JSON.stringify(data) : undefined,
   });
 
+  if (res.status === 401 && getAuthToken) {
+    const freshHeaders = await getAuthHeaders();
+    if (freshHeaders.Authorization && freshHeaders.Authorization !== authHeaders.Authorization) {
+      const retryRes = await fetch(url.toString(), {
+        method,
+        headers: {
+          ...freshHeaders,
+          ...(data ? { "Content-Type": "application/json" } : {}),
+        },
+        body: data ? JSON.stringify(data) : undefined,
+      });
+      await throwIfResNotOk(retryRes);
+      return retryRes;
+    }
+  }
+
   await throwIfResNotOk(res);
   return res;
 }
@@ -68,6 +84,20 @@ export const getQueryFn: <T>(options: {
     const res = await fetch(url.toString(), {
       headers: authHeaders,
     });
+
+    if (res.status === 401 && getAuthToken) {
+      const freshHeaders = await getAuthHeaders();
+      if (freshHeaders.Authorization && freshHeaders.Authorization !== authHeaders.Authorization) {
+        const retryRes = await fetch(url.toString(), {
+          headers: freshHeaders,
+        });
+        if (unauthorizedBehavior === "returnNull" && retryRes.status === 401) {
+          return null;
+        }
+        await throwIfResNotOk(retryRes);
+        return await retryRes.json();
+      }
+    }
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;

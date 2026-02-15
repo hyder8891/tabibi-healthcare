@@ -233,17 +233,30 @@ export default function AssessmentScreen() {
         });
 
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(url.toString(), {
+      const requestBody = JSON.stringify({
+        messages: apiMessages,
+        patientProfile: {
+          ...profile,
+          isPediatric: settings.pediatricMode,
+        },
+      });
+
+      let response = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...authHeaders },
-        body: JSON.stringify({
-          messages: apiMessages,
-          patientProfile: {
-            ...profile,
-            isPediatric: settings.pediatricMode,
-          },
-        }),
+        body: requestBody,
       });
+
+      if (response.status === 401) {
+        const freshHeaders = await getAuthHeaders();
+        if (freshHeaders.Authorization) {
+          response = await fetch(url.toString(), {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...freshHeaders },
+            body: requestBody,
+          });
+        }
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No response body");
