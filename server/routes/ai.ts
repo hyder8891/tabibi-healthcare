@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
+import { avicenna } from "../avicenna";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -222,6 +223,16 @@ export function registerAiRoutes(app: Express): void {
           systemContext += `- Allergies: ${patientProfile.allergies.join(", ")}\n`;
           systemContext += `- CRITICAL: Do NOT recommend any medications the patient is allergic to\n`;
         }
+      }
+
+      const userId = (req as any).userId;
+      try {
+        const avicennaContext = await avicenna.buildAIContext(userId);
+        if (avicennaContext) {
+          systemContext += avicennaContext;
+        }
+      } catch (err) {
+        console.error("Avicenna context injection error:", err instanceof Error ? err.message : "Unknown");
       }
 
       let imageAnalysis = "";
