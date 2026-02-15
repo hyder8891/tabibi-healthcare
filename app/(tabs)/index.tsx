@@ -405,17 +405,22 @@ export default function HomeScreen() {
               {t("Seasonal Health Alerts", "تنبيهات صحية موسمية")}
             </Text>
             {insights.seasonalAlerts.slice(0, 2).map((alert, idx) => (
-              <View key={idx} style={styles.seasonalCard}>
-                <View style={[styles.seasonalRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                  <View style={styles.seasonalIconWrap}>
-                    <Ionicons name="warning" size={18} color="#7C3AED" />
+              <View key={idx} style={styles.infoCard}>
+                <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                  <View style={styles.infoCardIconWrap}>
+                    <LinearGradient
+                      colors={["#7C3AED", "#A78BFA"]}
+                      style={styles.infoCardIconGradient}
+                    >
+                      <Ionicons name="alert-circle" size={20} color="#fff" />
+                    </LinearGradient>
                   </View>
-                  <View style={styles.seasonalContent}>
-                    <Text style={[styles.seasonalTitle, isRTL && { textAlign: "right" }]}>
+                  <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
+                    <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>
                       {t(alert.nameEn, alert.nameAr)}
                     </Text>
-                    <Text style={[styles.seasonalDesc, isRTL && { textAlign: "right" }]} numberOfLines={3}>
-                      {alert.description}
+                    <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]} numberOfLines={3}>
+                      {t(alert.description, alert.descriptionAr)}
                     </Text>
                   </View>
                 </View>
@@ -1070,42 +1075,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.primary,
-  },
-  seasonalCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    borderLeftWidth: 3,
-    borderLeftColor: "#7C3AED",
-  },
-  seasonalRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  seasonalIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#EDE9FE",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  seasonalContent: {
-    flex: 1,
-    gap: 4,
-  },
-  seasonalTitle: {
-    fontSize: 14,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.text,
-  },
-  seasonalDesc: {
-    fontSize: 12,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
-    lineHeight: 17,
   },
 });

@@ -439,7 +439,7 @@ export class AvicennaService {
     };
     nudges: Array<{ type: string; titleEn: string; titleAr: string; descEn: string; descAr: string; priority: number }>;
     trending: Array<{ name: string; count: number }>;
-    seasonalAlerts: Array<{ nameEn: string; nameAr: string; description: string }>;
+    seasonalAlerts: Array<{ nameEn: string; nameAr: string; description: string; descriptionAr: string }>;
   }> {
     const profile = await this.getOrCreateHealthProfile(userId);
     const conditions = decryptHealthData(profile.chronicConditions) || [];
@@ -512,7 +512,7 @@ export class AvicennaService {
       return data?.months?.includes(month);
     }).map(s => {
       const data = safeJsonParse(s.data);
-      return { nameEn: s.nameEn, nameAr: s.nameAr, description: data?.description || "" };
+      return { nameEn: s.nameEn, nameAr: s.nameAr, description: data?.description || "", descriptionAr: data?.descriptionAr || data?.description || "" };
     });
 
     for (const alert of relevantSeasonal) {
@@ -521,7 +521,7 @@ export class AvicennaService {
         titleEn: alert.nameEn,
         titleAr: alert.nameAr,
         descEn: alert.description,
-        descAr: alert.description,
+        descAr: alert.descriptionAr,
         priority: 3,
       });
     }
