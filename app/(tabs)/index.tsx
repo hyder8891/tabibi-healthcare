@@ -60,6 +60,215 @@ export default function HomeScreen() {
     router.push("/scan");
   };
 
+  const getInsightCards = () => {
+    const cards: Array<{
+      id: string;
+      icon: string;
+      iconSet: "ionicons" | "mci";
+      colors: [string, string];
+      titleEn: string;
+      titleAr: string;
+      descEn: string;
+      descAr: string;
+      route?: string;
+      priority: number;
+    }> = [];
+
+    if (insights?.nudges) {
+      for (const nudge of insights.nudges) {
+        const iconMap: Record<string, string> = {
+          onboarding: "sparkles",
+          vital_check: "heart-outline",
+          vital_alert: "heart",
+          recurring_condition: "refresh",
+          seasonal: "cloudy",
+        };
+        const colorMap: Record<string, [string, string]> = {
+          onboarding: [Colors.light.primary, "#14B8A6"],
+          vital_check: ["#EF4444", "#F87171"],
+          vital_alert: ["#DC2626", "#EF4444"],
+          recurring_condition: [Colors.light.accent, "#FB923C"],
+          seasonal: ["#7C3AED", "#A78BFA"],
+        };
+        const routeMap: Record<string, string> = {
+          onboarding: "/assessment",
+          vital_check: "/heart-rate",
+          vital_alert: "/heart-rate",
+          recurring_condition: "/assessment",
+        };
+        cards.push({
+          id: `nudge-${nudge.type}`,
+          icon: iconMap[nudge.type] || "sparkles",
+          iconSet: "ionicons",
+          colors: colorMap[nudge.type] || [Colors.light.primary, "#14B8A6"],
+          titleEn: nudge.titleEn,
+          titleAr: nudge.titleAr,
+          descEn: nudge.descEn,
+          descAr: nudge.descAr,
+          route: routeMap[nudge.type],
+          priority: nudge.priority,
+        });
+      }
+    }
+
+    const month = new Date().getMonth() + 1;
+    const hour = new Date().getHours();
+
+    if (month >= 6 && month <= 9) {
+      cards.push({
+        id: "tip-hydration",
+        icon: "water",
+        iconSet: "ionicons",
+        colors: ["#0EA5E9", "#38BDF8"],
+        titleEn: "Stay Hydrated",
+        titleAr: "حافظ على ترطيب جسمك",
+        descEn: "Drink 3-4 liters of water daily in this heat. Avoid being outdoors between 11am-4pm.",
+        descAr: "اشرب ٣-٤ لتر ماء يومياً في هذا الحر. تجنب الخروج بين الساعة ١١ صباحاً و ٤ عصراً.",
+        priority: 4,
+      });
+    }
+
+    if (month >= 11 || month <= 3) {
+      cards.push({
+        id: "tip-flu",
+        icon: "thermometer",
+        iconSet: "ionicons",
+        colors: ["#6366F1", "#818CF8"],
+        titleEn: "Flu Season Active",
+        titleAr: "موسم الإنفلونزا نشط",
+        descEn: "Wash hands often, ventilate rooms, and consider a flu vaccine. Keep paracetamol handy.",
+        descAr: "اغسل يديك كثيراً، هوّ الغرف، وفكّر بلقاح الإنفلونزا. احتفظ بالباراسيتامول.",
+        priority: 4,
+      });
+    }
+
+    if (month >= 3 && month <= 6) {
+      cards.push({
+        id: "tip-dust",
+        icon: "cloud",
+        iconSet: "ionicons",
+        colors: ["#D97706", "#F59E0B"],
+        titleEn: "Dust Storm Season",
+        titleAr: "موسم العواصف الرملية",
+        descEn: "Keep rescue inhalers accessible. Stay indoors during storms and seal windows.",
+        descAr: "احتفظ بجهاز الاستنشاق قريباً. ابقَ في المنزل أثناء العواصف وأغلق النوافذ.",
+        priority: 4,
+      });
+    }
+
+    cards.push({
+      id: "feature-scan",
+      icon: "camera",
+      iconSet: "ionicons",
+      colors: ["#059669", "#10B981"],
+      titleEn: "Scan Your Medicine",
+      titleAr: "امسح دواءك",
+      descEn: "Take a photo of any medication to identify it, check interactions, and get dosage info.",
+      descAr: "التقط صورة لأي دواء للتعرف عليه والتحقق من التداخلات ومعرفة الجرعة.",
+      route: "/scan",
+      priority: 5,
+    });
+
+    cards.push({
+      id: "feature-routing",
+      icon: "navigate",
+      iconSet: "ionicons",
+      colors: [Colors.light.accent, "#FB923C"],
+      titleEn: "Find Nearby Care",
+      titleAr: "ابحث عن رعاية قريبة",
+      descEn: "Locate pharmacies, labs, clinics, and hospitals near you with real-time availability.",
+      descAr: "حدّد موقع الصيدليات والمختبرات والعيادات والمستشفيات القريبة منك.",
+      route: "/routing",
+      priority: 5,
+    });
+
+    if (hour >= 22 || hour < 6) {
+      cards.push({
+        id: "tip-sleep",
+        icon: "moon",
+        iconSet: "ionicons",
+        colors: ["#4338CA", "#6366F1"],
+        titleEn: "Sleep Well Tonight",
+        titleAr: "نم جيداً الليلة",
+        descEn: "Avoid screens 30 min before bed. Keep room cool and dark for better sleep quality.",
+        descAr: "تجنب الشاشات ٣٠ دقيقة قبل النوم. حافظ على غرفة باردة ومظلمة لنوم أفضل.",
+        priority: 6,
+      });
+    }
+
+    if (hour >= 6 && hour < 12) {
+      cards.push({
+        id: "tip-morning",
+        icon: "sunny",
+        iconSet: "ionicons",
+        colors: ["#EA580C", "#F97316"],
+        titleEn: "Morning Health Check",
+        titleAr: "فحص صحي صباحي",
+        descEn: "Start your day right - measure your heart rate and log any symptoms early.",
+        descAr: "ابدأ يومك بشكل صحيح - قس معدل ضربات قلبك وسجّل أي أعراض مبكراً.",
+        route: "/heart-rate",
+        priority: 6,
+      });
+    }
+
+    cards.push({
+      id: "tip-selfmed",
+      icon: "medical",
+      iconSet: "ionicons",
+      colors: ["#BE185D", "#EC4899"],
+      titleEn: "Safe Self-Medication",
+      titleAr: "العلاج الذاتي الآمن",
+      descEn: "Always check drug interactions before combining medications. Use the scanner to verify.",
+      descAr: "تحقق دائماً من التداخلات الدوائية قبل الجمع بين الأدوية. استخدم الماسح للتأكد.",
+      route: "/scan",
+      priority: 6,
+    });
+
+    cards.push({
+      id: "tip-emergency",
+      icon: "alert-circle",
+      iconSet: "ionicons",
+      colors: ["#DC2626", "#EF4444"],
+      titleEn: "Know Emergency Signs",
+      titleAr: "اعرف علامات الطوارئ",
+      descEn: "Chest pain, difficulty breathing, sudden weakness, or high fever? Seek care immediately.",
+      descAr: "ألم في الصدر، صعوبة تنفس، ضعف مفاجئ، أو حمى شديدة؟ اطلب الرعاية فوراً.",
+      route: "/assessment",
+      priority: 7,
+    });
+
+    cards.push({
+      id: "tip-family",
+      icon: "people",
+      iconSet: "ionicons",
+      colors: ["#0891B2", "#06B6D4"],
+      titleEn: "Family Health Tip",
+      titleAr: "نصيحة صحية للعائلة",
+      descEn: "Keep a first-aid kit at home: paracetamol, ORS, bandages, antiseptic, and a thermometer.",
+      descAr: "احتفظ بحقيبة إسعافات أولية: باراسيتامول، محلول ملح، ضمادات، مطهر، وميزان حرارة.",
+      priority: 7,
+    });
+
+    if (profile?.age && profile.age >= 40) {
+      cards.push({
+        id: "tip-checkup",
+        icon: "clipboard",
+        iconSet: "ionicons",
+        colors: ["#7C3AED", "#A78BFA"],
+        titleEn: "Regular Check-ups",
+        titleAr: "فحوصات دورية",
+        descEn: "Adults 40+ should check blood pressure, blood sugar, and cholesterol regularly.",
+        descAr: "البالغون فوق ٤٠ يجب فحص ضغط الدم والسكر والكوليسترول بانتظام.",
+        priority: 5,
+      });
+    }
+
+    cards.sort((a, b) => a.priority - b.priority);
+    return cards;
+  };
+
+  const insightCards = getInsightCards();
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -253,7 +462,7 @@ export default function HomeScreen() {
 
         </View>
 
-        {insights && insights.nudges.length > 0 && (
+        {insightCards.length > 0 && (
           <>
             <View style={[styles.avicennaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
               <View style={styles.avicennaHeaderLeft}>
@@ -274,53 +483,32 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.nudgesScroll}
               style={styles.nudgesContainer}
+              decelerationRate="fast"
+              snapToInterval={188}
             >
-              {insights.nudges.slice(0, 5).map((nudge, idx) => (
+              {insightCards.map((card, idx) => (
                 <Pressable
-                  key={`${nudge.type}-${idx}`}
+                  key={card.id + idx}
                   style={({ pressed }) => [
                     styles.nudgeCard,
                     pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
                   ]}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    if (nudge.type === "onboarding") router.push("/assessment");
-                    else if (nudge.type === "vital_check") router.push("/heart-rate");
-                    else if (nudge.type === "recurring_condition") router.push("/assessment");
-                    else if (nudge.type === "vital_alert") router.push("/heart-rate");
+                    if (card.route) router.push(card.route as any);
                   }}
                 >
-                  <View style={[styles.nudgeIconWrap, {
-                    backgroundColor:
-                      nudge.type === "vital_alert" ? Colors.light.emergencyLight :
-                      nudge.type === "recurring_condition" ? Colors.light.warningLight :
-                      nudge.type === "seasonal" ? "#EDE9FE" :
-                      nudge.type === "vital_check" ? Colors.light.emergencyLight :
-                      Colors.light.primarySurface
-                  }]}>
-                    <Ionicons
-                      name={
-                        nudge.type === "vital_alert" ? "heart" :
-                        nudge.type === "recurring_condition" ? "refresh" :
-                        nudge.type === "seasonal" ? "cloudy" :
-                        nudge.type === "vital_check" ? "heart-outline" :
-                        "sparkles"
-                      }
-                      size={20}
-                      color={
-                        nudge.type === "vital_alert" ? Colors.light.emergency :
-                        nudge.type === "recurring_condition" ? Colors.light.warning :
-                        nudge.type === "seasonal" ? "#7C3AED" :
-                        nudge.type === "vital_check" ? Colors.light.emergency :
-                        Colors.light.primary
-                      }
-                    />
-                  </View>
+                  <LinearGradient
+                    colors={card.colors}
+                    style={styles.nudgeIconGradient}
+                  >
+                    <Ionicons name={card.icon as any} size={18} color="#fff" />
+                  </LinearGradient>
                   <Text style={[styles.nudgeTitle, isRTL && { textAlign: "right" }]} numberOfLines={2}>
-                    {t(nudge.titleEn, nudge.titleAr)}
+                    {t(card.titleEn, card.titleAr)}
                   </Text>
                   <Text style={[styles.nudgeDesc, isRTL && { textAlign: "right" }]} numberOfLines={3}>
-                    {t(nudge.descEn, nudge.descAr)}
+                    {t(card.descEn, card.descAr)}
                   </Text>
                 </Pressable>
               ))}
@@ -830,7 +1018,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   nudgeCard: {
-    width: 200,
+    width: 176,
     backgroundColor: Colors.light.surface,
     borderRadius: 18,
     padding: 16,
@@ -842,10 +1030,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  nudgeIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+  nudgeIconGradient: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 10,
