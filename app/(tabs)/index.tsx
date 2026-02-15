@@ -272,18 +272,18 @@ export default function HomeScreen() {
   const insightsScrollRef = useRef<ScrollView>(null);
   const scrollDirection = useRef<1 | -1>(1);
   const scrollOffset = useRef(0);
-  const userTouching = useRef(false);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const CARD_WIDTH = 176;
   const CARD_GAP = 12;
   const STEP = CARD_WIDTH + CARD_GAP;
 
-  useEffect(() => {
+  const startAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) return;
     if (insightCards.length <= 1) return;
     const maxScroll = (insightCards.length - 1) * STEP;
-    const SPEED = 0.5;
-    const interval = setInterval(() => {
-      if (userTouching.current) return;
-      scrollOffset.current += SPEED * scrollDirection.current;
+    autoScrollTimer.current = setInterval(() => {
+      scrollOffset.current += 0.5 * scrollDirection.current;
       if (scrollOffset.current >= maxScroll) {
         scrollOffset.current = maxScroll;
         scrollDirection.current = -1;
@@ -293,18 +293,28 @@ export default function HomeScreen() {
       }
       insightsScrollRef.current?.scrollTo({ x: scrollOffset.current, animated: false });
     }, 16);
-    return () => clearInterval(interval);
   }, [insightCards.length]);
 
-  const touchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) {
+      clearInterval(autoScrollTimer.current);
+      autoScrollTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    startAutoScroll();
+    return () => { stopAutoScroll(); if (resumeTimer.current) clearTimeout(resumeTimer.current); };
+  }, [insightCards.length]);
+
   const onInsightScrollBegin = useCallback(() => {
-    userTouching.current = true;
-    if (touchTimeout.current) clearTimeout(touchTimeout.current);
+    stopAutoScroll();
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
   }, []);
   const onInsightScrollEnd = useCallback((e: any) => {
     scrollOffset.current = e.nativeEvent.contentOffset.x;
-    if (touchTimeout.current) clearTimeout(touchTimeout.current);
-    touchTimeout.current = setTimeout(() => { userTouching.current = false; }, 3000);
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    resumeTimer.current = setTimeout(() => { startAutoScroll(); }, 3000);
   }, []);
 
   return (
