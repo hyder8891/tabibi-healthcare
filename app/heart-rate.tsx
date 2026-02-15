@@ -661,6 +661,7 @@ export default function HeartRateScreen() {
   const [fingerDetected, setFingerDetected] = useState(false);
   const [liveBpm, setLiveBpm] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
   const fingerRedRef = useRef<number[]>([]);
@@ -714,17 +715,14 @@ export default function HeartRateScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    if (IS_MOBILE && permission?.granted && (state === "idle" || state === "waiting_finger" || state === "measuring")) {
-      setTorchOn(false);
-      const t1 = setTimeout(() => setTorchOn(true), 150);
-      const t2 = setTimeout(() => {
-        setTorchOn(false);
-        setTimeout(() => setTorchOn(true), 50);
-      }, 500);
-      return () => { clearTimeout(t1); clearTimeout(t2); };
+  const handleCameraReady = useCallback(() => {
+    setCameraReady(true);
+    if (IS_MOBILE) {
+      setTimeout(() => {
+        setTorchOn(true);
+      }, 300);
     }
-  }, [permission?.granted]);
+  }, []);
 
   const captureFrameFinger = useCallback(async () => {
     if (!cameraRef.current || processingRef.current) return;
@@ -790,7 +788,7 @@ export default function HeartRateScreen() {
   }, []);
 
   const checkFingerPresence = useCallback(async () => {
-    if (!cameraRef.current || processingRef.current) return;
+    if (!cameraRef.current || processingRef.current || !cameraReady) return;
     processingRef.current = true;
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -818,10 +816,12 @@ export default function HeartRateScreen() {
           }
         }
       }
-    } catch {} finally {
+    } catch (e) {
+      console.log("FingerCheck error:", e);
+    } finally {
       processingRef.current = false;
     }
-  }, []);
+  }, [cameraReady]);
 
   const startFingerMeasurement = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -929,17 +929,14 @@ export default function HeartRateScreen() {
     setFingerDetected(false);
     setState("waiting_finger");
 
-    setTorchOn(false);
-    setTimeout(() => {
+    if (!torchOn) {
       setTorchOn(true);
-      setTimeout(() => {
-        setTorchOn(false);
-        setTimeout(() => setTorchOn(true), 50);
-      }, 300);
-    }, 100);
+    }
 
-    fingerCheckRef.current = setInterval(checkFingerPresence, FINGER_DETECT_INTERVAL_MS);
-  }, [checkFingerPresence]);
+    setTimeout(() => {
+      fingerCheckRef.current = setInterval(checkFingerPresence, FINGER_DETECT_INTERVAL_MS);
+    }, 500);
+  }, [checkFingerPresence, torchOn]);
 
   const startFaceMeasurement = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1020,11 +1017,7 @@ export default function HeartRateScreen() {
     setCountdown(MEASUREMENT_DURATION);
     setFingerDetected(false);
     if (IS_MOBILE) {
-      setTorchOn(false);
-      setTimeout(() => {
-        setTorchOn(true);
-        setTimeout(() => { setTorchOn(false); setTimeout(() => setTorchOn(true), 50); }, 300);
-      }, 100);
+      setTorchOn(true);
     }
   }, []);
 
@@ -1095,6 +1088,7 @@ export default function HeartRateScreen() {
                   facing="back"
                   enableTorch={torchOn}
                   animateShutter={false}
+                  onCameraReady={handleCameraReady}
                 />
                 <View style={[
                   styles.fingerCircleBorder,
@@ -1149,6 +1143,7 @@ export default function HeartRateScreen() {
                 style={styles.camera}
                 facing="front"
                 animateShutter={false}
+                onCameraReady={handleCameraReady}
               />
               <View style={styles.cameraOverlay}>
                 <View style={styles.faceGuide}>
@@ -1488,22 +1483,23 @@ const styles = StyleSheet.create({
   fingerCircleOuter: {
     alignSelf: "center",
     alignItems: "center",
-    gap: 16,
+    marginTop: 24,
+    gap: 20,
   },
   fingerCircleClip: {
-    width: 220,
-    height: 220,
-    borderRadius: 110,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
     overflow: "hidden",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#000",
   },
   fingerCameraFill: {
-    width: "100%",
-    height: "100%",
+    width: 240,
+    height: 240,
   },
   fingerCircleBorder: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: 110,
+    borderRadius: 120,
     borderWidth: 5,
     justifyContent: "center",
     alignItems: "center",
@@ -1516,7 +1512,7 @@ const styles = StyleSheet.create({
   },
   fingerCountdownRow: {
     alignItems: "center",
-    width: 220,
+    width: 240,
   },
   fingerCountdownText: {
     fontSize: 20,
