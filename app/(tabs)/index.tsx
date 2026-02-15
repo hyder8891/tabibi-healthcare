@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -269,6 +269,37 @@ export default function HomeScreen() {
 
   const insightCards = getInsightCards();
 
+  const insightsScrollRef = useRef<ScrollView>(null);
+  const scrollDirection = useRef<1 | -1>(1);
+  const scrollOffset = useRef(0);
+  const userTouching = useRef(false);
+  const CARD_WIDTH = 176;
+  const CARD_GAP = 12;
+  const STEP = CARD_WIDTH + CARD_GAP;
+
+  useEffect(() => {
+    if (insightCards.length <= 1) return;
+    const maxScroll = (insightCards.length - 1) * STEP;
+    const interval = setInterval(() => {
+      if (userTouching.current) return;
+      const next = scrollOffset.current + STEP * scrollDirection.current;
+      if (next >= maxScroll) {
+        scrollDirection.current = -1;
+      } else if (next <= 0) {
+        scrollDirection.current = 1;
+      }
+      scrollOffset.current = Math.max(0, Math.min(next, maxScroll));
+      insightsScrollRef.current?.scrollTo({ x: scrollOffset.current, animated: true });
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [insightCards.length]);
+
+  const onInsightScrollBegin = useCallback(() => { userTouching.current = true; }, []);
+  const onInsightScrollEnd = useCallback((e: any) => {
+    userTouching.current = false;
+    scrollOffset.current = e.nativeEvent.contentOffset.x;
+  }, []);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -479,12 +510,16 @@ export default function HomeScreen() {
             </View>
 
             <ScrollView
+              ref={insightsScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.nudgesScroll}
               style={styles.nudgesContainer}
               decelerationRate="fast"
-              snapToInterval={188}
+              snapToInterval={STEP}
+              onScrollBeginDrag={onInsightScrollBegin}
+              onScrollEndDrag={onInsightScrollEnd}
+              onMomentumScrollEnd={onInsightScrollEnd}
             >
               {insightCards.map((card, idx) => (
                 <Pressable
