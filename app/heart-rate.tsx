@@ -31,11 +31,13 @@ import { useAvicenna } from "@/contexts/AvicennaContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
 const IS_MOBILE = Platform.OS !== "web";
-const MEASUREMENT_DURATION = IS_MOBILE ? 20 : 20;
-const MIN_SAMPLES = IS_MOBILE ? 25 : 30;
-const FINGER_DETECT_INTERVAL_MS = 400;
+const MEASUREMENT_DURATION = IS_MOBILE ? 25 : 20;
+const MIN_SAMPLES = IS_MOBILE ? 35 : 30;
+const FINGER_DETECT_INTERVAL_MS = 350;
 const FINGER_CONFIRM_FRAMES = 3;
-const CAPTURE_DELAY_MS = 50;
+const CAPTURE_DELAY_MS = 33;
+const RGB_SMOOTH_WINDOW = 5;
+const EMA_ALPHA = 0.3;
 
 type MeasurementState = "idle" | "waiting_finger" | "measuring" | "processing" | "result";
 
@@ -205,7 +207,7 @@ async function extractRGBNative(uri: string): Promise<{ r: number; g: number; b:
   try {
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: 1, height: 1 } }],
+      [{ resize: { width: 8, height: 8 } }],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
     if (result.base64) {
@@ -220,15 +222,204 @@ async function extractRGBNative(uri: string): Promise<{ r: number; g: number; b:
   }
 }
 
+function smoothRGB(history: Array<{r: number; g: number; b: number}>): { r: number; g: number; b: number } {
+  if (history.length === 0) return { r: -1, g: -1, b: -1 };
+  const recent = history.slice(-RGB_SMOOTH_WINDOW);
+  const sum = recent.reduce((acc, v) => ({ r: acc.r + v.r, g: acc.g + v.g, b: acc.b + v.b }), { r: 0, g: 0, b: 0 });
+  return { r: sum.r / recent.length, g: sum.g / recent.length, b: sum.b / recent.length };
+}
+
 function isFingerCovering(r: number, g: number, b: number): boolean {
   const brightness = (r + g + b) / 3;
-  if (r > 150 && r > g * 1.2 && r > b * 1.2) return true;
-  if (brightness > 30 && brightness < 160 && r >= g && r >= b) return true;
-  if (brightness < 80 && r >= g * 0.9) return true;
+  if (brightness < 15 || brightness > 230) return false;
+  if (r > 160 && r > g * 1.3 && r > b * 1.3) return true;
+  if (brightness > 20 && brightness < 170 && r > g && r > b && (r - g) > 5 && (r - b) > 5) return true;
+  if (brightness < 90 && r >= g * 0.95 && r > b) return true;
   return false;
 }
 
-function processFingerSignals(redValues: number[], timestamps: number[]): HeartRateResult {
+function detrendSignal(sig: number[]) {
+  const len = sig.length;
+  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  for (let i = 0; i < len; i++) {
+    sumX += i; sumY += sig[i]; sumXY += i * sig[i]; sumXX += i * i;
+  }
+  const denom = len * sumXX - sumX * sumX;
+  if (Math.abs(denom) < 1e-12) return sig.map(() => 0);
+  const slope = (len * sumXY - sumX * sumY) / denom;
+  const intercept = (sumY - slope * sumX) / len;
+  return sig.map((v, i) => v - (slope * i + intercept));
+}
+
+function normalizeSignal(sig: number[]) {
+  const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
+  const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
+  return sig.map(v => (v - mean) / std);
+}
+
+function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+  const hpRC = 1.0 / (2 * Math.PI * lowFreq);
+  const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
+  const hp = new Array(sig.length);
+  hp[0] = sig[0];
+  for (let i = 1; i < sig.length; i++) {
+    hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
+  }
+  const hp2 = new Array(sig.length);
+  hp2[0] = hp[0];
+  for (let i = 1; i < sig.length; i++) {
+    hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
+  }
+  const lpRC = 1.0 / (2 * Math.PI * highFreq);
+  const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
+  const lp = new Array(sig.length);
+  lp[0] = hp2[0];
+  for (let i = 1; i < sig.length; i++) {
+    lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
+  }
+  const lp2 = new Array(sig.length);
+  lp2[0] = lp[0];
+  for (let i = 1; i < sig.length; i++) {
+    lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
+  }
+  return lp2;
+}
+
+function movingAverage(sig: number[], windowSize: number): number[] {
+  const result = new Array(sig.length);
+  const halfW = Math.floor(windowSize / 2);
+  for (let i = 0; i < sig.length; i++) {
+    let sum = 0, count = 0;
+    for (let j = Math.max(0, i - halfW); j <= Math.min(sig.length - 1, i + halfW); j++) {
+      sum += sig[j];
+      count++;
+    }
+    result[i] = sum / count;
+  }
+  return result;
+}
+
+function fft(re: number[], im: number[], sz: number) {
+  if (sz <= 1) return;
+  const halfN = sz / 2;
+  const evenReal = new Array(halfN);
+  const evenImag = new Array(halfN);
+  const oddReal = new Array(halfN);
+  const oddImag = new Array(halfN);
+  for (let i = 0; i < halfN; i++) {
+    evenReal[i] = re[2 * i]; evenImag[i] = im[2 * i];
+    oddReal[i] = re[2 * i + 1]; oddImag[i] = im[2 * i + 1];
+  }
+  fft(evenReal, evenImag, halfN);
+  fft(oddReal, oddImag, halfN);
+  for (let k = 0; k < halfN; k++) {
+    const angle = -2 * Math.PI * k / sz;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const tReal = cos * oddReal[k] - sin * oddImag[k];
+    const tImag = sin * oddReal[k] + cos * oddImag[k];
+    re[k] = evenReal[k] + tReal;
+    im[k] = evenImag[k] + tImag;
+    re[k + halfN] = evenReal[k] - tReal;
+    im[k + halfN] = evenImag[k] - tImag;
+  }
+}
+
+function computeFFTBpm(sig: number[], fps: number): { bpm: number; snr: number } {
+  const n = sig.length;
+  const minFreq = 0.83;
+  const maxFreq = 3.0;
+
+  const zeroPadFactor = 4;
+  const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
+  const real = new Array(fftSize).fill(0);
+  const imag = new Array(fftSize).fill(0);
+  for (let i = 0; i < n; i++) {
+    const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
+    real[i] = sig[i] * hannCoeff;
+  }
+
+  fft(real, imag, fftSize);
+
+  const magnitudes: number[] = [];
+  for (let i = 0; i < fftSize / 2; i++) {
+    magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
+  }
+
+  const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / fps));
+  const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / fps));
+
+  let peakBin = scaledMinBin;
+  let peakMag = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    if (magnitudes[i] > peakMag) {
+      peakMag = magnitudes[i];
+      peakBin = i;
+    }
+  }
+
+  let peakFreq: number;
+  if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
+    const a = magnitudes[peakBin - 1];
+    const b = magnitudes[peakBin];
+    const c = magnitudes[peakBin + 1];
+    const denom = a - 2 * b + c;
+    if (Math.abs(denom) > 1e-10) {
+      const delta = 0.5 * (a - c) / denom;
+      peakFreq = (peakBin + delta) * fps / fftSize;
+    } else {
+      peakFreq = peakBin * fps / fftSize;
+    }
+  } else {
+    peakFreq = peakBin * fps / fftSize;
+  }
+
+  let totalPower = 0;
+  let peakPower = 0;
+  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+    const power = magnitudes[i] * magnitudes[i];
+    totalPower += power;
+    if (Math.abs(i - peakBin) <= 2) peakPower += power;
+  }
+  const snr = totalPower > 0 ? peakPower / totalPower : 0;
+  return { bpm: Math.round(peakFreq * 60), snr };
+}
+
+function computeAutocorrelationBpm(sig: number[], fps: number): { bpm: number; confidence: number } {
+  const minLag = Math.floor(fps / 3.0);
+  const maxLag = Math.min(sig.length - 1, Math.ceil(fps / 0.83));
+  if (maxLag <= minLag) return { bpm: 0, confidence: 0 };
+
+  const n = sig.length;
+  const mean = sig.reduce((a, b) => a + b, 0) / n;
+  const centered = sig.map(v => v - mean);
+  const variance = centered.reduce((s, v) => s + v * v, 0);
+  if (variance < 1e-10) return { bpm: 0, confidence: 0 };
+
+  let bestLag = minLag;
+  let bestCorr = -Infinity;
+  const correlations: number[] = [];
+
+  for (let lag = minLag; lag <= maxLag; lag++) {
+    let sum = 0;
+    for (let i = 0; i < n - lag; i++) {
+      sum += centered[i] * centered[i + lag];
+    }
+    const corr = sum / variance;
+    correlations.push(corr);
+    if (corr > bestCorr) {
+      bestCorr = corr;
+      bestLag = lag;
+    }
+  }
+
+  const freq = fps / bestLag;
+  const bpm = Math.round(freq * 60);
+  const confidence = Math.max(0, bestCorr);
+  return { bpm, confidence };
+}
+
+function processFingerSignals(redValues: number[], greenValues: number[], timestamps: number[]): HeartRateResult {
   const invalidResult: HeartRateResult = {
     heartRate: 0,
     confidence: "low",
@@ -251,167 +442,78 @@ function processFingerSignals(redValues: number[], timestamps: number[]): HeartR
     }
   }
 
-  function detrendSignal(sig: number[]) {
-    const len = sig.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    for (let i = 0; i < len; i++) {
-      sumX += i; sumY += sig[i]; sumXY += i * sig[i]; sumXX += i * i;
-    }
-    const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / len;
-    return sig.map((v, i) => v - (slope * i + intercept));
-  }
+  const redDetrended = normalizeSignal(detrendSignal(redValues));
+  const greenDetrended = normalizeSignal(detrendSignal(greenValues));
 
-  function normalizeSignal(sig: number[]) {
-    const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
-    const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
-    return sig.map(v => (v - mean) / std);
-  }
-
-  const detrended = detrendSignal(redValues);
-  const normalized = normalizeSignal(detrended);
-
-  const minFreq = 0.75;
+  const minFreq = 0.83;
   const maxFreq = 3.0;
 
-  function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
-    const hpRC = 1.0 / (2 * Math.PI * lowFreq);
-    const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
-    const hp = new Array(sig.length);
-    hp[0] = sig[0];
-    for (let i = 1; i < sig.length; i++) {
-      hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
-    }
-    const hp2 = new Array(sig.length);
-    hp2[0] = hp[0];
-    for (let i = 1; i < sig.length; i++) {
-      hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
-    }
-    const lpRC = 1.0 / (2 * Math.PI * highFreq);
-    const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
-    const lp = new Array(sig.length);
-    lp[0] = hp2[0];
-    for (let i = 1; i < sig.length; i++) {
-      lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
-    }
-    const lp2 = new Array(sig.length);
-    lp2[0] = lp[0];
-    for (let i = 1; i < sig.length; i++) {
-      lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
-    }
-    return lp2;
+  const redFiltered = bandpassFilter(redDetrended, actualFps, minFreq, maxFreq);
+  const greenFiltered = bandpassFilter(greenDetrended, actualFps, minFreq, maxFreq);
+
+  const smoothedRed = movingAverage(redFiltered, 3);
+  const smoothedGreen = movingAverage(greenFiltered, 3);
+
+  const fftRed = computeFFTBpm(smoothedRed, actualFps);
+  const fftGreen = computeFFTBpm(smoothedGreen, actualFps);
+
+  const acRed = computeAutocorrelationBpm(smoothedRed, actualFps);
+  const acGreen = computeAutocorrelationBpm(smoothedGreen, actualFps);
+
+  const candidates: Array<{bpm: number; score: number; method: string}> = [];
+  if (fftRed.bpm >= 50 && fftRed.bpm <= 180) candidates.push({ bpm: fftRed.bpm, score: fftRed.snr, method: "fft-red" });
+  if (fftGreen.bpm >= 50 && fftGreen.bpm <= 180) candidates.push({ bpm: fftGreen.bpm, score: fftGreen.snr * 1.1, method: "fft-green" });
+  if (acRed.bpm >= 50 && acRed.bpm <= 180) candidates.push({ bpm: acRed.bpm, score: acRed.confidence * 0.8, method: "ac-red" });
+  if (acGreen.bpm >= 50 && acGreen.bpm <= 180) candidates.push({ bpm: acGreen.bpm, score: acGreen.confidence * 0.9, method: "ac-green" });
+
+  let bestBpm = 0;
+  let bestScore = 0;
+  let bestMethod = "none";
+
+  const agreeing = candidates.filter(c => {
+    return candidates.some(other => other !== c && Math.abs(other.bpm - c.bpm) <= 5);
+  });
+  if (agreeing.length >= 2) {
+    agreeing.sort((a, b) => b.score - a.score);
+    bestBpm = agreeing[0].bpm;
+    bestScore = agreeing[0].score * 1.5;
+    bestMethod = agreeing[0].method + "+agree";
+  } else if (candidates.length > 0) {
+    candidates.sort((a, b) => b.score - a.score);
+    bestBpm = candidates[0].bpm;
+    bestScore = candidates[0].score;
+    bestMethod = candidates[0].method;
   }
 
-  const filtered = bandpassFilter(normalized, actualFps, minFreq, maxFreq);
-
-  const zeroPadFactor = 4;
-  const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
-  const real = new Array(fftSize).fill(0);
-  const imag = new Array(fftSize).fill(0);
-  for (let i = 0; i < n; i++) {
-    const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
-    real[i] = filtered[i] * hannCoeff;
-  }
-
-  function fft(re: number[], im: number[], sz: number) {
-    if (sz <= 1) return;
-    const halfN = sz / 2;
-    const evenReal = new Array(halfN);
-    const evenImag = new Array(halfN);
-    const oddReal = new Array(halfN);
-    const oddImag = new Array(halfN);
-    for (let i = 0; i < halfN; i++) {
-      evenReal[i] = re[2 * i]; evenImag[i] = im[2 * i];
-      oddReal[i] = re[2 * i + 1]; oddImag[i] = im[2 * i + 1];
-    }
-    fft(evenReal, evenImag, halfN);
-    fft(oddReal, oddImag, halfN);
-    for (let k = 0; k < halfN; k++) {
-      const angle = -2 * Math.PI * k / sz;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const tReal = cos * oddReal[k] - sin * oddImag[k];
-      const tImag = sin * oddReal[k] + cos * oddImag[k];
-      re[k] = evenReal[k] + tReal;
-      im[k] = evenImag[k] + tImag;
-      re[k + halfN] = evenReal[k] - tReal;
-      im[k + halfN] = evenImag[k] - tImag;
-    }
-  }
-
-  fft(real, imag, fftSize);
-
-  const magnitudes: number[] = [];
-  for (let i = 0; i < fftSize / 2; i++) {
-    magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
-  }
-
-  const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
-  const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
-
-  let peakBin = scaledMinBin;
-  let peakMag = 0;
-  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-    if (magnitudes[i] > peakMag) {
-      peakMag = magnitudes[i];
-      peakBin = i;
-    }
-  }
-
-  let peakFreq: number;
-  if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
-    const alphaVal = magnitudes[peakBin - 1];
-    const beta = magnitudes[peakBin];
-    const gamma = magnitudes[peakBin + 1];
-    const denom = alphaVal - 2 * beta + gamma;
-    if (Math.abs(denom) > 1e-10) {
-      const delta = 0.5 * (alphaVal - gamma) / denom;
-      peakFreq = (peakBin + delta) * actualFps / fftSize;
-    } else {
-      peakFreq = peakBin * actualFps / fftSize;
-    }
-  } else {
-    peakFreq = peakBin * actualFps / fftSize;
-  }
-
-  let totalPower = 0;
-  let peakPower = 0;
-  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-    const power = magnitudes[i] * magnitudes[i];
-    totalPower += power;
-    if (Math.abs(i - peakBin) <= 2) peakPower += power;
-  }
-  const snr = totalPower > 0 ? peakPower / totalPower : 0;
-  const bpm = Math.round(peakFreq * 60);
-
-  const signalVariance = filtered.reduce((s, v) => s + v * v, 0) / n;
-  const hasVariation = signalVariance > 1e-10;
-  const isValidBpm = bpm >= 45 && bpm <= 180;
-  const isValidSignal = snr > 0.06 && hasVariation;
+  const signalVariance = smoothedRed.reduce((s, v) => s + v * v, 0) / n;
+  const hasVariation = signalVariance > 1e-8;
+  const isValidBpm = bestBpm >= 50 && bestBpm <= 180;
+  const isValidSignal = bestScore > 0.08 && hasVariation;
   const validReading = isValidBpm && isValidSignal;
-  const heartRate = validReading ? Math.max(45, Math.min(180, bpm)) : 0;
+  const heartRate = validReading ? bestBpm : 0;
 
   let confidence: "high" | "medium" | "low";
-  if (snr > 0.15 && n >= 60 && validReading) confidence = "high";
-  else if (snr > 0.08 && n >= 40 && validReading) confidence = "medium";
+  if (bestScore > 0.2 && n >= 50 && validReading && bestMethod.includes("agree")) confidence = "high";
+  else if (bestScore > 0.12 && n >= 35 && validReading) confidence = "medium";
   else confidence = "low";
 
+  const displaySig = smoothedGreen.length > 0 ? smoothedGreen : smoothedRed;
   const waveformLength = 100;
   const waveform: number[] = [];
   for (let i = 0; i < waveformLength; i++) {
-    const idx = Math.floor(i * filtered.length / waveformLength);
-    waveform.push(filtered[idx] || 0);
+    const idx = Math.floor(i * displaySig.length / waveformLength);
+    waveform.push(displaySig[idx] || 0);
   }
   const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
   const normalizedWaveform = waveform.map(v => v / maxWave);
 
-  console.log(`HeartRate: ${n} samples, fps=${actualFps.toFixed(1)}, bpm=${bpm}, snr=${snr.toFixed(3)}, valid=${validReading}`);
+  console.log(`HeartRate: ${n}samp fps=${actualFps.toFixed(1)} best=${bestBpm}bpm score=${bestScore.toFixed(3)} method=${bestMethod} fftR=${fftRed.bpm}/${fftRed.snr.toFixed(2)} fftG=${fftGreen.bpm}/${fftGreen.snr.toFixed(2)} acR=${acRed.bpm}/${acRed.confidence.toFixed(2)} acG=${acGreen.bpm}/${acGreen.confidence.toFixed(2)}`);
 
   return {
     heartRate,
     confidence,
     waveform: normalizedWaveform,
-    signalQuality: Math.round(snr * 100),
+    signalQuality: Math.round(bestScore * 100),
     validReading,
     message: validReading
       ? (confidence === "high" ? "Strong signal detected" : "Moderate signal - try holding still next time")
@@ -442,21 +544,6 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
   const gRaw = validSignals.map(s => s.g);
   const bRaw = validSignals.map(s => s.b);
   const vn = validSignals.length;
-
-  function detrendSignal(sig: number[]) {
-    const len = sig.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    for (let i = 0; i < len; i++) { sumX += i; sumY += sig[i]; sumXY += i * sig[i]; sumXX += i * i; }
-    const slope = (len * sumXY - sumX * sumY) / (len * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / len;
-    return sig.map((v, i) => v - (slope * i + intercept));
-  }
-
-  function normalizeSignal(sig: number[]) {
-    const mean = sig.reduce((a, b) => a + b, 0) / sig.length;
-    const std = Math.sqrt(sig.reduce((s, v) => s + (v - mean) ** 2, 0) / sig.length) || 1;
-    return sig.map(v => (v - mean) / std);
-  }
 
   const rNorm = normalizeSignal(detrendSignal(rRaw));
   const gNorm = normalizeSignal(detrendSignal(gRaw));
@@ -492,74 +579,14 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
     for (let i = 0; i < len; i++) posSignal[start + i] += xs[i] + alpha * ys[i];
   }
 
-  const minFreq = 0.75;
+  const minFreq = 0.83;
   const maxFreq = 3.0;
-
-  function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
-    const hpRC = 1.0 / (2 * Math.PI * lowFreq);
-    const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
-    const hp = new Array(sig.length);
-    hp[0] = sig[0];
-    for (let i = 1; i < sig.length; i++) hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
-    const hp2 = new Array(sig.length);
-    hp2[0] = hp[0];
-    for (let i = 1; i < sig.length; i++) hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
-    const lpRC = 1.0 / (2 * Math.PI * highFreq);
-    const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
-    const lp = new Array(sig.length);
-    lp[0] = hp2[0];
-    for (let i = 1; i < sig.length; i++) lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
-    const lp2 = new Array(sig.length);
-    lp2[0] = lp[0];
-    for (let i = 1; i < sig.length; i++) lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
-    return lp2;
-  }
 
   const filteredPOS = bandpassFilter(detrendSignal(posSignal), actualFps, minFreq, maxFreq);
   const filteredGreen = bandpassFilter(normalizeSignal(detrendSignal(gRaw)), actualFps, minFreq, maxFreq);
 
-  function computeFFTBpm(sig: number[], sigLen: number) {
-    const zeroPadFactor = 4;
-    const fftSize = Math.pow(2, Math.ceil(Math.log2(sigLen * zeroPadFactor)));
-    const real = new Array(fftSize).fill(0);
-    const imag = new Array(fftSize).fill(0);
-    for (let i = 0; i < sigLen; i++) {
-      real[i] = sig[i] * (0.5 - 0.5 * Math.cos(2 * Math.PI * i / (sigLen - 1)));
-    }
-    function fftInner(re: number[], im: number[], sz: number) {
-      if (sz <= 1) return;
-      const halfN = sz / 2;
-      const eR = new Array(halfN), eI = new Array(halfN), oR = new Array(halfN), oI = new Array(halfN);
-      for (let i = 0; i < halfN; i++) { eR[i] = re[2*i]; eI[i] = im[2*i]; oR[i] = re[2*i+1]; oI[i] = im[2*i+1]; }
-      fftInner(eR, eI, halfN); fftInner(oR, oI, halfN);
-      for (let k = 0; k < halfN; k++) {
-        const angle = -2 * Math.PI * k / sz;
-        const c = Math.cos(angle), s = Math.sin(angle);
-        const tR = c * oR[k] - s * oI[k], tI = s * oR[k] + c * oI[k];
-        re[k] = eR[k] + tR; im[k] = eI[k] + tI;
-        re[k + halfN] = eR[k] - tR; im[k + halfN] = eI[k] - tI;
-      }
-    }
-    fftInner(real, imag, fftSize);
-    const mags: number[] = [];
-    for (let i = 0; i < fftSize / 2; i++) mags.push(Math.sqrt(real[i]*real[i] + imag[i]*imag[i]));
-    const lo = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
-    const hi = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
-    let pk = lo, pkM = 0;
-    for (let i = lo; i <= hi; i++) { if (mags[i] > pkM) { pkM = mags[i]; pk = i; } }
-    let pf: number;
-    if (pk > lo && pk < hi) {
-      const a = mags[pk-1], b = mags[pk], c = mags[pk+1];
-      const d = a - 2*b + c;
-      pf = Math.abs(d) > 1e-10 ? (pk + 0.5*(a-c)/d) * actualFps/fftSize : pk * actualFps/fftSize;
-    } else pf = pk * actualFps / fftSize;
-    let tp = 0, pp = 0;
-    for (let i = lo; i <= hi; i++) { const p = mags[i]*mags[i]; tp += p; if (Math.abs(i-pk) <= 2) pp += p; }
-    return { bpm: Math.round(pf * 60), snr: tp > 0 ? pp/tp : 0 };
-  }
-
-  const posResult = computeFFTBpm(filteredPOS, vn);
-  const greenResult = computeFFTBpm(filteredGreen, vn);
+  const posResult = computeFFTBpm(filteredPOS, actualFps);
+  const greenResult = computeFFTBpm(filteredGreen, actualFps);
 
   let bestBpm: number, bestSnr: number;
   if (posResult.snr >= greenResult.snr && posResult.snr > 0.05) {
@@ -571,7 +598,7 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
     bestSnr = Math.max(posResult.snr, greenResult.snr);
   }
 
-  const isValid = bestBpm >= 45 && bestBpm <= 180 && bestSnr > 0.08;
+  const isValid = bestBpm >= 50 && bestBpm <= 180 && bestSnr > 0.08;
   const heartRate = isValid ? bestBpm : 0;
   let confidence: "high" | "medium" | "low";
   if (bestSnr > 0.18 && vn >= 60 && isValid) confidence = "high";
@@ -636,7 +663,10 @@ export default function HeartRateScreen() {
   const cameraRef = useRef<CameraView>(null);
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
   const fingerRedRef = useRef<number[]>([]);
+  const fingerGreenRef = useRef<number[]>([]);
   const fingerTimestampsRef = useRef<number[]>([]);
+  const rgbHistoryRef = useRef<Array<{r: number; g: number; b: number}>>([]);
+  const liveBpmRef = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const fingerCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -709,18 +739,32 @@ export default function HeartRateScreen() {
       if (photo) {
         const rgb = await extractRGBNative(photo.uri);
         if (rgb.r >= 0) {
+          rgbHistoryRef.current.push(rgb);
+          if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
+            rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
+          }
+          const smoothed = smoothRGB(rgbHistoryRef.current);
           const now = Date.now();
-          if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
-            fingerRedRef.current.push(rgb.r);
+          if (isFingerCovering(smoothed.r, smoothed.g, smoothed.b)) {
+            fingerRedRef.current.push(smoothed.r);
+            fingerGreenRef.current.push(smoothed.g);
             fingerTimestampsRef.current.push(now);
             setSampleCount(fingerRedRef.current.length);
 
             if (fingerRedRef.current.length >= 20 && fingerRedRef.current.length % 10 === 0) {
               const recent = fingerRedRef.current.slice(-30);
+              const recentG = fingerGreenRef.current.slice(-30);
               const recentTs = fingerTimestampsRef.current.slice(-30);
-              const quickResult = processFingerSignals(recent, recentTs);
+              const quickResult = processFingerSignals(recent, recentG, recentTs);
               if (quickResult.validReading) {
-                setLiveBpm(quickResult.heartRate);
+                if (liveBpmRef.current === 0) {
+                  liveBpmRef.current = quickResult.heartRate;
+                } else {
+                  liveBpmRef.current = Math.round(
+                    EMA_ALPHA * quickResult.heartRate + (1 - EMA_ALPHA) * liveBpmRef.current
+                  );
+                }
+                setLiveBpm(liveBpmRef.current);
               }
             }
           } else {
@@ -772,8 +816,13 @@ export default function HeartRateScreen() {
       if (photo) {
         const rgb = await extractRGBNative(photo.uri);
         if (rgb.r >= 0) {
-          const detected = isFingerCovering(rgb.r, rgb.g, rgb.b);
-          console.log(`FingerCheck: r=${rgb.r.toFixed(0)} g=${rgb.g.toFixed(0)} b=${rgb.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
+          rgbHistoryRef.current.push(rgb);
+          if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
+            rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
+          }
+          const smoothed = smoothRGB(rgbHistoryRef.current);
+          const detected = isFingerCovering(smoothed.r, smoothed.g, smoothed.b);
+          console.log(`FingerCheck: r=${smoothed.r.toFixed(0)} g=${smoothed.g.toFixed(0)} b=${smoothed.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
           if (detected) {
             fingerConfirmCount.current++;
             if (fingerConfirmCount.current >= FINGER_CONFIRM_FRAMES) {
@@ -784,8 +833,10 @@ export default function HeartRateScreen() {
               }
             }
           } else {
-            fingerConfirmCount.current = 0;
-            setFingerDetected(false);
+            fingerConfirmCount.current = Math.max(0, fingerConfirmCount.current - 1);
+            if (fingerConfirmCount.current === 0) {
+              setFingerDetected(false);
+            }
           }
         }
       }
@@ -801,13 +852,17 @@ export default function HeartRateScreen() {
     if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
 
     fingerRedRef.current = [];
+    fingerGreenRef.current = [];
     fingerTimestampsRef.current = [];
+    rgbHistoryRef.current = [];
+    liveBpmRef.current = 0;
     setSampleCount(0);
     setLiveBpm(0);
     setState("measuring");
     setCountdown(MEASUREMENT_DURATION);
 
     measureActiveRef.current = true;
+    let fingerLostCount = 0;
 
     const captureLoop = async () => {
       if (!measureActiveRef.current || !cameraRef.current) return;
@@ -820,21 +875,42 @@ export default function HeartRateScreen() {
         if (photo && measureActiveRef.current) {
           const rgb = await extractRGBNative(photo.uri);
           if (rgb.r >= 0) {
-            if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
+            rgbHistoryRef.current.push(rgb);
+            if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
+              rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
+            }
+            const smoothed = smoothRGB(rgbHistoryRef.current);
+
+            if (isFingerCovering(smoothed.r, smoothed.g, smoothed.b)) {
+              fingerLostCount = 0;
               setFingerDetected(true);
-              fingerRedRef.current.push(rgb.r);
+              fingerRedRef.current.push(smoothed.r);
+              fingerGreenRef.current.push(smoothed.g);
               fingerTimestampsRef.current.push(Date.now());
               setSampleCount(fingerRedRef.current.length);
 
-              if (fingerRedRef.current.length >= 15 && fingerRedRef.current.length % 5 === 0) {
+              if (fingerRedRef.current.length >= 20 && fingerRedRef.current.length % 5 === 0) {
                 const quickResult = processFingerSignals(
-                  fingerRedRef.current.slice(-40),
-                  fingerTimestampsRef.current.slice(-40)
+                  fingerRedRef.current.slice(-50),
+                  fingerGreenRef.current.slice(-50),
+                  fingerTimestampsRef.current.slice(-50)
                 );
-                if (quickResult.validReading) setLiveBpm(quickResult.heartRate);
+                if (quickResult.validReading) {
+                  if (liveBpmRef.current === 0) {
+                    liveBpmRef.current = quickResult.heartRate;
+                  } else {
+                    liveBpmRef.current = Math.round(
+                      EMA_ALPHA * quickResult.heartRate + (1 - EMA_ALPHA) * liveBpmRef.current
+                    );
+                  }
+                  setLiveBpm(liveBpmRef.current);
+                }
               }
             } else {
-              setFingerDetected(false);
+              fingerLostCount++;
+              if (fingerLostCount > 10) {
+                setFingerDetected(false);
+              }
             }
           }
         }
@@ -863,6 +939,7 @@ export default function HeartRateScreen() {
     setState("processing");
     try {
       const redVals = fingerRedRef.current;
+      const greenVals = fingerGreenRef.current;
       const timestamps = fingerTimestampsRef.current;
       if (redVals.length < MIN_SAMPLES) {
         setError(t(
@@ -873,7 +950,7 @@ export default function HeartRateScreen() {
         measurementStartedRef.current = false;
         return;
       }
-      const data = processFingerSignals(redVals, timestamps);
+      const data = processFingerSignals(redVals, greenVals, timestamps);
       setResult(data);
       setState("result");
       setTorchOn(false);
@@ -899,8 +976,10 @@ export default function HeartRateScreen() {
     setResult(null);
     setSampleCount(0);
     setLiveBpm(0);
+    liveBpmRef.current = 0;
     fingerConfirmCount.current = 0;
     measurementStartedRef.current = false;
+    rgbHistoryRef.current = [];
     setFingerDetected(false);
     setState("waiting_finger");
 
@@ -981,7 +1060,10 @@ export default function HeartRateScreen() {
     stopPulseAnimation();
     signalsRef.current = [];
     fingerRedRef.current = [];
+    fingerGreenRef.current = [];
     fingerTimestampsRef.current = [];
+    rgbHistoryRef.current = [];
+    liveBpmRef.current = 0;
     measurementStartedRef.current = false;
     fingerConfirmCount.current = 0;
     setState("idle");
