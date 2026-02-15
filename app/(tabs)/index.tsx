@@ -429,45 +429,6 @@ export default function HomeScreen() {
           </>
         )}
 
-        <View style={styles.infoCards}>
-          <View style={styles.infoCard}>
-            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.infoCardIconWrap}>
-                <LinearGradient
-                  colors={[Colors.light.primary, "#14B8A6"]}
-                  style={styles.infoCardIconGradient}
-                >
-                  <Ionicons name="shield-checkmark" size={20} color="#fff" />
-                </LinearGradient>
-              </View>
-              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
-                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-                  {t("Checks for emergency symptoms, drug interactions, and contraindications before any recommendation.", "يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.infoCardIconWrap}>
-                <LinearGradient
-                  colors={[Colors.light.accent, "#FB923C"]}
-                  style={styles.infoCardIconGradient}
-                >
-                  <Ionicons name="navigate" size={20} color="#fff" />
-                </LinearGradient>
-              </View>
-              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
-                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-                  {t("Find the nearest facility with exactly what you need \u2014 pharmacies, labs, or clinics.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه \u2014 صيدليات أو مختبرات أو عيادات.")}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
 
         {recentAssessments.length > 0 && (
           <>
@@ -826,10 +787,6 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     lineHeight: 17,
-  },
-  infoCards: {
-    gap: 12,
-    marginBottom: 28,
   },
   infoCard: {
     backgroundColor: Colors.light.surface,
