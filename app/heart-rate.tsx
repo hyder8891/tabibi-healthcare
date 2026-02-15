@@ -7,6 +7,7 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,9 +29,9 @@ import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
-const MEASUREMENT_DURATION = 15;
+const MEASUREMENT_DURATION = 20;
 const CAPTURE_FPS = 10;
-const MIN_SAMPLES = 60;
+const MIN_SAMPLES = 40;
 
 type MeasurementState = "idle" | "measuring" | "processing" | "result";
 
@@ -40,6 +41,7 @@ interface RppgResult {
   waveform: number[];
   signalQuality: number;
   message: string;
+  validReading: boolean;
 }
 
 function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: number; b: number }> {
@@ -53,14 +55,14 @@ function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: nu
         canvas.height = size;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve({ r: 128, g: 128, b: 128 });
+          resolve({ r: -1, g: -1, b: -1 });
           return;
         }
         ctx.drawImage(img, 0, 0, size, size);
-        const roiX = Math.floor(size * 0.25);
-        const roiY = Math.floor(size * 0.25);
-        const roiW = Math.floor(size * 0.5);
-        const roiH = Math.floor(size * 0.5);
+        const roiX = Math.floor(size * 0.2);
+        const roiY = Math.floor(size * 0.3);
+        const roiW = Math.floor(size * 0.6);
+        const roiH = Math.floor(size * 0.4);
         const imageData = ctx.getImageData(roiX, roiY, roiW, roiH);
         const data = imageData.data;
         let rSum = 0, gSum = 0, bSum = 0, count = 0;
@@ -71,133 +73,139 @@ function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: nu
           count++;
         }
         resolve({
-          r: count > 0 ? rSum / count : 128,
-          g: count > 0 ? gSum / count : 128,
-          b: count > 0 ? bSum / count : 128,
+          r: count > 0 ? rSum / count : -1,
+          g: count > 0 ? gSum / count : -1,
+          b: count > 0 ? bSum / count : -1,
         });
       };
-      img.onerror = () => resolve({ r: 128, g: 128, b: 128 });
+      img.onerror = () => resolve({ r: -1, g: -1, b: -1 });
       img.src = `data:image/jpeg;base64,${base64Data}`;
     } catch {
-      resolve({ r: 128, g: 128, b: 128 });
+      resolve({ r: -1, g: -1, b: -1 });
     }
   });
 }
 
 function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-
-  let width = 0;
-  let height = 0;
-  let colorType = 6;
-  let pos = 8;
-  while (pos < bytes.length) {
-    const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-    const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-    if (type === "IHDR") {
-      width = (bytes[pos+8] << 24) | (bytes[pos+9] << 16) | (bytes[pos+10] << 8) | bytes[pos+11];
-      height = (bytes[pos+12] << 24) | (bytes[pos+13] << 16) | (bytes[pos+14] << 8) | bytes[pos+15];
-      colorType = bytes[pos+17];
-    }
-    pos += 12 + length;
-  }
-
-  pos = 8;
-  const idatChunks: Uint8Array[] = [];
-  while (pos < bytes.length) {
-    const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
-    const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
-    if (type === "IDAT") {
-      idatChunks.push(bytes.slice(pos + 8, pos + 8 + length));
-    }
-    pos += 12 + length;
-  }
-
-  const totalLen = idatChunks.reduce((s, c) => s + c.length, 0);
-  const idatData = new Uint8Array(totalLen);
-  let offset = 0;
-  for (const chunk of idatChunks) {
-    idatData.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  let decompressed: Uint8Array;
   try {
-    decompressed = pako.inflate(idatData);
-  } catch {
-    return { r: 128, g: 128, b: 128 };
-  }
-
-  const bpp = (colorType === 2) ? 3 : 4;
-  const rowBytes = width * bpp;
-  const pixels = new Uint8Array(width * height * bpp);
-
-  for (let y = 0; y < height; y++) {
-    const filterType = decompressed[y * (rowBytes + 1)];
-    const rowStart = y * (rowBytes + 1) + 1;
-    const pixelRowStart = y * rowBytes;
-
-    for (let x = 0; x < rowBytes; x++) {
-      const raw = decompressed[rowStart + x];
-      let left = 0;
-      let up = 0;
-      let upLeft = 0;
-
-      if (x >= bpp) left = pixels[pixelRowStart + x - bpp];
-      if (y > 0) up = pixels[(y - 1) * rowBytes + x];
-      if (x >= bpp && y > 0) upLeft = pixels[(y - 1) * rowBytes + x - bpp];
-
-      let val = raw;
-      switch (filterType) {
-        case 0: val = raw; break;
-        case 1: val = (raw + left) & 0xff; break;
-        case 2: val = (raw + up) & 0xff; break;
-        case 3: val = (raw + Math.floor((left + up) / 2)) & 0xff; break;
-        case 4: {
-          const p = left + up - upLeft;
-          const pa = Math.abs(p - left);
-          const pb = Math.abs(p - up);
-          const pc = Math.abs(p - upLeft);
-          const paeth = (pa <= pb && pa <= pc) ? left : (pb <= pc ? up : upLeft);
-          val = (raw + paeth) & 0xff;
-          break;
-        }
-      }
-      pixels[pixelRowStart + x] = val;
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
-  }
 
-  let rSum = 0, gSum = 0, bSum = 0, count = 0;
-  for (let i = 0; i < width * height; i++) {
-    rSum += pixels[i * bpp];
-    gSum += pixels[i * bpp + 1];
-    bSum += pixels[i * bpp + 2];
-    count++;
-  }
+    let width = 0;
+    let height = 0;
+    let colorType = 6;
+    let pos = 8;
+    while (pos < bytes.length) {
+      const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if (type === "IHDR") {
+        width = (bytes[pos+8] << 24) | (bytes[pos+9] << 16) | (bytes[pos+10] << 8) | bytes[pos+11];
+        height = (bytes[pos+12] << 24) | (bytes[pos+13] << 16) | (bytes[pos+14] << 8) | bytes[pos+15];
+        colorType = bytes[pos+17];
+      }
+      pos += 12 + length;
+    }
 
-  return {
-    r: count > 0 ? rSum / count : 128,
-    g: count > 0 ? gSum / count : 128,
-    b: count > 0 ? bSum / count : 128,
-  };
+    if (width === 0 || height === 0) return { r: -1, g: -1, b: -1 };
+
+    pos = 8;
+    const idatChunks: Uint8Array[] = [];
+    while (pos < bytes.length) {
+      const length = (bytes[pos] << 24) | (bytes[pos+1] << 16) | (bytes[pos+2] << 8) | bytes[pos+3];
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      if (type === "IDAT") {
+        idatChunks.push(bytes.slice(pos + 8, pos + 8 + length));
+      }
+      pos += 12 + length;
+    }
+
+    const totalLen = idatChunks.reduce((s, c) => s + c.length, 0);
+    const idatData = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of idatChunks) {
+      idatData.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    let decompressed: Uint8Array;
+    try {
+      decompressed = pako.inflate(idatData);
+    } catch {
+      return { r: -1, g: -1, b: -1 };
+    }
+
+    const bpp = (colorType === 2) ? 3 : 4;
+    const rowBytes = width * bpp;
+    const pixels = new Uint8Array(width * height * bpp);
+
+    for (let y = 0; y < height; y++) {
+      const filterType = decompressed[y * (rowBytes + 1)];
+      const rowStart = y * (rowBytes + 1) + 1;
+      const pixelRowStart = y * rowBytes;
+
+      for (let x = 0; x < rowBytes; x++) {
+        const raw = decompressed[rowStart + x];
+        let left = 0;
+        let up = 0;
+        let upLeft = 0;
+
+        if (x >= bpp) left = pixels[pixelRowStart + x - bpp];
+        if (y > 0) up = pixels[(y - 1) * rowBytes + x];
+        if (x >= bpp && y > 0) upLeft = pixels[(y - 1) * rowBytes + x - bpp];
+
+        let val = raw;
+        switch (filterType) {
+          case 0: val = raw; break;
+          case 1: val = (raw + left) & 0xff; break;
+          case 2: val = (raw + up) & 0xff; break;
+          case 3: val = (raw + Math.floor((left + up) / 2)) & 0xff; break;
+          case 4: {
+            const p = left + up - upLeft;
+            const pa = Math.abs(p - left);
+            const pb = Math.abs(p - up);
+            const pc = Math.abs(p - upLeft);
+            const paeth = (pa <= pb && pa <= pc) ? left : (pb <= pc ? up : upLeft);
+            val = (raw + paeth) & 0xff;
+            break;
+          }
+        }
+        pixels[pixelRowStart + x] = val;
+      }
+    }
+
+    let rSum = 0, gSum = 0, bSum = 0, count = 0;
+    for (let i = 0; i < width * height; i++) {
+      rSum += pixels[i * bpp];
+      gSum += pixels[i * bpp + 1];
+      bSum += pixels[i * bpp + 2];
+      count++;
+    }
+
+    return {
+      r: count > 0 ? rSum / count : -1,
+      g: count > 0 ? gSum / count : -1,
+      b: count > 0 ? bSum / count : -1,
+    };
+  } catch {
+    return { r: -1, g: -1, b: -1 };
+  }
 }
 
 async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
   try {
-    const cropX = Math.floor(photoWidth * 0.25);
-    const cropY = Math.floor(photoHeight * 0.25);
-    const cropW = Math.floor(photoWidth * 0.5);
-    const cropH = Math.floor(photoHeight * 0.5);
+    const cropX = Math.floor(photoWidth * 0.2);
+    const cropY = Math.floor(photoHeight * 0.3);
+    const cropW = Math.floor(photoWidth * 0.6);
+    const cropH = Math.floor(photoHeight * 0.4);
 
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [
         { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-        { resize: { width: 8, height: 8 } },
+        { resize: { width: 16, height: 16 } },
       ],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
@@ -205,9 +213,9 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
     if (result.base64) {
       return parsePNGPixels(result.base64);
     }
-    return { r: 128, g: 128, b: 128 };
+    return { r: -1, g: -1, b: -1 };
   } catch {
-    return { r: 128, g: 128, b: 128 };
+    return { r: -1, g: -1, b: -1 };
   }
 }
 
@@ -215,19 +223,37 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
   const actualFps = fps || 10;
   const n = signals.length;
 
+  const invalidResult: RppgResult = {
+    heartRate: 0,
+    confidence: "low",
+    waveform: [],
+    signalQuality: 0,
+    message: "Could not detect heart rate",
+    validReading: false,
+  };
+
   if (n < 30) {
-    return {
-      heartRate: 0,
-      confidence: "low",
-      waveform: [],
-      signalQuality: 0,
-      message: "Not enough samples for analysis",
-    };
+    return { ...invalidResult, message: "Not enough samples for analysis" };
   }
 
-  const rRaw = signals.map(s => s.r);
-  const gRaw = signals.map(s => s.g);
-  const bRaw = signals.map(s => s.b);
+  const validSignals = signals.filter(s => s.r >= 0 && s.g >= 0 && s.b >= 0);
+  if (validSignals.length < 30) {
+    return { ...invalidResult, message: "Too many failed frame captures" };
+  }
+
+  const gValues = validSignals.map(s => s.g);
+  const gMin = Math.min(...gValues);
+  const gMax = Math.max(...gValues);
+  const gRange = gMax - gMin;
+
+  if (gRange < 0.3) {
+    return { ...invalidResult, message: "No color variation detected - ensure face is visible and well-lit" };
+  }
+
+  const rRaw = validSignals.map(s => s.r);
+  const gRaw = validSignals.map(s => s.g);
+  const bRaw = validSignals.map(s => s.b);
+  const vn = validSignals.length;
 
   function detrendSignal(sig: number[]) {
     const len = sig.length;
@@ -258,10 +284,10 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
   const bNorm = normalizeSignal(bDetrend);
 
   const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
-  const posSignal = new Array(n).fill(0);
+  const posSignal = new Array(vn).fill(0);
 
-  for (let start = 0; start < n - windowSize; start += Math.floor(windowSize / 2)) {
-    const end = Math.min(start + windowSize, n);
+  for (let start = 0; start < vn - windowSize; start += Math.floor(windowSize / 2)) {
+    const end = Math.min(start + windowSize, vn);
     const len = end - start;
 
     const rWin = rNorm.slice(start, end);
@@ -297,161 +323,200 @@ function processRppgClient(signals: Array<{r: number; g: number; b: number}>, fp
 
   const posDetrended = detrendSignal(posSignal);
 
+  const greenDetrended = detrendSignal(gRaw);
+  const greenNormalized = normalizeSignal(greenDetrended);
+
   const minFreq = 0.75;
-  const maxFreq = 3.5;
+  const maxFreq = 3.0;
 
-  function butterworthBandpass(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
-    const dt = 1.0 / sampleRate;
-    const lowRC = 1.0 / (2 * Math.PI * lowFreq);
-    const highRC = 1.0 / (2 * Math.PI * highFreq);
-    const alphaHigh = dt / (highRC + dt);
-    const alphaLow = lowRC / (lowRC + dt);
+  function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+    const result = new Array(sig.length);
 
-    const highPassed = new Array(sig.length).fill(0);
-    highPassed[0] = sig[0];
+    const hpRC = 1.0 / (2 * Math.PI * lowFreq);
+    const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
+    const hp = new Array(sig.length);
+    hp[0] = sig[0];
     for (let i = 1; i < sig.length; i++) {
-      highPassed[i] = alphaLow * (highPassed[i - 1] + sig[i] - sig[i - 1]);
+      hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
     }
-
-    const bandPassed = new Array(sig.length).fill(0);
-    bandPassed[0] = highPassed[0];
+    const hp2 = new Array(sig.length);
+    hp2[0] = hp[0];
     for (let i = 1; i < sig.length; i++) {
-      bandPassed[i] = bandPassed[i - 1] + alphaHigh * (highPassed[i] - bandPassed[i - 1]);
+      hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
     }
 
-    const resultSig = new Array(sig.length).fill(0);
-    resultSig[0] = bandPassed[0];
+    const lpRC = 1.0 / (2 * Math.PI * highFreq);
+    const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
+    result[0] = hp2[0];
     for (let i = 1; i < sig.length; i++) {
-      resultSig[i] = alphaLow * (resultSig[i - 1] + bandPassed[i] - bandPassed[i - 1]);
+      result[i] = result[i - 1] + lpAlpha * (hp2[i] - result[i - 1]);
     }
-    const finalResult = new Array(sig.length).fill(0);
-    finalResult[0] = resultSig[0];
+    const lp2 = new Array(sig.length);
+    lp2[0] = result[0];
     for (let i = 1; i < sig.length; i++) {
-      finalResult[i] = finalResult[i - 1] + alphaHigh * (resultSig[i] - finalResult[i - 1]);
+      lp2[i] = lp2[i - 1] + lpAlpha * (result[i] - lp2[i - 1]);
     }
 
-    return finalResult;
+    return lp2;
   }
 
-  const filtered = butterworthBandpass(posDetrended, actualFps, minFreq, maxFreq);
+  const filteredPOS = bandpassFilter(posDetrended, actualFps, minFreq, maxFreq);
+  const filteredGreen = bandpassFilter(greenNormalized, actualFps, minFreq, maxFreq);
 
-  const zeroPadFactor = 4;
-  const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
-  const real = new Array(fftSize).fill(0);
-  const imag = new Array(fftSize).fill(0);
+  function computeFFTBpm(filtered: number[], sigLen: number) {
+    const zeroPadFactor = 4;
+    const fftSize = Math.pow(2, Math.ceil(Math.log2(sigLen * zeroPadFactor)));
+    const real = new Array(fftSize).fill(0);
+    const imag = new Array(fftSize).fill(0);
 
-  for (let i = 0; i < n; i++) {
-    const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
-    real[i] = filtered[i] * hannCoeff;
-  }
-
-  function fft(re: number[], im: number[], sz: number) {
-    if (sz <= 1) return;
-    const halfN = sz / 2;
-    const evenReal = new Array(halfN);
-    const evenImag = new Array(halfN);
-    const oddReal = new Array(halfN);
-    const oddImag = new Array(halfN);
-
-    for (let i = 0; i < halfN; i++) {
-      evenReal[i] = re[2 * i];
-      evenImag[i] = im[2 * i];
-      oddReal[i] = re[2 * i + 1];
-      oddImag[i] = im[2 * i + 1];
+    for (let i = 0; i < sigLen; i++) {
+      const hannCoeff = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (sigLen - 1));
+      real[i] = filtered[i] * hannCoeff;
     }
 
-    fft(evenReal, evenImag, halfN);
-    fft(oddReal, oddImag, halfN);
+    function fft(re: number[], im: number[], sz: number) {
+      if (sz <= 1) return;
+      const halfN = sz / 2;
+      const evenReal = new Array(halfN);
+      const evenImag = new Array(halfN);
+      const oddReal = new Array(halfN);
+      const oddImag = new Array(halfN);
 
-    for (let k = 0; k < halfN; k++) {
-      const angle = -2 * Math.PI * k / sz;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      const tReal = cos * oddReal[k] - sin * oddImag[k];
-      const tImag = sin * oddReal[k] + cos * oddImag[k];
-      re[k] = evenReal[k] + tReal;
-      im[k] = evenImag[k] + tImag;
-      re[k + halfN] = evenReal[k] - tReal;
-      im[k + halfN] = evenImag[k] - tImag;
+      for (let i = 0; i < halfN; i++) {
+        evenReal[i] = re[2 * i];
+        evenImag[i] = im[2 * i];
+        oddReal[i] = re[2 * i + 1];
+        oddImag[i] = im[2 * i + 1];
+      }
+
+      fft(evenReal, evenImag, halfN);
+      fft(oddReal, oddImag, halfN);
+
+      for (let k = 0; k < halfN; k++) {
+        const angle = -2 * Math.PI * k / sz;
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+        const tReal = cos * oddReal[k] - sin * oddImag[k];
+        const tImag = sin * oddReal[k] + cos * oddImag[k];
+        re[k] = evenReal[k] + tReal;
+        im[k] = evenImag[k] + tImag;
+        re[k + halfN] = evenReal[k] - tReal;
+        im[k + halfN] = evenImag[k] - tImag;
+      }
     }
-  }
 
-  fft(real, imag, fftSize);
+    fft(real, imag, fftSize);
 
-  const magnitudes: number[] = [];
-  for (let i = 0; i < fftSize / 2; i++) {
-    magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
-  }
-
-  const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
-  const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
-
-  let peakBin = scaledMinBin;
-  let peakMag = 0;
-  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-    if (magnitudes[i] > peakMag) {
-      peakMag = magnitudes[i];
-      peakBin = i;
+    const magnitudes: number[] = [];
+    for (let i = 0; i < fftSize / 2; i++) {
+      magnitudes.push(Math.sqrt(real[i] * real[i] + imag[i] * imag[i]));
     }
+
+    const scaledMinBin = Math.max(1, Math.floor(minFreq * fftSize / actualFps));
+    const scaledMaxBin = Math.min(fftSize / 2 - 1, Math.ceil(maxFreq * fftSize / actualFps));
+
+    let peakBin = scaledMinBin;
+    let peakMag = 0;
+    for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+      if (magnitudes[i] > peakMag) {
+        peakMag = magnitudes[i];
+        peakBin = i;
+      }
+    }
+
+    let peakFreq: number;
+    if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
+      const alphaVal = magnitudes[peakBin - 1];
+      const beta = magnitudes[peakBin];
+      const gamma = magnitudes[peakBin + 1];
+      const denom = alphaVal - 2 * beta + gamma;
+      if (Math.abs(denom) > 1e-10) {
+        const delta = 0.5 * (alphaVal - gamma) / denom;
+        peakFreq = (peakBin + delta) * actualFps / fftSize;
+      } else {
+        peakFreq = peakBin * actualFps / fftSize;
+      }
+    } else {
+      peakFreq = peakBin * actualFps / fftSize;
+    }
+
+    let totalPower = 0;
+    let peakPower = 0;
+    for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
+      const power = magnitudes[i] * magnitudes[i];
+      totalPower += power;
+      if (Math.abs(i - peakBin) <= 2) {
+        peakPower += power;
+      }
+    }
+    const snr = totalPower > 0 ? peakPower / totalPower : 0;
+
+    return { bpm: Math.round(peakFreq * 60), snr, peakMag };
   }
 
-  let peakFreq;
-  if (peakBin > scaledMinBin && peakBin < scaledMaxBin) {
-    const alphaVal = magnitudes[peakBin - 1];
-    const beta = magnitudes[peakBin];
-    const gamma = magnitudes[peakBin + 1];
-    const delta = 0.5 * (alphaVal - gamma) / (alphaVal - 2 * beta + gamma);
-    peakFreq = (peakBin + delta) * actualFps / fftSize;
+  const posResult = computeFFTBpm(filteredPOS, vn);
+  const greenResult = computeFFTBpm(filteredGreen, vn);
+
+  let bestBpm: number;
+  let bestSnr: number;
+  let usedMethod: string;
+
+  if (posResult.snr >= greenResult.snr && posResult.snr > 0.05) {
+    bestBpm = posResult.bpm;
+    bestSnr = posResult.snr;
+    usedMethod = "POS";
+  } else if (greenResult.snr > 0.05) {
+    bestBpm = greenResult.bpm;
+    bestSnr = greenResult.snr;
+    usedMethod = "Green";
   } else {
-    peakFreq = peakBin * actualFps / fftSize;
+    bestBpm = posResult.snr >= greenResult.snr ? posResult.bpm : greenResult.bpm;
+    bestSnr = Math.max(posResult.snr, greenResult.snr);
+    usedMethod = "fallback";
   }
 
-  let heartRate = Math.round(peakFreq * 60);
-  heartRate = Math.max(45, Math.min(180, heartRate));
-
-  let totalPower = 0;
-  let peakPower = 0;
-  for (let i = scaledMinBin; i <= scaledMaxBin; i++) {
-    const power = magnitudes[i] * magnitudes[i];
-    totalPower += power;
-    if (Math.abs(i - peakBin) <= 2) {
-      peakPower += power;
-    }
-  }
-  const snr = totalPower > 0 ? peakPower / totalPower : 0;
-
-  const signalVariance = filtered.reduce((s, v) => s + v * v, 0) / n;
+  const signalVariance = filteredPOS.reduce((s, v) => s + v * v, 0) / vn;
   const hasVariation = signalVariance > 1e-10;
 
+  const isValidBpm = bestBpm >= 45 && bestBpm <= 180;
+  const isValidSignal = bestSnr > 0.08 && hasVariation;
+  const validReading = isValidBpm && isValidSignal;
+
+  const heartRate = validReading ? Math.max(45, Math.min(180, bestBpm)) : 0;
+
   let confidence: "high" | "medium" | "low";
-  if (snr > 0.20 && n >= 60 && hasVariation) {
+  if (bestSnr > 0.18 && vn >= 60 && hasVariation && validReading) {
     confidence = "high";
-  } else if (snr > 0.10 && n >= 40 && hasVariation) {
+  } else if (bestSnr > 0.10 && vn >= 40 && hasVariation && validReading) {
     confidence = "medium";
   } else {
     confidence = "low";
   }
 
+  const displayFiltered = posResult.snr >= greenResult.snr ? filteredPOS : filteredGreen;
   const waveformLength = 100;
   const waveform: number[] = [];
   for (let i = 0; i < waveformLength; i++) {
-    const idx = Math.floor(i * filtered.length / waveformLength);
-    waveform.push(filtered[idx] || 0);
+    const idx = Math.floor(i * displayFiltered.length / waveformLength);
+    waveform.push(displayFiltered[idx] || 0);
   }
 
   const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
   const normalizedWaveform = waveform.map(v => v / maxWave);
 
+  console.log(`rPPG: ${vn} valid samples, fps=${actualFps.toFixed(1)}, POS(bpm=${posResult.bpm},snr=${posResult.snr.toFixed(3)}), Green(bpm=${greenResult.bpm},snr=${greenResult.snr.toFixed(3)}), used=${usedMethod}, valid=${validReading}`);
+
   return {
     heartRate,
     confidence,
     waveform: normalizedWaveform,
-    signalQuality: Math.round(snr * 100),
-    message: confidence === "high"
-      ? "Strong signal detected"
-      : confidence === "medium"
-        ? "Moderate signal quality - try holding still in good lighting"
-        : "Weak signal - ensure face is well-lit and stay still",
+    signalQuality: Math.round(bestSnr * 100),
+    validReading,
+    message: validReading
+      ? (confidence === "high"
+        ? "Strong signal detected"
+        : "Moderate signal - try better lighting next time")
+      : "Could not detect a reliable heart rate - ensure good lighting and stay very still",
   };
 }
 
@@ -498,6 +563,7 @@ export default function HeartRateScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [state, setState] = useState<MeasurementState>("idle");
   const [countdown, setCountdown] = useState(MEASUREMENT_DURATION);
+  const [sampleCount, setSampleCount] = useState(0);
   const [result, setResult] = useState<RppgResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -570,10 +636,13 @@ export default function HeartRateScreen() {
         } else {
           rgb = await extractRGBFromPhotoNative(photo.uri, photo.width, photo.height);
         }
-        signalsRef.current.push({
-          ...rgb,
-          timestamp: Date.now(),
-        });
+        if (rgb.r >= 0 && rgb.g >= 0 && rgb.b >= 0) {
+          signalsRef.current.push({
+            ...rgb,
+            timestamp: Date.now(),
+          });
+          setSampleCount(signalsRef.current.length);
+        }
       }
     } catch {
     } finally {
@@ -588,8 +657,8 @@ export default function HeartRateScreen() {
       const signals = signalsRef.current;
       if (signals.length < MIN_SAMPLES) {
         setError(t(
-          "Not enough data collected. Please try again with better lighting.",
-          "لم يتم جمع بيانات كافية. يرجى المحاولة مرة أخرى في إضاءة أفضل."
+          "Not enough data collected. Please try again with better lighting and hold the phone steady.",
+          "لم يتم جمع بيانات كافية. يرجى المحاولة مرة أخرى في إضاءة أفضل مع تثبيت الهاتف."
         ));
         setState("idle");
         return;
@@ -605,17 +674,19 @@ export default function HeartRateScreen() {
       }
 
       const rgbSignals = signals.map(s => ({ r: s.r, g: s.g, b: s.b }));
-      console.log(`rPPG: ${signals.length} samples, actualFps=${actualFps.toFixed(1)}, first RGB=[${rgbSignals[0]?.r.toFixed(1)},${rgbSignals[0]?.g.toFixed(1)},${rgbSignals[0]?.b.toFixed(1)}], last RGB=[${rgbSignals[rgbSignals.length-1]?.r.toFixed(1)},${rgbSignals[rgbSignals.length-1]?.g.toFixed(1)},${rgbSignals[rgbSignals.length-1]?.b.toFixed(1)}]`);
       const data = processRppgClient(rgbSignals, actualFps);
 
       setResult(data);
       setState("result");
-      startPulseAnimation();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      getProfile().then((profile) => {
-        saveProfile({ ...profile, lastBpm: data.heartRate, lastBpmDate: Date.now() });
-      });
+      if (data.validReading) {
+        startPulseAnimation();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        getProfile().then((profile) => {
+          saveProfile({ ...profile, lastBpm: data.heartRate, lastBpmDate: Date.now() });
+        });
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
     } catch (err) {
       setError(t(
         "Failed to process heart rate data. Please try again.",
@@ -629,6 +700,7 @@ export default function HeartRateScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setError(null);
     setResult(null);
+    setSampleCount(0);
     signalsRef.current = [];
     setState("measuring");
     setCountdown(MEASUREMENT_DURATION);
@@ -657,6 +729,7 @@ export default function HeartRateScreen() {
     setState("idle");
     setResult(null);
     setError(null);
+    setSampleCount(0);
     setCountdown(MEASUREMENT_DURATION);
   }, []);
 
@@ -680,13 +753,13 @@ export default function HeartRateScreen() {
           </Text>
           <Text style={styles.permissionText}>
             {t(
-              "The heart rate monitor uses your front camera to detect subtle color changes in your face that correspond to your pulse.",
-              "يستخدم مقياس معدل ضربات القلب الكاميرا الأمامية للكشف عن تغييرات اللون الدقيقة في وجهك التي تتوافق مع نبضك."
+              "The heart rate monitor uses your front camera to detect subtle color changes in your face caused by blood flow. Please allow camera access to continue.",
+              "يستخدم مقياس نبضات القلب الكاميرا الأمامية للكشف عن تغييرات اللون الدقيقة في وجهك الناتجة عن تدفق الدم. يرجى السماح بالوصول إلى الكاميرا للاستمرار."
             )}
           </Text>
           <Pressable style={styles.permissionButton} onPress={requestPermission}>
             <Text style={styles.permissionButtonText}>
-              {t("Enable Camera", "تفعيل الكاميرا")}
+              {t("Allow Camera", "السماح بالكاميرا")}
             </Text>
           </Pressable>
         </View>
@@ -694,11 +767,12 @@ export default function HeartRateScreen() {
     );
   }
 
-  const confidenceColor = result?.confidence === "high"
-    ? Colors.light.success
-    : result?.confidence === "medium"
-      ? Colors.light.warning
-      : Colors.light.emergency;
+  const confidenceColor =
+    result?.confidence === "high"
+      ? Colors.light.success
+      : result?.confidence === "medium"
+        ? Colors.light.warning
+        : Colors.light.emergency;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
@@ -742,6 +816,9 @@ export default function HeartRateScreen() {
                     ]}
                   />
                 </View>
+                <Text style={styles.sampleCountText}>
+                  {sampleCount} {t("frames", "إطار")}
+                </Text>
               </View>
             )}
           </View>
@@ -754,8 +831,8 @@ export default function HeartRateScreen() {
                 </Text>
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
                   {t(
-                    "Hold your phone steady and look at the camera. Ensure good lighting on your face.",
-                    "امسك هاتفك ثابتاً وانظر إلى الكاميرا. تأكد من الإضاءة الجيدة على وجهك."
+                    "Hold your phone steady and look at the camera. Ensure good, natural lighting on your face. Stay very still during measurement.",
+                    "امسك هاتفك ثابتاً وانظر إلى الكاميرا. تأكد من الإضاءة الطبيعية الجيدة على وجهك. ابقَ ثابتاً تماماً أثناء القياس."
                   )}
                 </Text>
                 <Pressable
@@ -803,29 +880,44 @@ export default function HeartRateScreen() {
           </View>
         </View>
       ) : result ? (
-        <View style={styles.resultSection}>
-          <Animated.View style={[styles.bpmCircle, pulseAnimStyle]}>
-            <Ionicons name="heart" size={28} color={Colors.light.emergency} />
-            <Text style={styles.bpmValue}>{result.heartRate}</Text>
-            <Text style={styles.bpmLabel}>BPM</Text>
-          </Animated.View>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.resultSection} showsVerticalScrollIndicator={false}>
+          {result.validReading ? (
+            <>
+              <Animated.View style={[styles.bpmCircle, pulseAnimStyle]}>
+                <Ionicons name="heart" size={28} color={Colors.light.emergency} />
+                <Text style={styles.bpmValue}>{result.heartRate}</Text>
+                <Text style={styles.bpmLabel}>BPM</Text>
+              </Animated.View>
 
-          <View style={[styles.confidenceBadge, { backgroundColor: confidenceColor + "20" }]}>
-            <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
-            <Text style={[styles.confidenceText, { color: confidenceColor }]}>
-              {result.confidence === "high"
-                ? t("High Confidence", "ثقة عالية")
-                : result.confidence === "medium"
-                  ? t("Medium Confidence", "ثقة متوسطة")
-                  : t("Low Confidence", "ثقة منخفضة")}
-            </Text>
-          </View>
+              <View style={[styles.confidenceBadge, { backgroundColor: confidenceColor + "20" }]}>
+                <View style={[styles.confidenceDot, { backgroundColor: confidenceColor }]} />
+                <Text style={[styles.confidenceText, { color: confidenceColor }]}>
+                  {result.confidence === "high"
+                    ? t("High Confidence", "ثقة عالية")
+                    : result.confidence === "medium"
+                      ? t("Medium Confidence", "ثقة متوسطة")
+                      : t("Low Confidence", "ثقة منخفضة")}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.noReadingCircle}>
+              <Ionicons name="heart-dislike-outline" size={32} color={Colors.light.textTertiary} />
+              <Text style={styles.noReadingText}>—</Text>
+              <Text style={styles.noReadingLabel}>BPM</Text>
+            </View>
+          )}
 
           <Text style={[styles.resultMessage, isRTL && { textAlign: "right" }]}>
-            {result.message}
+            {result.validReading
+              ? result.message
+              : t(
+                  "Could not detect a reliable heart rate. Try again with better lighting, hold very still, and make sure your face is clearly visible.",
+                  "لم يتمكن من اكتشاف نبضات قلب موثوقة. حاول مرة أخرى مع إضاءة أفضل، ابقَ ثابتاً تماماً، وتأكد من أن وجهك واضح."
+                )}
           </Text>
 
-          {result.waveform && result.waveform.length > 0 && (
+          {result.validReading && result.waveform && result.waveform.length > 0 && (
             <View style={styles.waveformContainer}>
               <Text style={styles.waveformLabel}>
                 {t("Pulse Waveform", "موجة النبض")}
@@ -834,22 +926,50 @@ export default function HeartRateScreen() {
             </View>
           )}
 
-          <View style={styles.statsRow}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{result.signalQuality}%</Text>
-              <Text style={styles.statLabel}>{t("Signal Quality", "جودة الإشارة")}</Text>
+          {result.validReading && (
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{result.signalQuality}%</Text>
+                <Text style={styles.statLabel}>{t("Signal Quality", "جودة الإشارة")}</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>
+                  {result.heartRate < 60
+                    ? t("Low", "منخفض")
+                    : result.heartRate > 100
+                      ? t("High", "مرتفع")
+                      : t("Normal", "طبيعي")}
+                </Text>
+                <Text style={styles.statLabel}>{t("Range", "النطاق")}</Text>
+              </View>
             </View>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {result.heartRate < 60
-                  ? t("Low", "منخفض")
-                  : result.heartRate > 100
-                    ? t("High", "مرتفع")
-                    : t("Normal", "طبيعي")}
+          )}
+
+          {!result.validReading && (
+            <View style={styles.tipsContainer}>
+              <Text style={[styles.tipsTitle, isRTL && { textAlign: "right" }]}>
+                {t("Tips for better results:", "نصائح لنتائج أفضل:")}
               </Text>
-              <Text style={styles.statLabel}>{t("Range", "النطاق")}</Text>
+              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="sunny-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                  {t("Use natural, even lighting on your face", "استخدم إضاءة طبيعية متساوية على وجهك")}
+                </Text>
+              </View>
+              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="phone-portrait-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                  {t("Hold the phone completely still", "أمسك الهاتف ثابتاً تماماً")}
+                </Text>
+              </View>
+              <View style={[styles.tipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="person-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.tipText, isRTL && { textAlign: "right" }]}>
+                  {t("Keep your face centered and still", "ابقِ وجهك في المنتصف وثابتاً")}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           <Pressable
             style={({ pressed }) => [
@@ -873,7 +993,7 @@ export default function HeartRateScreen() {
               )}
             </Text>
           </View>
-        </View>
+        </ScrollView>
       ) : null}
 
       {error && (
@@ -1044,6 +1164,12 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.light.primaryLight,
   },
+  sampleCountText: {
+    fontSize: 11,
+    fontFamily: "DMSans_400Regular",
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 4,
+  },
   instructionSection: {
     flex: 1,
     justifyContent: "center",
@@ -1124,10 +1250,10 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
   },
   resultSection: {
-    flex: 1,
     alignItems: "center",
     padding: 24,
     paddingTop: 32,
+    paddingBottom: 40,
   },
   bpmCircle: {
     width: 160,
@@ -1144,6 +1270,30 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 4,
+  },
+  noReadingCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    backgroundColor: Colors.light.borderLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 16,
+    borderWidth: 4,
+    borderColor: Colors.light.textTertiary + "30",
+  },
+  noReadingText: {
+    fontSize: 48,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.textTertiary,
+    marginTop: 2,
+  },
+  noReadingLabel: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textTertiary,
+    opacity: 0.7,
+    marginTop: -4,
   },
   bpmValue: {
     fontSize: 48,
@@ -1182,6 +1332,7 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textAlign: "center",
     marginBottom: 20,
+    lineHeight: 20,
   },
   waveformContainer: {
     width: "100%",
@@ -1207,6 +1358,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     marginBottom: 20,
+    width: "100%",
   },
   statCard: {
     flex: 1,
@@ -1232,6 +1384,32 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
   },
+  tipsContainer: {
+    width: "100%",
+    backgroundColor: Colors.light.primarySurface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    gap: 10,
+  },
+  tipsTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  tipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 18,
+  },
   retryButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1254,7 +1432,7 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: Colors.light.borderLight,
     borderRadius: 12,
-    marginTop: "auto",
+    width: "100%",
   },
   disclaimerText: {
     flex: 1,
