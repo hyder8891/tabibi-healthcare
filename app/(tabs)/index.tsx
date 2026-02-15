@@ -278,7 +278,10 @@ export default function HomeScreen() {
   const CARD_GAP = 12;
   const STEP = CARD_WIDTH + CARD_GAP;
 
+  const isWeb = Platform.OS === "web";
+
   const startAutoScroll = useCallback(() => {
+    if (!isWeb) return;
     if (autoScrollTimer.current) return;
     if (insightCards.length <= 1) return;
     const maxScroll = (insightCards.length - 1) * STEP;
@@ -303,7 +306,7 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
-    startAutoScroll();
+    if (isWeb) startAutoScroll();
     return () => { stopAutoScroll(); if (resumeTimer.current) clearTimeout(resumeTimer.current); };
   }, [insightCards.length]);
 
@@ -314,7 +317,7 @@ export default function HomeScreen() {
   const onInsightScrollEnd = useCallback((e: any) => {
     scrollOffset.current = e.nativeEvent.contentOffset.x;
     if (resumeTimer.current) clearTimeout(resumeTimer.current);
-    resumeTimer.current = setTimeout(() => { startAutoScroll(); }, 3000);
+    if (isWeb) resumeTimer.current = setTimeout(() => { startAutoScroll(); }, 3000);
   }, []);
 
   return (
