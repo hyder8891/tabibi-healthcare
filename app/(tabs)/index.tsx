@@ -296,10 +296,15 @@ export default function HomeScreen() {
     return () => clearInterval(interval);
   }, [insightCards.length]);
 
-  const onInsightScrollBegin = useCallback(() => { userTouching.current = true; }, []);
+  const touchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onInsightScrollBegin = useCallback(() => {
+    userTouching.current = true;
+    if (touchTimeout.current) clearTimeout(touchTimeout.current);
+  }, []);
   const onInsightScrollEnd = useCallback((e: any) => {
-    userTouching.current = false;
     scrollOffset.current = e.nativeEvent.contentOffset.x;
+    if (touchTimeout.current) clearTimeout(touchTimeout.current);
+    touchTimeout.current = setTimeout(() => { userTouching.current = false; }, 3000);
   }, []);
 
   return (
