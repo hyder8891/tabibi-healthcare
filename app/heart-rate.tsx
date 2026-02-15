@@ -30,8 +30,8 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
 const MEASUREMENT_DURATION = 20;
-const CAPTURE_FPS = 10;
-const MIN_SAMPLES = 40;
+const CAPTURE_FPS = Platform.OS === "web" ? 8 : 4;
+const MIN_SAMPLES = 30;
 
 type MeasurementState = "idle" | "measuring" | "processing" | "result";
 
@@ -47,7 +47,7 @@ interface RppgResult {
 function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: number; b: number }> {
   return new Promise((resolve) => {
     try {
-      const img = new Image();
+      const img = new (window as any).Image() as HTMLImageElement;
       img.onload = () => {
         const canvas = document.createElement("canvas");
         const size = 64;
@@ -78,8 +78,13 @@ function extractRGBFromBase64Web(base64Data: string): Promise<{ r: number; g: nu
           b: count > 0 ? bSum / count : -1,
         });
       };
-      img.onerror = () => resolve({ r: -1, g: -1, b: -1 });
-      img.src = `data:image/jpeg;base64,${base64Data}`;
+      img.onerror = () => {
+        resolve({ r: -1, g: -1, b: -1 });
+      };
+      const imgSrc = base64Data.startsWith("data:")
+        ? base64Data
+        : `data:image/png;base64,${base64Data}`;
+      img.src = imgSrc;
     } catch {
       resolve({ r: -1, g: -1, b: -1 });
     }
@@ -205,13 +210,16 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
       uri,
       [
         { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-        { resize: { width: 16, height: 16 } },
+        { resize: { width: 4, height: 4 } },
       ],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
 
     if (result.base64) {
-      return parsePNGPixels(result.base64);
+      const rawBase64 = result.base64.startsWith("data:")
+        ? result.base64.replace(/^data:image\/\w+;base64,/, "")
+        : result.base64;
+      return parsePNGPixels(rawBase64);
     }
     return { r: -1, g: -1, b: -1 };
   } catch {
@@ -621,7 +629,7 @@ export default function HeartRateScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.1,
-        base64: Platform.OS === "web",
+        base64: true,
         skipProcessing: true,
       });
 
@@ -630,6 +638,8 @@ export default function HeartRateScreen() {
         if (Platform.OS === "web") {
           if (photo.base64) {
             rgb = await extractRGBFromBase64Web(photo.base64);
+          } else if (photo.uri) {
+            rgb = await extractRGBFromBase64Web(photo.uri);
           } else {
             return;
           }
