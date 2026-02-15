@@ -280,17 +280,19 @@ export default function HomeScreen() {
   useEffect(() => {
     if (insightCards.length <= 1) return;
     const maxScroll = (insightCards.length - 1) * STEP;
+    const SPEED = 0.5;
     const interval = setInterval(() => {
       if (userTouching.current) return;
-      const next = scrollOffset.current + STEP * scrollDirection.current;
-      if (next >= maxScroll) {
+      scrollOffset.current += SPEED * scrollDirection.current;
+      if (scrollOffset.current >= maxScroll) {
+        scrollOffset.current = maxScroll;
         scrollDirection.current = -1;
-      } else if (next <= 0) {
+      } else if (scrollOffset.current <= 0) {
+        scrollOffset.current = 0;
         scrollDirection.current = 1;
       }
-      scrollOffset.current = Math.max(0, Math.min(next, maxScroll));
-      insightsScrollRef.current?.scrollTo({ x: scrollOffset.current, animated: true });
-    }, 3000);
+      insightsScrollRef.current?.scrollTo({ x: scrollOffset.current, animated: false });
+    }, 16);
     return () => clearInterval(interval);
   }, [insightCards.length]);
 
