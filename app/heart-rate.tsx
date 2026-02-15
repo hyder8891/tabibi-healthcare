@@ -31,14 +31,11 @@ import { useAvicenna } from "@/contexts/AvicennaContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 
 const IS_MOBILE = Platform.OS !== "web";
-const MEASUREMENT_DURATION = IS_MOBILE ? 15 : 20;
-const CAPTURE_INTERVAL_MS = IS_MOBILE ? 100 : 125;
-const MIN_SAMPLES = IS_MOBILE ? 40 : 30;
-const FINGER_DETECT_INTERVAL_MS = 300;
-const FINGER_RED_THRESHOLD = 80;
-const FINGER_GREEN_MAX = 180;
-const FINGER_VARIANCE_MAX = 40;
+const MEASUREMENT_DURATION = IS_MOBILE ? 20 : 20;
+const MIN_SAMPLES = IS_MOBILE ? 25 : 30;
+const FINGER_DETECT_INTERVAL_MS = 400;
 const FINGER_CONFIRM_FRAMES = 3;
+const CAPTURE_DELAY_MS = 50;
 
 type MeasurementState = "idle" | "waiting_finger" | "measuring" | "processing" | "result";
 
@@ -204,37 +201,11 @@ function parsePNGPixels(base64: string): { r: number; g: number; b: number } {
   }
 }
 
-async function extractRGBNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
+async function extractRGBNative(uri: string): Promise<{ r: number; g: number; b: number }> {
   try {
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: 4, height: 4 } }],
-      { base64: true, format: ImageManipulator.SaveFormat.PNG }
-    );
-    if (result.base64) {
-      const rawBase64 = result.base64.startsWith("data:")
-        ? result.base64.replace(/^data:image\/\w+;base64,/, "")
-        : result.base64;
-      return parsePNGPixels(rawBase64);
-    }
-    return { r: -1, g: -1, b: -1 };
-  } catch {
-    return { r: -1, g: -1, b: -1 };
-  }
-}
-
-async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoHeight: number): Promise<{ r: number; g: number; b: number }> {
-  try {
-    const cropX = Math.floor(photoWidth * 0.2);
-    const cropY = Math.floor(photoHeight * 0.3);
-    const cropW = Math.floor(photoWidth * 0.6);
-    const cropH = Math.floor(photoHeight * 0.4);
-    const result = await ImageManipulator.manipulateAsync(
-      uri,
-      [
-        { crop: { originX: cropX, originY: cropY, width: cropW, height: cropH } },
-        { resize: { width: 4, height: 4 } },
-      ],
+      [{ resize: { width: 1, height: 1 } }],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
     if (result.base64) {
@@ -251,13 +222,9 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
 
 function isFingerCovering(r: number, g: number, b: number): boolean {
   const brightness = (r + g + b) / 3;
-  if (brightness >= 100 && brightness <= 220) {
-    const range = Math.max(r, g, b) - Math.min(r, g, b);
-    if (range < 50) return true;
-  }
-  if (r > 120 && r > g * 1.1 && r > b * 1.1) return true;
-  if (r > FINGER_RED_THRESHOLD && r >= g && r >= b && brightness > 80) return true;
-  if (brightness < 60 && r >= g && r >= b) return true;
+  if (r > 150 && r > g * 1.2 && r > b * 1.2) return true;
+  if (brightness > 30 && brightness < 160 && r >= g && r >= b) return true;
+  if (brightness < 80 && r >= g * 0.9) return true;
   return false;
 }
 
@@ -272,7 +239,7 @@ function processFingerSignals(redValues: number[], timestamps: number[]): HeartR
   };
 
   const n = redValues.length;
-  if (n < 30) {
+  if (n < 20) {
     return { ...invalidResult, message: "Not enough samples for analysis" };
   }
 
@@ -676,6 +643,7 @@ export default function HeartRateScreen() {
   const processingRef = useRef(false);
   const fingerConfirmCount = useRef(0);
   const measurementStartedRef = useRef(false);
+  const measureActiveRef = useRef(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const pulseScale = useSharedValue(1);
@@ -707,6 +675,7 @@ export default function HeartRateScreen() {
   }, []);
 
   const clearAllTimers = useCallback(() => {
+    measureActiveRef.current = false;
     if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
     if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null; }
     if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
@@ -733,12 +702,12 @@ export default function HeartRateScreen() {
     processingRef.current = true;
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.1,
+        quality: 0.01,
         base64: false,
         skipProcessing: true,
       });
       if (photo) {
-        const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+        const rgb = await extractRGBNative(photo.uri);
         if (rgb.r >= 0) {
           const now = Date.now();
           if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
@@ -796,12 +765,12 @@ export default function HeartRateScreen() {
     processingRef.current = true;
     try {
       const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.1,
+        quality: 0.01,
         base64: false,
         skipProcessing: true,
       });
       if (photo) {
-        const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+        const rgb = await extractRGBNative(photo.uri);
         if (rgb.r >= 0) {
           const detected = isFingerCovering(rgb.r, rgb.g, rgb.b);
           console.log(`FingerCheck: r=${rgb.r.toFixed(0)} g=${rgb.g.toFixed(0)} b=${rgb.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
@@ -838,17 +807,18 @@ export default function HeartRateScreen() {
     setState("measuring");
     setCountdown(MEASUREMENT_DURATION);
 
+    measureActiveRef.current = true;
+
     const captureLoop = async () => {
-      if (!cameraRef.current || processingRef.current) return;
-      processingRef.current = true;
+      if (!measureActiveRef.current || !cameraRef.current) return;
       try {
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.1,
+          quality: 0.01,
           base64: false,
           skipProcessing: true,
         });
-        if (photo) {
-          const rgb = await extractRGBNative(photo.uri, photo.width, photo.height);
+        if (photo && measureActiveRef.current) {
+          const rgb = await extractRGBNative(photo.uri);
           if (rgb.r >= 0) {
             if (isFingerCovering(rgb.r, rgb.g, rgb.b)) {
               setFingerDetected(true);
@@ -856,7 +826,7 @@ export default function HeartRateScreen() {
               fingerTimestampsRef.current.push(Date.now());
               setSampleCount(fingerRedRef.current.length);
 
-              if (fingerRedRef.current.length >= 25 && fingerRedRef.current.length % 8 === 0) {
+              if (fingerRedRef.current.length >= 15 && fingerRedRef.current.length % 5 === 0) {
                 const quickResult = processFingerSignals(
                   fingerRedRef.current.slice(-40),
                   fingerTimestampsRef.current.slice(-40)
@@ -868,17 +838,18 @@ export default function HeartRateScreen() {
             }
           }
         }
-      } catch {} finally {
-        processingRef.current = false;
+      } catch {}
+      if (measureActiveRef.current) {
+        setTimeout(captureLoop, CAPTURE_DELAY_MS);
       }
     };
 
-    intervalRef.current = setInterval(captureLoop, CAPTURE_INTERVAL_MS);
+    captureLoop();
 
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          measureActiveRef.current = false;
           if (countdownRef.current) clearInterval(countdownRef.current);
           processFingerResult();
           return 0;
@@ -951,7 +922,7 @@ export default function HeartRateScreen() {
     setState("measuring");
     setCountdown(MEASUREMENT_DURATION);
 
-    intervalRef.current = setInterval(captureFrameFace, CAPTURE_INTERVAL_MS);
+    intervalRef.current = setInterval(captureFrameFace, 125);
 
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
