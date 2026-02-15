@@ -250,9 +250,13 @@ async function extractRGBFromPhotoNative(uri: string, photoWidth: number, photoH
 }
 
 function isFingerCovering(r: number, g: number, b: number): boolean {
-  if (r > 120 && r > g * 1.3 && r > b * 1.2) return true;
-  if (r > FINGER_RED_THRESHOLD && g < FINGER_GREEN_MAX && r > g && r > b) return true;
   const brightness = (r + g + b) / 3;
+  if (brightness >= 100 && brightness <= 220) {
+    const range = Math.max(r, g, b) - Math.min(r, g, b);
+    if (range < 50) return true;
+  }
+  if (r > 120 && r > g * 1.1 && r > b * 1.1) return true;
+  if (r > FINGER_RED_THRESHOLD && r >= g && r >= b && brightness > 80) return true;
   if (brightness < 60 && r >= g && r >= b) return true;
   return false;
 }
@@ -661,7 +665,7 @@ export default function HeartRateScreen() {
   const [fingerDetected, setFingerDetected] = useState(false);
   const [liveBpm, setLiveBpm] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
+  const cameraReadyRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
   const fingerRedRef = useRef<number[]>([]);
@@ -716,7 +720,7 @@ export default function HeartRateScreen() {
   }, []);
 
   const handleCameraReady = useCallback(() => {
-    setCameraReady(true);
+    cameraReadyRef.current = true;
     if (IS_MOBILE) {
       setTimeout(() => {
         setTorchOn(true);
@@ -788,7 +792,7 @@ export default function HeartRateScreen() {
   }, []);
 
   const checkFingerPresence = useCallback(async () => {
-    if (!cameraRef.current || processingRef.current || !cameraReady) return;
+    if (!cameraRef.current || processingRef.current || !cameraReadyRef.current) return;
     processingRef.current = true;
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -821,7 +825,7 @@ export default function HeartRateScreen() {
     } finally {
       processingRef.current = false;
     }
-  }, [cameraReady]);
+  }, []);
 
   const startFingerMeasurement = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
