@@ -234,7 +234,7 @@ function isFingerCovering(r: number, g: number, b: number, duringMeasurement = f
   if (brightness < 10 || brightness > 245) return false;
 
   if (duringMeasurement) {
-    if (brightness >= 50 && brightness <= 230 && r >= g * 0.9) return true;
+    if (brightness >= 15 && brightness <= 240 && r >= g * 0.8) return true;
     return false;
   }
 
@@ -475,7 +475,7 @@ function computeFFTBpm(sig: number[], fps: number): { bpm: number; snr: number }
 }
 
 function computeAutocorrelationBpm(sig: number[], fps: number): { bpm: number; confidence: number } {
-  const minLag = Math.floor(fps / 3.0);
+  const minLag = Math.max(1, Math.floor(fps / 3.0));
   const maxLag = Math.min(sig.length - 1, Math.ceil(fps / 0.83));
   if (maxLag <= minLag) return { bpm: 0, confidence: 0 };
 
