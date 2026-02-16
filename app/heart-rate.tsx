@@ -478,8 +478,8 @@ function computeFFTBpm(sig: number[], fps: number): { bpm: number; snr: number }
 }
 
 function computeAutocorrelationBpm(sig: number[], fps: number): { bpm: number; confidence: number } {
-  const minLag = Math.max(1, Math.floor(fps / 3.0));
-  const maxLag = Math.min(sig.length - 1, Math.ceil(fps / 0.83));
+  const minLag = Math.max(1, Math.ceil(fps * 60 / 180));
+  const maxLag = Math.min(sig.length - 1, Math.floor(fps * 60 / 40));
   if (maxLag <= minLag) return { bpm: 0, confidence: 0 };
 
   const n = sig.length;
