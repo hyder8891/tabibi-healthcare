@@ -32,7 +32,7 @@ import { getProfile, saveProfile } from "@/lib/storage";
 
 const IS_MOBILE = Platform.OS !== "web";
 const MEASUREMENT_DURATION = IS_MOBILE ? 25 : 20;
-const MIN_SAMPLES = IS_MOBILE ? 35 : 30;
+const MIN_SAMPLES = IS_MOBILE ? 25 : 30;
 const FINGER_DETECT_INTERVAL_MS = 350;
 const FINGER_CONFIRM_FRAMES = 3;
 const CAPTURE_DELAY_MS = 33;
@@ -229,12 +229,23 @@ function smoothRGB(history: Array<{r: number; g: number; b: number}>): { r: numb
   return { r: sum.r / recent.length, g: sum.g / recent.length, b: sum.b / recent.length };
 }
 
-function isFingerCovering(r: number, g: number, b: number): boolean {
+function isFingerCovering(r: number, g: number, b: number, duringMeasurement = false): boolean {
   const brightness = (r + g + b) / 3;
-  if (brightness < 15 || brightness > 230) return false;
-  if (r > 160 && r > g * 1.3 && r > b * 1.3) return true;
-  if (brightness > 20 && brightness < 170 && r > g && r > b && (r - g) > 5 && (r - b) > 5) return true;
-  if (brightness < 90 && r >= g * 0.95 && r > b) return true;
+  if (brightness < 10 || brightness > 245) return false;
+
+  if (duringMeasurement) {
+    if (brightness >= 50 && brightness <= 230 && r >= g * 0.9) return true;
+    return false;
+  }
+
+  if (r > 160 && r > g * 1.2 && r > b * 1.2) return true;
+  if (brightness > 20 && brightness < 200 && r > g && r > b && (r - g) > 3 && (r - b) > 3) return true;
+  if (brightness > 60 && brightness < 200 && r >= g * 0.95 && r >= b * 0.95) return true;
+  if (brightness >= 80 && brightness <= 200) {
+    const maxC = Math.max(r, g, b);
+    const minC = Math.min(r, g, b);
+    if ((maxC - minC) < 40 && r >= minC) return true;
+  }
   return false;
 }
 
@@ -854,7 +865,6 @@ export default function HeartRateScreen() {
     fingerRedRef.current = [];
     fingerGreenRef.current = [];
     fingerTimestampsRef.current = [];
-    rgbHistoryRef.current = [];
     liveBpmRef.current = 0;
     setSampleCount(0);
     setLiveBpm(0);
@@ -863,6 +873,7 @@ export default function HeartRateScreen() {
 
     measureActiveRef.current = true;
     let fingerLostCount = 0;
+    let totalFrames = 0;
 
     const captureLoop = async () => {
       if (!measureActiveRef.current || !cameraRef.current) return;
@@ -875,13 +886,14 @@ export default function HeartRateScreen() {
         if (photo && measureActiveRef.current) {
           const rgb = await extractRGBNative(photo.uri);
           if (rgb.r >= 0) {
+            totalFrames++;
             rgbHistoryRef.current.push(rgb);
             if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
               rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
             }
             const smoothed = smoothRGB(rgbHistoryRef.current);
 
-            if (isFingerCovering(smoothed.r, smoothed.g, smoothed.b)) {
+            if (totalFrames <= 3 || isFingerCovering(smoothed.r, smoothed.g, smoothed.b, true)) {
               fingerLostCount = 0;
               setFingerDetected(true);
               fingerRedRef.current.push(smoothed.r);
@@ -907,8 +919,9 @@ export default function HeartRateScreen() {
                 }
               }
             } else {
+              console.log(`MeasureReject: r=${Math.round(smoothed.r)} g=${Math.round(smoothed.g)} b=${Math.round(smoothed.b)} lost=${fingerLostCount}`);
               fingerLostCount++;
-              if (fingerLostCount > 10) {
+              if (fingerLostCount > 20) {
                 setFingerDetected(false);
               }
             }
