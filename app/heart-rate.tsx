@@ -25,6 +25,8 @@ import Animated, {
 } from "react-native-reanimated";
 import * as ImageManipulator from "expo-image-manipulator";
 import pako from "pako";
+import * as VideoThumbnails from "expo-video-thumbnails";
+import * as FileSystem from "expo-file-system";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAvicenna } from "@/contexts/AvicennaContext";
@@ -35,7 +37,8 @@ const MEASUREMENT_DURATION = IS_MOBILE ? 25 : 20;
 const MIN_SAMPLES = IS_MOBILE ? 25 : 30;
 const FINGER_DETECT_INTERVAL_MS = 350;
 const FINGER_CONFIRM_FRAMES = 3;
-const CAPTURE_DELAY_MS = 33;
+const EXTRACT_FPS = 10;
+const EXTRACT_BATCH_SIZE = 5;
 const RGB_SMOOTH_WINDOW = 5;
 const EMA_ALPHA = 0.3;
 
@@ -774,6 +777,7 @@ export default function HeartRateScreen() {
   const [fingerDetected, setFingerDetected] = useState(false);
   const [liveBpm, setLiveBpm] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
+  const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
   const cameraReadyRef = useRef(false);
   const cameraRef = useRef<CameraView>(null);
   const signalsRef = useRef<Array<{ r: number; g: number; b: number; timestamp: number }>>([]);
@@ -789,6 +793,7 @@ export default function HeartRateScreen() {
   const fingerConfirmCount = useRef(0);
   const measurementStartedRef = useRef(false);
   const measureActiveRef = useRef(false);
+  const recordingRef = useRef(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   const pulseScale = useSharedValue(1);
@@ -842,56 +847,6 @@ export default function HeartRateScreen() {
     }
   }, []);
 
-  const captureFrameFinger = useCallback(async () => {
-    if (!cameraRef.current || processingRef.current) return;
-    processingRef.current = true;
-    try {
-      const photo = await cameraRef.current.takePictureAsync({
-        quality: 0.01,
-        base64: false,
-        skipProcessing: true,
-      });
-      if (photo) {
-        const rgb = await extractRGBNative(photo.uri);
-        if (rgb.r >= 0) {
-          rgbHistoryRef.current.push(rgb);
-          if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
-            rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
-          }
-          const smoothed = smoothRGB(rgbHistoryRef.current);
-          const now = Date.now();
-          if (isFingerCovering(smoothed.r, smoothed.g, smoothed.b)) {
-            fingerRedRef.current.push(smoothed.r);
-            fingerGreenRef.current.push(smoothed.g);
-            fingerTimestampsRef.current.push(now);
-            setSampleCount(fingerRedRef.current.length);
-
-            if (fingerRedRef.current.length >= 20 && fingerRedRef.current.length % 10 === 0) {
-              const recent = fingerRedRef.current.slice(-30);
-              const recentG = fingerGreenRef.current.slice(-30);
-              const recentTs = fingerTimestampsRef.current.slice(-30);
-              const quickResult = processFingerSignals(recent, recentG, recentTs);
-              if (quickResult.validReading) {
-                if (liveBpmRef.current === 0) {
-                  liveBpmRef.current = quickResult.heartRate;
-                } else {
-                  liveBpmRef.current = Math.round(
-                    EMA_ALPHA * quickResult.heartRate + (1 - EMA_ALPHA) * liveBpmRef.current
-                  );
-                }
-                setLiveBpm(liveBpmRef.current);
-              }
-            }
-          } else {
-            setFingerDetected(false);
-            fingerConfirmCount.current = 0;
-          }
-        }
-      }
-    } catch {} finally {
-      processingRef.current = false;
-    }
-  }, []);
 
   const captureFrameFace = useCallback(async () => {
     if (!cameraRef.current || processingRef.current) return;
@@ -919,6 +874,8 @@ export default function HeartRateScreen() {
     }
   }, []);
 
+  const fingerCheckErrorCount = useRef(0);
+
   const checkFingerPresence = useCallback(async () => {
     if (!cameraRef.current || processingRef.current || !cameraReadyRef.current) return;
     processingRef.current = true;
@@ -928,6 +885,7 @@ export default function HeartRateScreen() {
         base64: false,
         skipProcessing: true,
       });
+      fingerCheckErrorCount.current = 0;
       if (photo) {
         const rgb = await extractRGBNative(photo.uri);
         if (rgb.r >= 0) {
@@ -957,12 +915,18 @@ export default function HeartRateScreen() {
       }
     } catch (e) {
       console.log("FingerCheck error:", e);
+      fingerCheckErrorCount.current++;
+      if (fingerCheckErrorCount.current >= 3) {
+        console.log("takePictureAsync not available in video mode, showing manual start");
+        if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
+        setFingerDetected(true);
+      }
     } finally {
       processingRef.current = false;
     }
   }, []);
 
-  const startFingerMeasurement = useCallback(() => {
+  const startFingerMeasurement = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
 
@@ -974,91 +938,85 @@ export default function HeartRateScreen() {
     setLiveBpm(0);
     setState("measuring");
     setCountdown(MEASUREMENT_DURATION);
-
     measureActiveRef.current = true;
-    let fingerLostCount = 0;
-    let totalFrames = 0;
-
-    const captureLoop = async () => {
-      if (!measureActiveRef.current || !cameraRef.current) return;
-      try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.01,
-          base64: false,
-          skipProcessing: true,
-        });
-        if (photo && measureActiveRef.current) {
-          const rgb = await extractRGBNative(photo.uri);
-          if (rgb.r >= 0) {
-            totalFrames++;
-            rgbHistoryRef.current.push(rgb);
-            if (rgbHistoryRef.current.length > RGB_SMOOTH_WINDOW * 2) {
-              rgbHistoryRef.current = rgbHistoryRef.current.slice(-RGB_SMOOTH_WINDOW * 2);
-            }
-            const smoothed = smoothRGB(rgbHistoryRef.current);
-
-            if (totalFrames <= 3 || isFingerCovering(smoothed.r, smoothed.g, smoothed.b, true)) {
-              fingerLostCount = 0;
-              setFingerDetected(true);
-              fingerRedRef.current.push(smoothed.r);
-              fingerGreenRef.current.push(smoothed.g);
-              fingerTimestampsRef.current.push(Date.now());
-              setSampleCount(fingerRedRef.current.length);
-
-              if (fingerRedRef.current.length >= 20 && fingerRedRef.current.length % 5 === 0) {
-                const quickResult = processFingerSignals(
-                  fingerRedRef.current.slice(-50),
-                  fingerGreenRef.current.slice(-50),
-                  fingerTimestampsRef.current.slice(-50)
-                );
-                if (quickResult.validReading) {
-                  if (liveBpmRef.current === 0) {
-                    liveBpmRef.current = quickResult.heartRate;
-                  } else {
-                    liveBpmRef.current = Math.round(
-                      EMA_ALPHA * quickResult.heartRate + (1 - EMA_ALPHA) * liveBpmRef.current
-                    );
-                  }
-                  setLiveBpm(liveBpmRef.current);
-                }
-              }
-            } else {
-              console.log(`MeasureReject: r=${Math.round(smoothed.r)} g=${Math.round(smoothed.g)} b=${Math.round(smoothed.b)} lost=${fingerLostCount}`);
-              fingerLostCount++;
-              if (fingerLostCount > 20) {
-                setFingerDetected(false);
-              }
-            }
-          }
-        }
-      } catch {}
-      if (measureActiveRef.current) {
-        setTimeout(captureLoop, CAPTURE_DELAY_MS);
-      }
-    };
-
-    captureLoop();
+    recordingRef.current = true;
 
     countdownRef.current = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          measureActiveRef.current = false;
           if (countdownRef.current) clearInterval(countdownRef.current);
-          processFingerResult();
+          try { cameraRef.current?.stopRecording(); } catch {}
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
-  }, []);
 
-  const processFingerResult = useCallback(() => {
-    setState("processing");
     try {
-      const redVals = fingerRedRef.current;
-      const greenVals = fingerGreenRef.current;
-      const timestamps = fingerTimestampsRef.current;
-      if (redVals.length < MIN_SAMPLES) {
+      if (!cameraRef.current) throw new Error("Camera not ready");
+
+      const video = await cameraRef.current.recordAsync({
+        maxDuration: MEASUREMENT_DURATION + 2,
+      });
+
+      recordingRef.current = false;
+
+      if (!measureActiveRef.current) {
+        try { await FileSystem.deleteAsync(video.uri, { idempotent: true }); } catch {}
+        return;
+      }
+
+      setState("processing");
+
+      const durationMs = MEASUREMENT_DURATION * 1000;
+      const intervalMs = Math.round(1000 / EXTRACT_FPS);
+      const totalFrames = Math.floor(durationMs / intervalMs);
+      setAnalyzeProgress({ current: 0, total: totalFrames });
+
+      const redValues: number[] = [];
+      const greenValues: number[] = [];
+      const timestamps: number[] = [];
+
+      for (let i = 0; i < totalFrames; i += EXTRACT_BATCH_SIZE) {
+        if (!measureActiveRef.current) break;
+
+        const batch: Promise<{ rgb: { r: number; g: number; b: number }; timeMs: number }>[] = [];
+        for (let j = 0; j < EXTRACT_BATCH_SIZE && (i + j) < totalFrames; j++) {
+          const frameIdx = i + j;
+          const timeMs = frameIdx * intervalMs;
+          batch.push(
+            VideoThumbnails.getThumbnailAsync(video.uri, { time: timeMs })
+              .then(async (thumb) => {
+                const rgb = await extractRGBNative(thumb.uri);
+                try { await FileSystem.deleteAsync(thumb.uri, { idempotent: true }); } catch {}
+                return { rgb, timeMs };
+              })
+              .catch(() => ({ rgb: { r: -1, g: -1, b: -1 } as { r: number; g: number; b: number }, timeMs }))
+          );
+        }
+
+        const results = await Promise.all(batch);
+        for (const { rgb, timeMs } of results) {
+          if (rgb.r >= 0 && isFingerCovering(rgb.r, rgb.g, rgb.b, true)) {
+            redValues.push(rgb.r);
+            greenValues.push(rgb.g);
+            timestamps.push(timeMs);
+          }
+        }
+
+        setAnalyzeProgress({ current: Math.min(i + EXTRACT_BATCH_SIZE, totalFrames), total: totalFrames });
+        setSampleCount(redValues.length);
+      }
+
+      try { await FileSystem.deleteAsync(video.uri, { idempotent: true }); } catch {}
+
+      if (!measureActiveRef.current) return;
+
+      fingerRedRef.current = redValues;
+      fingerGreenRef.current = greenValues;
+      fingerTimestampsRef.current = timestamps;
+
+      if (redValues.length < MIN_SAMPLES) {
         setError(t(
           "Not enough data collected. Press your finger firmly over the camera and flash.",
           "لم يتم جمع بيانات كافية. اضغط إصبعك بقوة على الكاميرا والفلاش."
@@ -1067,7 +1025,8 @@ export default function HeartRateScreen() {
         measurementStartedRef.current = false;
         return;
       }
-      const data = processFingerSignals(redVals, greenVals, timestamps);
+
+      const data = processFingerSignals(redValues, greenValues, timestamps);
       setResult(data);
       setState("result");
       setTorchOn(false);
@@ -1081,10 +1040,14 @@ export default function HeartRateScreen() {
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
-    } catch {
-      setError(t("Failed to process data. Please try again.", "فشل في المعالجة. يرجى المحاولة مرة أخرى."));
-      setState("idle");
-      measurementStartedRef.current = false;
+    } catch (err) {
+      console.log("Recording/analysis error:", err);
+      recordingRef.current = false;
+      if (measureActiveRef.current) {
+        setError(t("Recording failed. Please try again.", "فشل التسجيل. يرجى المحاولة مرة أخرى."));
+        setState("idle");
+        measurementStartedRef.current = false;
+      }
     }
   }, []);
 
@@ -1174,6 +1137,10 @@ export default function HeartRateScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     clearAllTimers();
     stopPulseAnimation();
+    if (recordingRef.current) {
+      try { cameraRef.current?.stopRecording(); } catch {}
+      recordingRef.current = false;
+    }
     signalsRef.current = [];
     fingerRedRef.current = [];
     fingerGreenRef.current = [];
@@ -1189,6 +1156,7 @@ export default function HeartRateScreen() {
     setLiveBpm(0);
     setCountdown(MEASUREMENT_DURATION);
     setFingerDetected(false);
+    setAnalyzeProgress({ current: 0, total: 0 });
     if (IS_MOBILE) {
       setTorchOn(true);
     }
@@ -1259,6 +1227,7 @@ export default function HeartRateScreen() {
                   ref={cameraRef}
                   style={styles.fingerCameraFill}
                   facing="back"
+                  mode="video"
                   enableTorch={torchOn}
                   animateShutter={false}
                   onCameraReady={handleCameraReady}
@@ -1304,7 +1273,7 @@ export default function HeartRateScreen() {
                     }]} />
                   </View>
                   <Text style={styles.fingerSampleText}>
-                    {sampleCount} {t("frames", "إطار")}
+                    {t("Recording...", "جاري التسجيل...")}
                   </Text>
                 </View>
               )}
@@ -1384,7 +1353,7 @@ export default function HeartRateScreen() {
                   <View style={[styles.pulsingDot, { backgroundColor: fingerDetected ? Colors.light.success : Colors.light.warning }]} />
                   <Text style={styles.measuringText}>
                     {fingerDetected
-                      ? t("Finger detected, starting...", "تم اكتشاف الإصبع، جاري البدء...")
+                      ? t("Finger detected!", "تم اكتشاف الإصبع!")
                       : t("Waiting for finger...", "في انتظار الإصبع...")}
                   </Text>
                 </View>
@@ -1394,6 +1363,25 @@ export default function HeartRateScreen() {
                     "اضغط طرف إصبعك بقوة على عدسة الكاميرا وضوء الفلاش."
                   )}
                 </Text>
+                {fingerDetected && !measurementStartedRef.current && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.startButton,
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                    ]}
+                    onPress={() => {
+                      if (!measurementStartedRef.current) {
+                        measurementStartedRef.current = true;
+                        startFingerMeasurement();
+                      }
+                    }}
+                  >
+                    <Ionicons name="videocam" size={20} color="#fff" />
+                    <Text style={styles.startButtonText}>
+                      {t("Start Recording", "بدء التسجيل")}
+                    </Text>
+                  </Pressable>
+                )}
                 <Pressable style={styles.cancelButton} onPress={resetMeasurement}>
                   <Text style={styles.cancelButtonText}>{t("Cancel", "إلغاء")}</Text>
                 </Pressable>
@@ -1403,23 +1391,15 @@ export default function HeartRateScreen() {
             {state === "measuring" && (
               <>
                 <View style={styles.measuringRow}>
-                  <View style={[styles.pulsingDot, { backgroundColor: fingerDetected || !IS_MOBILE ? Colors.light.success : Colors.light.emergency }]} />
+                  <View style={[styles.pulsingDot, { backgroundColor: Colors.light.success }]} />
                   <Text style={styles.measuringText}>
-                    {IS_MOBILE && !fingerDetected
-                      ? t("Finger lost!", "فقد الإصبع!")
+                    {IS_MOBILE
+                      ? t("Recording...", "جاري التسجيل...")
                       : t("Measuring...", "جاري القياس...")}
                   </Text>
                 </View>
-                {IS_MOBILE && liveBpm > 0 && (
-                  <View style={styles.liveBpmRow}>
-                    <Ionicons name="heart" size={16} color={Colors.light.emergency} />
-                    <Text style={styles.liveBpmDisplay}>~{liveBpm} BPM</Text>
-                  </View>
-                )}
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
-                  {IS_MOBILE && !fingerDetected
-                    ? t("Place your finger back on the camera", "أعد وضع إصبعك على الكاميرا")
-                    : t("Stay still and breathe normally", "ابقَ ثابتاً وتنفس بشكل طبيعي")}
+                  {t("Stay still and breathe normally", "ابقَ ثابتاً وتنفس بشكل طبيعي")}
                 </Text>
                 <Pressable style={styles.cancelButton} onPress={resetMeasurement}>
                   <Text style={styles.cancelButtonText}>{t("Cancel", "إلغاء")}</Text>
@@ -1431,8 +1411,30 @@ export default function HeartRateScreen() {
               <View style={styles.processingContainer}>
                 <ActivityIndicator size="large" color={Colors.light.primary} />
                 <Text style={styles.processingText}>
-                  {t("Analyzing pulse data...", "جاري تحليل بيانات النبض...")}
+                  {analyzeProgress.total > 0
+                    ? t(
+                        `Analyzing frames... ${analyzeProgress.current}/${analyzeProgress.total}`,
+                        `جاري تحليل الإطارات... ${analyzeProgress.current}/${analyzeProgress.total}`
+                      )
+                    : t("Analyzing pulse data...", "جاري تحليل بيانات النبض...")}
                 </Text>
+                {analyzeProgress.total > 0 && (
+                  <View style={{ width: 200, marginTop: 8 }}>
+                    <View style={styles.fingerProgressBg}>
+                      <View style={[styles.fingerProgressFill, {
+                        width: `${(analyzeProgress.current / analyzeProgress.total) * 100}%`,
+                      }]} />
+                    </View>
+                  </View>
+                )}
+                {sampleCount > 0 && (
+                  <Text style={[styles.processingText, { fontSize: 13, marginTop: 4 }]}>
+                    {sampleCount} {t("valid frames", "إطار صالح")}
+                  </Text>
+                )}
+                <Pressable style={[styles.cancelButton, { marginTop: 16 }]} onPress={resetMeasurement}>
+                  <Text style={styles.cancelButtonText}>{t("Cancel", "إلغاء")}</Text>
+                </Pressable>
               </View>
             )}
           </View>
