@@ -77,6 +77,3 @@ ensurePreviewReachable = "/status"
 [userenv]
 
 [userenv.shared]
-EXPO_PUBLIC_FIREBASE_API_KEY = "AIzaSyAE90oAHwPmg1tDilxRbCb6MByy5hhGlg8"
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN = "mydoctor-40043.firebaseapp.com"
-EXPO_PUBLIC_FIREBASE_PROJECT_ID = "mydoctor-40043"
