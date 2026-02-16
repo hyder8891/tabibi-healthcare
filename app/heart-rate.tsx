@@ -310,6 +310,84 @@ function movingAverage(sig: number[], windowSize: number): number[] {
   return result;
 }
 
+function interpolateSignal(values: number[], timestamps: number[], targetFps: number): { signal: number[]; fps: number } {
+  if (values.length < 3) return { signal: values, fps: 1 };
+  const startTime = timestamps[0];
+  const endTime = timestamps[timestamps.length - 1];
+  const duration = (endTime - startTime) / 1000;
+  if (duration <= 0) return { signal: values, fps: 1 };
+
+  const numSamples = Math.max(values.length, Math.round(duration * targetFps));
+  const dt = duration / (numSamples - 1);
+  const result: number[] = [];
+
+  for (let i = 0; i < numSamples; i++) {
+    const t = startTime + i * dt * 1000;
+    let idx = 0;
+    while (idx < timestamps.length - 1 && timestamps[idx + 1] < t) idx++;
+
+    if (idx >= timestamps.length - 1) {
+      result.push(values[values.length - 1]);
+    } else {
+      const t0 = timestamps[idx];
+      const t1 = timestamps[idx + 1];
+      const frac = (t1 - t0) > 0 ? (t - t0) / (t1 - t0) : 0;
+      const v0 = values[idx];
+      const v1 = values[idx + 1];
+
+      if (idx > 0 && idx < timestamps.length - 2) {
+        const vm1 = values[idx - 1];
+        const v2 = values[idx + 2];
+        const a = -0.5 * vm1 + 1.5 * v0 - 1.5 * v1 + 0.5 * v2;
+        const b = vm1 - 2.5 * v0 + 2 * v1 - 0.5 * v2;
+        const c = -0.5 * vm1 + 0.5 * v1;
+        const d = v0;
+        result.push(a * frac * frac * frac + b * frac * frac + c * frac + d);
+      } else {
+        result.push(v0 + frac * (v1 - v0));
+      }
+    }
+  }
+
+  return { signal: result, fps: (numSamples - 1) / duration };
+}
+
+function countPeaksBpm(sig: number[], fps: number): { bpm: number; confidence: number } {
+  if (sig.length < 10) return { bpm: 0, confidence: 0 };
+
+  const smoothed = movingAverage(sig, Math.max(3, Math.round(fps * 0.1)));
+  const mean = smoothed.reduce((a, b) => a + b, 0) / smoothed.length;
+
+  let crossings = 0;
+  let wasAbove = smoothed[0] > mean;
+  const crossingPositions: number[] = [];
+
+  for (let i = 1; i < smoothed.length; i++) {
+    const isAbove = smoothed[i] > mean;
+    if (isAbove && !wasAbove) {
+      crossings++;
+      crossingPositions.push(i);
+    }
+    wasAbove = isAbove;
+  }
+
+  if (crossings < 2) return { bpm: 0, confidence: 0 };
+
+  const duration = sig.length / fps;
+  const bpm = Math.round((crossings / duration) * 60);
+
+  const intervals: number[] = [];
+  for (let i = 1; i < crossingPositions.length; i++) {
+    intervals.push((crossingPositions[i] - crossingPositions[i - 1]) / fps);
+  }
+  const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+  const intervalVariance = intervals.reduce((s, v) => s + (v - meanInterval) ** 2, 0) / intervals.length;
+  const cv = Math.sqrt(intervalVariance) / (meanInterval || 1);
+  const confidence = Math.max(0, 1 - cv * 2);
+
+  return { bpm, confidence };
+}
+
 function fft(re: number[], im: number[], sz: number) {
   if (sz <= 1) return;
   const halfN = sz / 2;
@@ -341,7 +419,7 @@ function computeFFTBpm(sig: number[], fps: number): { bpm: number; snr: number }
   const minFreq = 0.83;
   const maxFreq = 3.0;
 
-  const zeroPadFactor = 4;
+  const zeroPadFactor = 8;
   const fftSize = Math.pow(2, Math.ceil(Math.log2(n * zeroPadFactor)));
   const real = new Array(fftSize).fill(0);
   const imag = new Array(fftSize).fill(0);
@@ -441,20 +519,39 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
   };
 
   const n = redValues.length;
-  if (n < 20) {
+  if (n < 15) {
     return { ...invalidResult, message: "Not enough samples for analysis" };
   }
 
-  let actualFps = 10;
+  let rawFps = 10;
   if (timestamps.length > 1) {
     const totalDuration = (timestamps[timestamps.length - 1] - timestamps[0]) / 1000;
     if (totalDuration > 0) {
-      actualFps = (timestamps.length - 1) / totalDuration;
+      rawFps = (timestamps.length - 1) / totalDuration;
     }
   }
 
-  const redDetrended = normalizeSignal(detrendSignal(redValues));
-  const greenDetrended = normalizeSignal(detrendSignal(greenValues));
+  const TARGET_FPS = 10;
+  const needsInterpolation = rawFps < 4;
+
+  let redSig: number[];
+  let greenSig: number[];
+  let actualFps: number;
+
+  if (needsInterpolation && timestamps.length >= 3) {
+    const interpRed = interpolateSignal(redValues, timestamps, TARGET_FPS);
+    const interpGreen = interpolateSignal(greenValues, timestamps, TARGET_FPS);
+    redSig = interpRed.signal;
+    greenSig = interpGreen.signal;
+    actualFps = interpRed.fps;
+  } else {
+    redSig = redValues;
+    greenSig = greenValues;
+    actualFps = rawFps;
+  }
+
+  const redDetrended = normalizeSignal(detrendSignal(redSig));
+  const greenDetrended = normalizeSignal(detrendSignal(greenSig));
 
   const minFreq = 0.83;
   const maxFreq = 3.0;
@@ -471,24 +568,31 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
   const acRed = computeAutocorrelationBpm(smoothedRed, actualFps);
   const acGreen = computeAutocorrelationBpm(smoothedGreen, actualFps);
 
+  const peakRed = countPeaksBpm(smoothedRed, actualFps);
+  const peakGreen = countPeaksBpm(smoothedGreen, actualFps);
+
   const candidates: Array<{bpm: number; score: number; method: string}> = [];
   if (fftRed.bpm >= 50 && fftRed.bpm <= 180) candidates.push({ bpm: fftRed.bpm, score: fftRed.snr, method: "fft-red" });
   if (fftGreen.bpm >= 50 && fftGreen.bpm <= 180) candidates.push({ bpm: fftGreen.bpm, score: fftGreen.snr * 1.1, method: "fft-green" });
   if (acRed.bpm >= 50 && acRed.bpm <= 180) candidates.push({ bpm: acRed.bpm, score: acRed.confidence * 0.8, method: "ac-red" });
   if (acGreen.bpm >= 50 && acGreen.bpm <= 180) candidates.push({ bpm: acGreen.bpm, score: acGreen.confidence * 0.9, method: "ac-green" });
+  if (peakRed.bpm >= 50 && peakRed.bpm <= 180) candidates.push({ bpm: peakRed.bpm, score: peakRed.confidence * 0.7, method: "peak-red" });
+  if (peakGreen.bpm >= 50 && peakGreen.bpm <= 180) candidates.push({ bpm: peakGreen.bpm, score: peakGreen.confidence * 0.75, method: "peak-green" });
 
   let bestBpm = 0;
   let bestScore = 0;
   let bestMethod = "none";
 
   const agreeing = candidates.filter(c => {
-    return candidates.some(other => other !== c && Math.abs(other.bpm - c.bpm) <= 5);
+    return candidates.some(other => other !== c && Math.abs(other.bpm - c.bpm) <= 8);
   });
   if (agreeing.length >= 2) {
     agreeing.sort((a, b) => b.score - a.score);
-    bestBpm = agreeing[0].bpm;
+    const agreedGroup = agreeing.filter(c => Math.abs(c.bpm - agreeing[0].bpm) <= 8);
+    const avgBpm = Math.round(agreedGroup.reduce((s, c) => s + c.bpm, 0) / agreedGroup.length);
+    bestBpm = avgBpm;
     bestScore = agreeing[0].score * 1.5;
-    bestMethod = agreeing[0].method + "+agree";
+    bestMethod = agreeing[0].method + "+agree(" + agreedGroup.length + ")";
   } else if (candidates.length > 0) {
     candidates.sort((a, b) => b.score - a.score);
     bestBpm = candidates[0].bpm;
@@ -496,16 +600,16 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
     bestMethod = candidates[0].method;
   }
 
-  const signalVariance = smoothedRed.reduce((s, v) => s + v * v, 0) / n;
+  const signalVariance = smoothedRed.reduce((s, v) => s + v * v, 0) / smoothedRed.length;
   const hasVariation = signalVariance > 1e-8;
   const isValidBpm = bestBpm >= 50 && bestBpm <= 180;
-  const isValidSignal = bestScore > 0.08 && hasVariation;
+  const isValidSignal = bestScore > 0.06 && hasVariation;
   const validReading = isValidBpm && isValidSignal;
   const heartRate = validReading ? bestBpm : 0;
 
   let confidence: "high" | "medium" | "low";
-  if (bestScore > 0.2 && n >= 50 && validReading && bestMethod.includes("agree")) confidence = "high";
-  else if (bestScore > 0.12 && n >= 35 && validReading) confidence = "medium";
+  if (bestScore > 0.2 && n >= 30 && validReading && bestMethod.includes("agree")) confidence = "high";
+  else if (bestScore > 0.10 && n >= 20 && validReading) confidence = "medium";
   else confidence = "low";
 
   const displaySig = smoothedGreen.length > 0 ? smoothedGreen : smoothedRed;
@@ -518,7 +622,7 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
   const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
   const normalizedWaveform = waveform.map(v => v / maxWave);
 
-  console.log(`HeartRate: ${n}samp fps=${actualFps.toFixed(1)} best=${bestBpm}bpm score=${bestScore.toFixed(3)} method=${bestMethod} fftR=${fftRed.bpm}/${fftRed.snr.toFixed(2)} fftG=${fftGreen.bpm}/${fftGreen.snr.toFixed(2)} acR=${acRed.bpm}/${acRed.confidence.toFixed(2)} acG=${acGreen.bpm}/${acGreen.confidence.toFixed(2)}`);
+  console.log(`HeartRate: ${n}raw/${redSig.length}interp rawFps=${rawFps.toFixed(1)} effectiveFps=${actualFps.toFixed(1)} best=${bestBpm}bpm score=${bestScore.toFixed(3)} method=${bestMethod} fftR=${fftRed.bpm}/${fftRed.snr.toFixed(2)} fftG=${fftGreen.bpm}/${fftGreen.snr.toFixed(2)} acR=${acRed.bpm}/${acRed.confidence.toFixed(2)} acG=${acGreen.bpm}/${acGreen.confidence.toFixed(2)} pkR=${peakRed.bpm}/${peakRed.confidence.toFixed(2)} pkG=${peakGreen.bpm}/${peakGreen.confidence.toFixed(2)}`);
 
   return {
     heartRate,
@@ -996,14 +1100,13 @@ export default function HeartRateScreen() {
     setFingerDetected(false);
     setState("waiting_finger");
 
-    if (!torchOn) {
-      setTorchOn(true);
-    }
+    setTorchOn(false);
+    setTimeout(() => setTorchOn(true), 100);
 
     setTimeout(() => {
       fingerCheckRef.current = setInterval(checkFingerPresence, FINGER_DETECT_INTERVAL_MS);
     }, 500);
-  }, [checkFingerPresence, torchOn]);
+  }, [checkFingerPresence]);
 
   const startFaceMeasurement = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
