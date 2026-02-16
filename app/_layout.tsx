@@ -8,6 +8,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { queryClient } from "@/lib/query-client";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { AvicennaProvider } from "@/contexts/AvicennaContext";
 import { getProfile } from "@/lib/storage";
 import {
   useFonts,
@@ -115,13 +116,6 @@ function RootLayoutNav() {
           animation: "slide_from_bottom",
         }}
       />
-      <Stack.Screen
-        name="orders"
-        options={{
-          headerShown: false,
-          animation: "slide_from_right",
-        }}
-      />
     </Stack>
   );
 }
@@ -147,12 +141,14 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <SettingsProvider>
           <AuthProvider>
-            <GestureHandlerRootView>
-              <KeyboardProvider>
-                <StatusBar style="dark" />
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </GestureHandlerRootView>
+            <AvicennaProvider>
+              <GestureHandlerRootView>
+                <KeyboardProvider>
+                  <StatusBar style="dark" />
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </AvicennaProvider>
           </AuthProvider>
         </SettingsProvider>
       </QueryClientProvider>

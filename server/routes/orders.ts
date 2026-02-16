@@ -30,6 +30,13 @@ export function registerOrderRoutes(app: Express): void {
         userId: req.userId!,
         status: "pending",
       });
+      await storage.logAuditEvent({
+        userId: req.userId!,
+        action: "create",
+        resourceType: "order",
+        resourceId: order.id,
+        ipAddress: req.ip,
+      });
       return res.status(201).json(order);
     } catch (error) {
       console.error("Create order error:", error instanceof Error ? error.message : "Unknown error");
@@ -78,6 +85,13 @@ export function registerOrderRoutes(app: Express): void {
         return res.status(400).json({ error: "Only pending orders can be cancelled" });
       }
       const updatedOrder = await storage.updateOrder(orderId, { status: "cancelled" });
+      await storage.logAuditEvent({
+        userId: req.userId!,
+        action: "cancel",
+        resourceType: "order",
+        resourceId: orderId,
+        ipAddress: req.ip,
+      });
       return res.json(updatedOrder);
     } catch (error) {
       console.error("Cancel order error:", error instanceof Error ? error.message : "Unknown error");

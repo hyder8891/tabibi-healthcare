@@ -12,7 +12,7 @@ function getEncryptionKey(): Buffer {
   if (process.env.NODE_ENV === "production") {
     throw new Error("ENCRYPTION_KEY environment variable is required in production");
   }
-  console.warn("WARNING: Using derived encryption key. Set ENCRYPTION_KEY for production.");
+  console.warn("\x1b[33m⚠ WARNING: Using derived encryption key from DATABASE_URL. Set ENCRYPTION_KEY env var for production use.\x1b[0m");
   return crypto.createHash("sha256").update(process.env.DATABASE_URL || "dev-key").digest();
 }
 

@@ -68,11 +68,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setAuthTokenGetter(async () => {
-      const fbUser = firebaseUserRef.current;
+      let fbUser = firebaseUserRef.current;
+      if (!fbUser) {
+        fbUser = auth.currentUser;
+        if (fbUser) firebaseUserRef.current = fbUser;
+      }
       if (!fbUser) return null;
       try {
-        return await fbUser.getIdToken();
+        return await fbUser.getIdToken(true);
       } catch {
+        try {
+          const refreshed = auth.currentUser;
+          if (refreshed) {
+            firebaseUserRef.current = refreshed;
+            return await refreshed.getIdToken(true);
+          }
+        } catch {}
         return null;
       }
     });

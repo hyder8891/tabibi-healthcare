@@ -19,12 +19,12 @@ import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile } from "@/lib/storage";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { fetch } from "expo/fetch";
 import type { NearbyFacility, PatientProfile } from "@/lib/types";
 import * as Location from "expo-location";
 
-type OrderStep = "pharmacy" | "details" | "confirm";
+type OrderStep = "pharmacy" | "details" | "confirm" | "success";
 
 export default function OrderScreen() {
   const insets = useSafeAreaInsets();
@@ -79,13 +79,44 @@ export default function OrderScreen() {
         accuracy: Location.Accuracy.Balanced,
       });
       const baseUrl = getApiUrl();
+      const authHeaders = await getAuthHeaders();
       const url = new URL(
         `/api/nearby-facilities?latitude=${location.coords.latitude}&longitude=${location.coords.longitude}&type=pharmacy`,
         baseUrl,
       );
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await fetch(url.toString(), {
+        headers: authHeaders,
+      });
       const data = await res.json();
-      setPharmacies(data.facilities || []);
+      const facilities: NearbyFacility[] = data.facilities || [];
+      setPharmacies(facilities);
+
+      const enriched = await Promise.all(
+        facilities.map(async (f) => {
+          if (!f.placeId) return f;
+          try {
+            const detailUrl = new URL(`/api/place-details/${f.placeId}`, baseUrl);
+            const detailRes = await fetch(detailUrl.toString(), {
+              headers: authHeaders,
+            });
+            if (detailRes.ok) {
+              const details = await detailRes.json();
+              return {
+                ...f,
+                phone: details.phone || f.phone,
+                internationalPhone: details.internationalPhone || f.internationalPhone,
+              };
+            }
+          } catch {}
+          return f;
+        }),
+      );
+      setPharmacies(enriched);
+      setSelectedPharmacy((prev) => {
+        if (!prev) return prev;
+        const updated = enriched.find((p) => p.id === prev.id);
+        return updated || prev;
+      });
     } catch (err) {
       console.error("Failed to load pharmacies:", err);
     } finally {
@@ -93,8 +124,14 @@ export default function OrderScreen() {
     }
   };
 
+  const getPharmacyWithPhone = (pharmacy: NearbyFacility): NearbyFacility => {
+    const latest = pharmacies.find((p) => p.id === pharmacy.id);
+    return latest || pharmacy;
+  };
+
   const openWhatsApp = (pharmacy: NearbyFacility) => {
-    const phone = (pharmacy.internationalPhone || pharmacy.phone || "").replace(/[\s\-\(\)]/g, "");
+    const p = getPharmacyWithPhone(pharmacy);
+    const phone = (p.internationalPhone || p.phone || "").replace(/[\s\-\(\)]/g, "");
     if (!phone) {
       Alert.alert(t("No Phone", "لا يوجد رقم"), t("This pharmacy has no phone number listed.", "لا يوجد رقم هاتف لهذه الصيدلية."));
       return;
@@ -105,17 +142,24 @@ export default function OrderScreen() {
         ? `مرحباً، أود طلب الدواء التالي:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nالكمية: ${quantity}\n\nهل هو متوفر لديكم؟`
         : `Hello, I'd like to order the following medicine:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nQuantity: ${quantity}\n\nIs it available?`,
     );
-    Linking.openURL(`https://wa.me/${cleanPhone}?text=${message}`);
+    Linking.openURL(`https://wa.me/${cleanPhone}?text=${message}`).catch(() => {
+      Alert.alert(t("Error", "خطأ"), t("Could not open WhatsApp. Make sure it is installed.", "تعذر فتح واتساب. تأكد من تثبيته."));
+    });
   };
 
   const callPharmacy = (pharmacy: NearbyFacility) => {
-    const phone = pharmacy.internationalPhone || pharmacy.phone || "";
+    const p = getPharmacyWithPhone(pharmacy);
+    const phone = p.internationalPhone || p.phone || "";
     if (!phone) {
       Alert.alert(t("No Phone", "لا يوجد رقم"), t("This pharmacy has no phone number listed.", "لا يوجد رقم هاتف لهذه الصيدلية."));
       return;
     }
-    Linking.openURL(`tel:${phone}`);
+    Linking.openURL(`tel:${phone}`).catch(() => {
+      Alert.alert(t("Error", "خطأ"), t("Could not make the call.", "تعذر إجراء المكالمة."));
+    });
   };
+
+  const [orderError, setOrderError] = useState<string | null>(null);
 
   const submitOrder = async () => {
     if (!selectedPharmacy || !patientName.trim() || !patientPhone.trim() || !deliveryAddress.trim()) {
@@ -127,13 +171,15 @@ export default function OrderScreen() {
     }
 
     setSubmitting(true);
+    setOrderError(null);
     try {
-      const res = await apiRequest("POST", "/api/orders", {
-        pharmacyName: selectedPharmacy.name,
-        pharmacyPhone: selectedPharmacy.internationalPhone || selectedPharmacy.phone || "",
-        pharmacyAddress: selectedPharmacy.address,
-        pharmacyPlaceId: selectedPharmacy.placeId || "",
-        medicineName,
+      const pharmacy = getPharmacyWithPhone(selectedPharmacy);
+      await apiRequest("POST", "/api/orders", {
+        pharmacyName: pharmacy.name,
+        pharmacyPhone: pharmacy.internationalPhone || pharmacy.phone || "",
+        pharmacyAddress: pharmacy.address,
+        pharmacyPlaceId: pharmacy.placeId || "",
+        medicineName: medicineName || "Unnamed Medicine",
         medicineDosage: medicineDosage || "",
         medicineFrequency: medicineFrequency || "",
         quantity,
@@ -143,35 +189,13 @@ export default function OrderScreen() {
         notes: notes.trim() || "",
       });
 
-      const order = await res.json();
-
-      Alert.alert(
-        t("Order Placed", "تم تقديم الطلب"),
-        t(
-          "Your order has been placed. Contact the pharmacy via WhatsApp or call to confirm availability.",
-          "تم تقديم طلبك. تواصل مع الصيدلية عبر واتساب أو اتصل لتأكيد التوفر.",
-        ),
-        [
-          {
-            text: t("WhatsApp", "واتساب"),
-            onPress: () => openWhatsApp(selectedPharmacy!),
-          },
-          {
-            text: t("Call", "اتصال"),
-            onPress: () => callPharmacy(selectedPharmacy!),
-          },
-          {
-            text: t("Done", "تم"),
-            onPress: () => router.back(),
-          },
-        ],
-      );
-    } catch (err) {
+      setSubmitting(false);
+      setStep("success");
+    } catch (err: any) {
       console.error("Order error:", err);
-      Alert.alert(
-        t("Error", "خطأ"),
-        t("Failed to place order. Please try again.", "فشل في تقديم الطلب. يرجى المحاولة مرة أخرى."),
-      );
+      const errorMsg = t("Failed to place order. Please try again.", "فشل في تقديم الطلب. يرجى المحاولة مرة أخرى.");
+      setOrderError(errorMsg);
+      Alert.alert(t("Error", "خطأ"), errorMsg);
     } finally {
       setSubmitting(false);
     }
@@ -390,7 +414,7 @@ export default function OrderScreen() {
 
       <View style={styles.contactRow}>
         <Pressable
-          style={[styles.contactBtn, styles.whatsappBtn]}
+          style={({ pressed }) => [styles.contactBtn, styles.whatsappBtn, pressed && { opacity: 0.8 }]}
           onPress={() => selectedPharmacy && openWhatsApp(selectedPharmacy)}
         >
           <Ionicons name="logo-whatsapp" size={20} color="#fff" />
@@ -400,7 +424,7 @@ export default function OrderScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.contactBtn, styles.callBtn]}
+          style={({ pressed }) => [styles.contactBtn, styles.callBtn, pressed && { opacity: 0.8 }]}
           onPress={() => selectedPharmacy && callPharmacy(selectedPharmacy)}
         >
           <Ionicons name="call" size={20} color={Colors.light.primary} />
@@ -409,6 +433,65 @@ export default function OrderScreen() {
           </Text>
         </Pressable>
       </View>
+
+      {orderError ? (
+        <View style={{ backgroundColor: "#FEF2F2", padding: 12, borderRadius: 10, marginTop: 12 }}>
+          <Text style={{ color: Colors.light.emergency, fontSize: 13, fontFamily: "DMSans_500Medium", textAlign: isRTL ? "right" : "left" }}>
+            {orderError}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  const renderSuccessStep = () => (
+    <View style={styles.stepContent}>
+      <View style={{ alignItems: "center", paddingTop: 40, paddingBottom: 24 }}>
+        <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: Colors.light.primarySurface, alignItems: "center", justifyContent: "center", marginBottom: 20 }}>
+          <Ionicons name="checkmark-circle" size={48} color={Colors.light.primary} />
+        </View>
+        <Text style={{ fontSize: 22, fontFamily: "DMSans_700Bold", color: Colors.light.text, textAlign: "center", marginBottom: 8 }}>
+          {t("Order Placed!", "تم تقديم الطلب!")}
+        </Text>
+        <Text style={{ fontSize: 14, fontFamily: "DMSans_400Regular", color: Colors.light.textSecondary, textAlign: "center", lineHeight: 20, paddingHorizontal: 20 }}>
+          {t(
+            "Contact the pharmacy via WhatsApp or call to confirm availability and delivery.",
+            "تواصل مع الصيدلية عبر واتساب أو اتصل لتأكيد التوفر والتوصيل.",
+          )}
+        </Text>
+      </View>
+
+      <View style={styles.contactRow}>
+        <Pressable
+          style={({ pressed }) => [styles.contactBtn, styles.whatsappBtn, pressed && { opacity: 0.8 }]}
+          onPress={() => selectedPharmacy && openWhatsApp(selectedPharmacy)}
+        >
+          <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+          <Text style={styles.contactBtnText}>
+            {t("WhatsApp", "واتساب")}
+          </Text>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [styles.contactBtn, styles.callBtn, pressed && { opacity: 0.8 }]}
+          onPress={() => selectedPharmacy && callPharmacy(selectedPharmacy)}
+        >
+          <Ionicons name="call" size={20} color={Colors.light.primary} />
+          <Text style={[styles.contactBtnText, { color: Colors.light.primary }]}>
+            {t("Call", "اتصال")}
+          </Text>
+        </Pressable>
+      </View>
+
+      <Pressable
+        style={({ pressed }) => [styles.nextBtn, { marginTop: 24 }, pressed && { opacity: 0.85 }]}
+        onPress={() => router.replace("/(tabs)/orders")}
+      >
+        <MaterialCommunityIcons name="clipboard-list-outline" size={20} color="#fff" />
+        <Text style={[styles.nextBtnText, { marginLeft: 8 }]}>
+          {t("View My Orders", "عرض طلباتي")}
+        </Text>
+      </Pressable>
     </View>
   );
 
@@ -430,25 +513,35 @@ export default function OrderScreen() {
     else router.back();
   };
 
-  const stepIndex = step === "pharmacy" ? 0 : step === "details" ? 1 : 2;
+  const stepIndex = step === "pharmacy" ? 0 : step === "details" ? 1 : step === "confirm" ? 2 : 3;
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <Pressable style={styles.headerBtn} onPress={handleBack}>
-          <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={Colors.light.text} />
-        </Pressable>
+        {step !== "success" ? (
+          <Pressable style={styles.headerBtn} onPress={handleBack}>
+            <Ionicons name={isRTL ? "chevron-forward" : "chevron-back"} size={24} color={Colors.light.text} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
         <Text style={styles.headerTitle}>
-          {t("Order Medicine", "طلب دواء")}
+          {step === "success" ? t("Order Confirmed", "تم تأكيد الطلب") : t("Order Medicine", "طلب دواء")}
         </Text>
-        <View style={styles.headerBtn} />
+        {step === "success" ? (
+          <Pressable style={styles.headerBtn} onPress={() => router.replace("/(tabs)")}>
+            <Ionicons name="close" size={24} color={Colors.light.text} />
+          </Pressable>
+        ) : (
+          <View style={styles.headerBtn} />
+        )}
       </View>
 
-      <View style={styles.stepper}>
+      {step !== "success" && <View style={styles.stepper}>
         {[0, 1, 2].map((i) => (
           <View key={i} style={[styles.stepDot, i <= stepIndex && styles.stepDotActive]} />
         ))}
-      </View>
+      </View>}
 
       <ScrollView
         style={{ flex: 1 }}
@@ -459,9 +552,10 @@ export default function OrderScreen() {
         {step === "pharmacy" && renderPharmacyStep()}
         {step === "details" && renderDetailsStep()}
         {step === "confirm" && renderConfirmStep()}
+        {step === "success" && renderSuccessStep()}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, 16) }]}>
+      {step !== "success" && <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, 16) }]}>
         <Pressable
           style={({ pressed }) => [
             styles.nextBtn,
@@ -486,7 +580,7 @@ export default function OrderScreen() {
             </>
           )}
         </Pressable>
-      </View>
+      </View>}
     </View>
   );
 }

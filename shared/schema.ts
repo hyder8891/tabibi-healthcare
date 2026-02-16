@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, real, boolean, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -10,7 +10,6 @@ export const users = pgTable("users", {
   firebaseUid: text("firebase_uid").unique(),
   email: text("email").unique(),
   phone: text("phone").unique(),
-  password: text("password"),
   name: text("name"),
   photoUrl: text("photo_url"),
   authProvider: text("auth_provider").default("email"),
@@ -21,7 +20,6 @@ export const insertUserSchema = createInsertSchema(users).pick({
   firebaseUid: true,
   email: true,
   phone: true,
-  password: true,
   name: true,
   photoUrl: true,
   authProvider: true,
@@ -67,3 +65,84 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id")
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  action: text("action").notNull(),
+  resourceType: text("resource_type").notNull(),
+  resourceId: text("resource_id"),
+  metadata: text("metadata"),
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const healthProfiles = pgTable("health_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  chronicConditions: text("chronic_conditions"),
+  medicationHistory: text("medication_history"),
+  allergyDetails: text("allergy_details"),
+  familyHistory: text("family_history"),
+  vitalTrends: text("vital_trends"),
+  riskFactors: text("risk_factors"),
+  assessmentCount: integer("assessment_count").notNull().default(0),
+  lastConditions: text("last_conditions"),
+  preferredPharmacies: text("preferred_pharmacies"),
+  region: text("region"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHealthProfileSchema = createInsertSchema(healthProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHealthProfile = z.infer<typeof insertHealthProfileSchema>;
+export type HealthProfile = typeof healthProfiles.$inferSelect;
+
+export const healthEvents = pgTable("health_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  eventType: text("event_type").notNull(),
+  category: text("category").notNull(),
+  eventData: text("event_data"),
+  tags: text("tags"),
+  outcome: text("outcome"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertHealthEventSchema = createInsertSchema(healthEvents).omit({ id: true, createdAt: true });
+export type InsertHealthEvent = z.infer<typeof insertHealthEventSchema>;
+export type HealthEvent = typeof healthEvents.$inferSelect;
+
+export const populationAnalytics = pgTable("population_analytics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  period: text("period").notNull(),
+  periodDate: text("period_date").notNull(),
+  category: text("category").notNull(),
+  itemName: text("item_name").notNull(),
+  itemNameAr: text("item_name_ar"),
+  count: integer("count").notNull().default(1),
+  region: text("region"),
+  metadata: text("metadata"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertPopulationAnalyticSchema = createInsertSchema(populationAnalytics).omit({ id: true, updatedAt: true });
+export type InsertPopulationAnalytic = z.infer<typeof insertPopulationAnalyticSchema>;
+export type PopulationAnalytic = typeof populationAnalytics.$inferSelect;
+
+export const iraqiHealthKnowledge = pgTable("iraqi_health_knowledge", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  category: text("category").notNull(),
+  nameEn: text("name_en").notNull(),
+  nameAr: text("name_ar").notNull(),
+  data: text("data").notNull(),
+  prevalenceRank: integer("prevalence_rank"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertIraqiHealthKnowledgeSchema = createInsertSchema(iraqiHealthKnowledge).omit({ id: true, createdAt: true });
+export type InsertIraqiHealthKnowledge = z.infer<typeof insertIraqiHealthKnowledgeSchema>;
+export type IraqiHealthKnowledge = typeof iraqiHealthKnowledge.$inferSelect;

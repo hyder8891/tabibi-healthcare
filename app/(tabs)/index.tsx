@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,8 @@ import Colors from "@/constants/colors";
 import { getAssessments, getProfile } from "@/lib/storage";
 import type { Assessment, PatientProfile } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
+import { useAvicenna } from "@/contexts/AvicennaContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,11 +26,24 @@ export default function HomeScreen() {
   const [profile, setProfile] = useState<PatientProfile | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const { t, isRTL } = useSettings();
+  const { user } = useAuth();
+  const { insights, syncProfile } = useAvicenna();
 
   useEffect(() => {
     loadRecent();
-    getProfile().then(setProfile);
-  }, []);
+    getProfile().then((p) => {
+      setProfile(p);
+      if (user && p) {
+        syncProfile({
+          medications: p.medications,
+          conditions: p.conditions,
+          allergies: p.allergies,
+          age: p.age,
+          gender: p.gender,
+        }).catch(() => {});
+      }
+    });
+  }, [user]);
 
   const loadRecent = async () => {
     const assessments = await getAssessments();
@@ -44,6 +59,266 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push("/scan");
   };
+
+  const getInsightCards = () => {
+    const cards: Array<{
+      id: string;
+      icon: string;
+      iconSet: "ionicons" | "mci";
+      colors: [string, string];
+      titleEn: string;
+      titleAr: string;
+      descEn: string;
+      descAr: string;
+      route?: string;
+      priority: number;
+    }> = [];
+
+    if (insights?.nudges) {
+      for (const nudge of insights.nudges) {
+        const iconMap: Record<string, string> = {
+          onboarding: "sparkles",
+          vital_check: "heart-outline",
+          vital_alert: "heart",
+          recurring_condition: "refresh",
+          seasonal: "cloudy",
+        };
+        const colorMap: Record<string, [string, string]> = {
+          onboarding: [Colors.light.primary, "#14B8A6"],
+          vital_check: ["#EF4444", "#F87171"],
+          vital_alert: ["#DC2626", "#EF4444"],
+          recurring_condition: [Colors.light.accent, "#FB923C"],
+          seasonal: ["#7C3AED", "#A78BFA"],
+        };
+        const routeMap: Record<string, string> = {
+          onboarding: "/assessment",
+          vital_check: "/heart-rate",
+          vital_alert: "/heart-rate",
+          recurring_condition: "/assessment",
+        };
+        cards.push({
+          id: `nudge-${nudge.type}`,
+          icon: iconMap[nudge.type] || "sparkles",
+          iconSet: "ionicons",
+          colors: colorMap[nudge.type] || [Colors.light.primary, "#14B8A6"],
+          titleEn: nudge.titleEn,
+          titleAr: nudge.titleAr,
+          descEn: nudge.descEn,
+          descAr: nudge.descAr,
+          route: routeMap[nudge.type],
+          priority: nudge.priority,
+        });
+      }
+    }
+
+    const month = new Date().getMonth() + 1;
+    const hour = new Date().getHours();
+
+    if (month >= 6 && month <= 9) {
+      cards.push({
+        id: "tip-hydration",
+        icon: "water",
+        iconSet: "ionicons",
+        colors: ["#0EA5E9", "#38BDF8"],
+        titleEn: "Stay Hydrated",
+        titleAr: "حافظ على ترطيب جسمك",
+        descEn: "Drink 3-4 liters of water daily in this heat. Avoid being outdoors between 11am-4pm.",
+        descAr: "اشرب ٣-٤ لتر ماء يومياً في هذا الحر. تجنب الخروج بين الساعة ١١ صباحاً و ٤ عصراً.",
+        priority: 4,
+      });
+    }
+
+    if (month >= 11 || month <= 3) {
+      cards.push({
+        id: "tip-flu",
+        icon: "thermometer",
+        iconSet: "ionicons",
+        colors: ["#6366F1", "#818CF8"],
+        titleEn: "Flu Season Active",
+        titleAr: "موسم الإنفلونزا نشط",
+        descEn: "Wash hands often, ventilate rooms, and consider a flu vaccine. Keep paracetamol handy.",
+        descAr: "اغسل يديك كثيراً، هوّ الغرف، وفكّر بلقاح الإنفلونزا. احتفظ بالباراسيتامول.",
+        priority: 4,
+      });
+    }
+
+    if (month >= 3 && month <= 6) {
+      cards.push({
+        id: "tip-dust",
+        icon: "cloud",
+        iconSet: "ionicons",
+        colors: ["#D97706", "#F59E0B"],
+        titleEn: "Dust Storm Season",
+        titleAr: "موسم العواصف الرملية",
+        descEn: "Keep rescue inhalers accessible. Stay indoors during storms and seal windows.",
+        descAr: "احتفظ بجهاز الاستنشاق قريباً. ابقَ في المنزل أثناء العواصف وأغلق النوافذ.",
+        priority: 4,
+      });
+    }
+
+    cards.push({
+      id: "feature-scan",
+      icon: "camera",
+      iconSet: "ionicons",
+      colors: ["#059669", "#10B981"],
+      titleEn: "Scan Your Medicine",
+      titleAr: "امسح دواءك",
+      descEn: "Take a photo of any medication to identify it, check interactions, and get dosage info.",
+      descAr: "التقط صورة لأي دواء للتعرف عليه والتحقق من التداخلات ومعرفة الجرعة.",
+      route: "/scan",
+      priority: 5,
+    });
+
+    cards.push({
+      id: "feature-routing",
+      icon: "navigate",
+      iconSet: "ionicons",
+      colors: [Colors.light.accent, "#FB923C"],
+      titleEn: "Find Nearby Care",
+      titleAr: "ابحث عن رعاية قريبة",
+      descEn: "Locate pharmacies, labs, clinics, and hospitals near you with real-time availability.",
+      descAr: "حدّد موقع الصيدليات والمختبرات والعيادات والمستشفيات القريبة منك.",
+      route: "/routing",
+      priority: 5,
+    });
+
+    if (hour >= 22 || hour < 6) {
+      cards.push({
+        id: "tip-sleep",
+        icon: "moon",
+        iconSet: "ionicons",
+        colors: ["#4338CA", "#6366F1"],
+        titleEn: "Sleep Well Tonight",
+        titleAr: "نم جيداً الليلة",
+        descEn: "Avoid screens 30 min before bed. Keep room cool and dark for better sleep quality.",
+        descAr: "تجنب الشاشات ٣٠ دقيقة قبل النوم. حافظ على غرفة باردة ومظلمة لنوم أفضل.",
+        priority: 6,
+      });
+    }
+
+    if (hour >= 6 && hour < 12) {
+      cards.push({
+        id: "tip-morning",
+        icon: "sunny",
+        iconSet: "ionicons",
+        colors: ["#EA580C", "#F97316"],
+        titleEn: "Morning Health Check",
+        titleAr: "فحص صحي صباحي",
+        descEn: "Start your day right - measure your heart rate and log any symptoms early.",
+        descAr: "ابدأ يومك بشكل صحيح - قس معدل ضربات قلبك وسجّل أي أعراض مبكراً.",
+        route: "/heart-rate",
+        priority: 6,
+      });
+    }
+
+    cards.push({
+      id: "tip-selfmed",
+      icon: "medical",
+      iconSet: "ionicons",
+      colors: ["#BE185D", "#EC4899"],
+      titleEn: "Safe Self-Medication",
+      titleAr: "العلاج الذاتي الآمن",
+      descEn: "Always check drug interactions before combining medications. Use the scanner to verify.",
+      descAr: "تحقق دائماً من التداخلات الدوائية قبل الجمع بين الأدوية. استخدم الماسح للتأكد.",
+      route: "/scan",
+      priority: 6,
+    });
+
+    cards.push({
+      id: "tip-emergency",
+      icon: "alert-circle",
+      iconSet: "ionicons",
+      colors: ["#DC2626", "#EF4444"],
+      titleEn: "Know Emergency Signs",
+      titleAr: "اعرف علامات الطوارئ",
+      descEn: "Chest pain, difficulty breathing, sudden weakness, or high fever? Seek care immediately.",
+      descAr: "ألم في الصدر، صعوبة تنفس، ضعف مفاجئ، أو حمى شديدة؟ اطلب الرعاية فوراً.",
+      route: "/assessment",
+      priority: 7,
+    });
+
+    cards.push({
+      id: "tip-family",
+      icon: "people",
+      iconSet: "ionicons",
+      colors: ["#0891B2", "#06B6D4"],
+      titleEn: "Family Health Tip",
+      titleAr: "نصيحة صحية للعائلة",
+      descEn: "Keep a first-aid kit at home: paracetamol, ORS, bandages, antiseptic, and a thermometer.",
+      descAr: "احتفظ بحقيبة إسعافات أولية: باراسيتامول، محلول ملح، ضمادات، مطهر، وميزان حرارة.",
+      priority: 7,
+    });
+
+    if (profile?.age && profile.age >= 40) {
+      cards.push({
+        id: "tip-checkup",
+        icon: "clipboard",
+        iconSet: "ionicons",
+        colors: ["#7C3AED", "#A78BFA"],
+        titleEn: "Regular Check-ups",
+        titleAr: "فحوصات دورية",
+        descEn: "Adults 40+ should check blood pressure, blood sugar, and cholesterol regularly.",
+        descAr: "البالغون فوق ٤٠ يجب فحص ضغط الدم والسكر والكوليسترول بانتظام.",
+        priority: 5,
+      });
+    }
+
+    cards.sort((a, b) => a.priority - b.priority);
+    return cards;
+  };
+
+  const insightCards = getInsightCards();
+
+  const insightsScrollRef = useRef<ScrollView>(null);
+  const scrollDirection = useRef<1 | -1>(1);
+  const scrollOffset = useRef(0);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const CARD_WIDTH = 176;
+  const CARD_GAP = 12;
+  const STEP = CARD_WIDTH + CARD_GAP;
+
+  const isWeb = Platform.OS === "web";
+
+  const startAutoScroll = useCallback(() => {
+    if (!isWeb) return;
+    if (autoScrollTimer.current) return;
+    if (insightCards.length <= 1) return;
+    const maxScroll = (insightCards.length - 1) * STEP;
+    autoScrollTimer.current = setInterval(() => {
+      scrollOffset.current += 0.5 * scrollDirection.current;
+      if (scrollOffset.current >= maxScroll) {
+        scrollOffset.current = maxScroll;
+        scrollDirection.current = -1;
+      } else if (scrollOffset.current <= 0) {
+        scrollOffset.current = 0;
+        scrollDirection.current = 1;
+      }
+      insightsScrollRef.current?.scrollTo({ x: scrollOffset.current, animated: false });
+    }, 16);
+  }, [insightCards.length]);
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollTimer.current) {
+      clearInterval(autoScrollTimer.current);
+      autoScrollTimer.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isWeb) startAutoScroll();
+    return () => { stopAutoScroll(); if (resumeTimer.current) clearTimeout(resumeTimer.current); };
+  }, [insightCards.length]);
+
+  const onInsightScrollBegin = useCallback(() => {
+    stopAutoScroll();
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+  }, []);
+  const onInsightScrollEnd = useCallback((e: any) => {
+    scrollOffset.current = e.nativeEvent.contentOffset.x;
+    if (resumeTimer.current) clearTimeout(resumeTimer.current);
+    if (isWeb) resumeTimer.current = setTimeout(() => { startAutoScroll(); }, 3000);
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -238,45 +513,134 @@ export default function HomeScreen() {
 
         </View>
 
-        <View style={styles.infoCards}>
-          <View style={styles.infoCard}>
-            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.infoCardIconWrap}>
+        {insightCards.length > 0 && (
+          <>
+            <View style={[styles.avicennaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={styles.avicennaHeaderLeft}>
                 <LinearGradient
-                  colors={[Colors.light.primary, "#14B8A6"]}
-                  style={styles.infoCardIconGradient}
+                  colors={["#7C3AED", "#A78BFA"]}
+                  style={styles.avicennaIconGradient}
                 >
-                  <Ionicons name="shield-checkmark" size={20} color="#fff" />
+                  <MaterialCommunityIcons name="brain" size={16} color="#fff" />
                 </LinearGradient>
-              </View>
-              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Safety First", "السلامة أولاً")}</Text>
-                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-                  {t("Checks for emergency symptoms, drug interactions, and contraindications before any recommendation.", "يتحقق من أعراض الطوارئ والتداخلات الدوائية وموانع الاستعمال قبل أي توصية.")}
+                <Text style={[styles.sectionTitle, { marginBottom: 0, marginTop: 0 }]}>
+                  {t("Health Insights", "رؤى صحية")}
                 </Text>
               </View>
             </View>
-          </View>
 
-          <View style={styles.infoCard}>
-            <View style={[styles.infoCardRow, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.infoCardIconWrap}>
-                <LinearGradient
-                  colors={[Colors.light.accent, "#FB923C"]}
-                  style={styles.infoCardIconGradient}
+            <ScrollView
+              ref={insightsScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.nudgesScroll}
+              style={styles.nudgesContainer}
+              decelerationRate="fast"
+              snapToInterval={STEP}
+              onScrollBeginDrag={onInsightScrollBegin}
+              onScrollEndDrag={onInsightScrollEnd}
+              onMomentumScrollEnd={onInsightScrollEnd}
+            >
+              {insightCards.map((card, idx) => (
+                <Pressable
+                  key={card.id + idx}
+                  style={({ pressed }) => [
+                    styles.nudgeCard,
+                    pressed && { opacity: 0.9, transform: [{ scale: 0.97 }] },
+                  ]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    if (card.route) router.push(card.route as any);
+                  }}
                 >
-                  <Ionicons name="navigate" size={20} color="#fff" />
-                </LinearGradient>
+                  <LinearGradient
+                    colors={card.colors}
+                    style={styles.nudgeIconGradient}
+                  >
+                    <Ionicons name={card.icon as any} size={18} color="#fff" />
+                  </LinearGradient>
+                  <Text style={[styles.nudgeTitle, isRTL && { textAlign: "right" }]} numberOfLines={2}>
+                    {t(card.titleEn, card.titleAr)}
+                  </Text>
+                  <Text style={[styles.nudgeDesc, isRTL && { textAlign: "right" }]} numberOfLines={3}>
+                    {t(card.descEn, card.descAr)}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </>
+        )}
+
+        {insights?.healthSummary && insights.healthSummary.totalAssessments > 0 && (
+          <View style={styles.healthSummaryCard}>
+            <LinearGradient
+              colors={["#F0FDFA", "#ECFDF5"]}
+              style={styles.healthSummaryGradient}
+            >
+              <View style={[styles.healthSummaryHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+                <View style={styles.healthSummaryHeaderLeft}>
+                  <Ionicons name="analytics" size={18} color={Colors.light.primary} />
+                  <Text style={styles.healthSummaryTitle}>
+                    {t("Your Health Profile", "ملفك الصحي")}
+                  </Text>
+                </View>
+                <View style={[styles.riskBadge, {
+                  backgroundColor:
+                    insights.healthSummary.riskLevel === "high" ? Colors.light.emergencyLight :
+                    insights.healthSummary.riskLevel === "moderate" ? Colors.light.warningLight :
+                    Colors.light.successLight
+                }]}>
+                  <View style={[styles.riskDot, {
+                    backgroundColor:
+                      insights.healthSummary.riskLevel === "high" ? Colors.light.emergency :
+                      insights.healthSummary.riskLevel === "moderate" ? Colors.light.warning :
+                      Colors.light.success
+                  }]} />
+                  <Text style={[styles.riskText, {
+                    color:
+                      insights.healthSummary.riskLevel === "high" ? Colors.light.emergency :
+                      insights.healthSummary.riskLevel === "moderate" ? Colors.light.warning :
+                      Colors.light.success
+                  }]}>
+                    {t(
+                      insights.healthSummary.riskLevel === "high" ? "High Risk" :
+                      insights.healthSummary.riskLevel === "moderate" ? "Moderate" : "Low Risk",
+                      insights.healthSummary.riskLevel === "high" ? "خطر عالي" :
+                      insights.healthSummary.riskLevel === "moderate" ? "متوسط" : "خطر منخفض"
+                    )}
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.infoCardContent, isRTL && { alignItems: "flex-end" }]}>
-                <Text style={[styles.infoCardTitle, isRTL && { textAlign: "right" }]}>{t("Smart Routing", "التوجيه الذكي")}</Text>
-                <Text style={[styles.infoCardText, isRTL && { textAlign: "right" }]}>
-                  {t("Find the nearest facility with exactly what you need \u2014 pharmacies, labs, or clinics.", "ابحث عن أقرب مرفق يحتوي على ما تحتاجه \u2014 صيدليات أو مختبرات أو عيادات.")}
-                </Text>
+
+              <View style={styles.healthStatsRow}>
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.totalAssessments}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Assessments", "تقييمات")}</Text>
+                </View>
+                <View style={styles.healthStatDivider} />
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.medicationCount}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Medications", "أدوية")}</Text>
+                </View>
+                <View style={styles.healthStatDivider} />
+                <View style={styles.healthStat}>
+                  <Text style={styles.healthStatValue}>{insights.healthSummary.recentVitals.length}</Text>
+                  <Text style={styles.healthStatLabel}>{t("Vitals", "مؤشرات")}</Text>
+                </View>
               </View>
-            </View>
+
+              {insights.healthSummary.recentConditions.length > 0 && (
+                <View style={styles.recentConditionsRow}>
+                  {insights.healthSummary.recentConditions.slice(0, 3).map((condition, idx) => (
+                    <View key={idx} style={styles.conditionChip}>
+                      <Text style={styles.conditionChipText} numberOfLines={1}>{condition}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </LinearGradient>
           </View>
-        </View>
+        )}
 
         {recentAssessments.length > 0 && (
           <>
@@ -636,56 +1000,6 @@ const styles = StyleSheet.create({
     color: Colors.light.textTertiary,
     lineHeight: 17,
   },
-  infoCards: {
-    gap: 12,
-    marginBottom: 28,
-  },
-  infoCard: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: Colors.light.borderLight,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  infoCardRow: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 14,
-  },
-  infoCardIconWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    overflow: "hidden",
-  },
-  infoCardIconGradient: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoCardContent: {
-    flex: 1,
-    gap: 4,
-  },
-  infoCardTitle: {
-    fontSize: 15,
-    fontFamily: "DMSans_700Bold",
-    color: Colors.light.text,
-    letterSpacing: -0.1,
-  },
-  infoCardText: {
-    fontSize: 13,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textSecondary,
-    lineHeight: 19,
-  },
   recentCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -731,5 +1045,158 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textTertiary,
+  },
+  avicennaHeader: {
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 14,
+    marginTop: 4,
+  },
+  avicennaHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  avicennaIconGradient: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nudgesContainer: {
+    marginBottom: 24,
+    marginHorizontal: -20,
+  },
+  nudgesScroll: {
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  nudgeCard: {
+    width: 176,
+    backgroundColor: Colors.light.surface,
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  nudgeIconGradient: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 10,
+  },
+  nudgeTitle: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+    marginBottom: 4,
+    lineHeight: 19,
+  },
+  nudgeDesc: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    lineHeight: 17,
+  },
+  healthSummaryCard: {
+    marginBottom: 24,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  healthSummaryGradient: {
+    padding: 18,
+    borderRadius: 20,
+  },
+  healthSummaryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  healthSummaryHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  healthSummaryTitle: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.text,
+  },
+  riskBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 5,
+  },
+  riskDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  riskText: {
+    fontSize: 11,
+    fontFamily: "DMSans_600SemiBold",
+  },
+  healthStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    marginBottom: 14,
+  },
+  healthStat: {
+    alignItems: "center",
+    flex: 1,
+  },
+  healthStatValue: {
+    fontSize: 22,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.primary,
+  },
+  healthStatLabel: {
+    fontSize: 11,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textTertiary,
+    marginTop: 2,
+  },
+  healthStatDivider: {
+    width: 1,
+    height: 28,
+    backgroundColor: Colors.light.borderLight,
+  },
+  recentConditionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  conditionChip: {
+    backgroundColor: Colors.light.primarySurface,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(13, 148, 136, 0.12)",
+  },
+  conditionChipText: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
   },
 });

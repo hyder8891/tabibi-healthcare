@@ -15,8 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { fetch } from "expo/fetch";
+import { apiRequest, getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import type { MedicineOrder } from "@/lib/types";
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string; labelEn: string; labelAr: string; icon: string }> = {
@@ -36,6 +35,7 @@ export default function OrdersTabScreen() {
 
   const [orders, setOrders] = useState<MedicineOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -46,9 +46,12 @@ export default function OrdersTabScreen() {
   const loadOrders = async () => {
     try {
       setLoading(true);
+      const authHeaders = await getAuthHeaders();
       const baseUrl = getApiUrl();
       const url = new URL("/api/orders", baseUrl);
-      const res = await fetch(url.toString(), { credentials: "include" });
+      const res = await fetch(url.toString(), {
+        headers: authHeaders,
+      });
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
@@ -61,25 +64,27 @@ export default function OrdersTabScreen() {
   };
 
   const cancelOrder = async (orderId: string) => {
-    Alert.alert(
-      t("Cancel Order", "إلغاء الطلب"),
-      t("Are you sure you want to cancel this order?", "هل أنت متأكد من إلغاء هذا الطلب؟"),
-      [
-        { text: t("No", "لا"), style: "cancel" },
-        {
-          text: t("Yes, Cancel", "نعم، إلغاء"),
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await apiRequest("PATCH", `/api/orders/${orderId}/cancel`);
-              loadOrders();
-            } catch (err) {
-              Alert.alert(t("Error", "خطأ"), t("Failed to cancel order.", "فشل في إلغاء الطلب."));
-            }
-          },
-        },
-      ],
-    );
+    if (cancellingId) return;
+    setCancellingId(orderId);
+    try {
+      const authHeaders = await getAuthHeaders();
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/orders/${orderId}/cancel`, baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PATCH",
+        headers: authHeaders,
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Cancel failed");
+      }
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: "cancelled" } : o));
+    } catch (err: any) {
+      console.error("Cancel error:", err?.message || err);
+      Alert.alert(t("Error", "خطأ"), t("Failed to cancel order.", "فشل في إلغاء الطلب."));
+    } finally {
+      setCancellingId(null);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -157,10 +162,18 @@ export default function OrdersTabScreen() {
               </Pressable>
             ) : null}
             <Pressable
-              style={[styles.actionSmallBtn, styles.cancelSmallBtn]}
+              style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.7 }]}
               onPress={() => cancelOrder(item.id)}
+              disabled={cancellingId === item.id}
             >
-              <Ionicons name="close" size={16} color={Colors.light.emergency} />
+              {cancellingId === item.id ? (
+                <ActivityIndicator size="small" color={Colors.light.emergency} />
+              ) : (
+                <>
+                  <Ionicons name="close-circle-outline" size={16} color={Colors.light.emergency} />
+                  <Text style={styles.cancelBtnText}>{t("Cancel", "إلغاء")}</Text>
+                </>
+              )}
             </Pressable>
           </View>
         )}
@@ -330,5 +343,22 @@ const styles = StyleSheet.create({
   cancelSmallBtn: {
     backgroundColor: Colors.light.emergencyLight,
     borderColor: "#FECACA",
+  },
+  cancelBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: Colors.light.emergencyLight,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+  },
+  cancelBtnText: {
+    fontSize: 13,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.emergency,
   },
 });

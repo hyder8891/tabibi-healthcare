@@ -41,6 +41,7 @@ export interface ChatMessage {
 
 export interface MedicineRecommendation {
   name: string;
+  localBrand?: string;
   activeIngredient: string;
   class: string;
   dosage: string;

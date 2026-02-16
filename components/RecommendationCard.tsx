@@ -83,21 +83,76 @@ export function RecommendationCard({
             </View>
             {result.recommendations.pathwayA.medicines.map((med, i) => (
               <View key={i} style={styles.medCard}>
-                <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
-                <Text style={[styles.medDetail, isRTL && { textAlign: "right" }]}>
-                  {med.activeIngredient} - {med.class}
-                </Text>
-                <View style={[styles.medInfo, isRTL && { flexDirection: "row-reverse" }]}>
-                  <Text style={styles.medDosage}>
-                    {med.dosage} | {med.frequency}
-                  </Text>
-                  <Text style={styles.medDuration}>{med.duration}</Text>
+                <View style={[styles.medTitleRow, isRTL && { flexDirection: "row-reverse" }]}>
+                  <MaterialCommunityIcons name="pill" size={18} color={Colors.light.primary} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.medName, isRTL && { textAlign: "right" }]}>{med.name}</Text>
+                    {med.localBrand && (
+                      <Text style={[styles.medLocalBrand, isRTL && { textAlign: "right" }]}>{med.localBrand}</Text>
+                    )}
+                  </View>
                 </View>
-                {med.warnings.length > 0 && (
-                  <Text style={styles.medWarning}>
-                    {med.warnings.join(". ")}
-                  </Text>
+
+                <View style={styles.medDivider} />
+
+                <View style={styles.medDetailsGrid}>
+                  <View style={[styles.medDetailRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.medDetailLabel, isRTL && { flexDirection: "row-reverse" }]}>
+                      <MaterialCommunityIcons name="flask-outline" size={14} color={Colors.light.textTertiary} />
+                      <Text style={styles.medDetailLabelText}>{t("Active Ingredient", "المادة الفعالة")}</Text>
+                    </View>
+                    <Text style={[styles.medDetailValue, isRTL && { textAlign: "right" }]}>{med.activeIngredient}</Text>
+                  </View>
+
+                  <View style={[styles.medDetailRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.medDetailLabel, isRTL && { flexDirection: "row-reverse" }]}>
+                      <MaterialCommunityIcons name="medical-bag" size={14} color={Colors.light.textTertiary} />
+                      <Text style={styles.medDetailLabelText}>{t("Class", "التصنيف")}</Text>
+                    </View>
+                    <Text style={[styles.medDetailValue, isRTL && { textAlign: "right" }]}>{med.class}</Text>
+                  </View>
+
+                  <View style={styles.medDivider} />
+
+                  <View style={[styles.medDetailRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.medDetailLabel, isRTL && { flexDirection: "row-reverse" }]}>
+                      <MaterialCommunityIcons name="needle" size={14} color={Colors.light.primary} />
+                      <Text style={[styles.medDetailLabelText, { color: Colors.light.primary }]}>{t("Dosage", "الجرعة")}</Text>
+                    </View>
+                    <Text style={[styles.medDetailValueBold, isRTL && { textAlign: "right" }]}>{med.dosage}</Text>
+                  </View>
+
+                  <View style={[styles.medDetailRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.medDetailLabel, isRTL && { flexDirection: "row-reverse" }]}>
+                      <MaterialCommunityIcons name="clock-outline" size={14} color={Colors.light.primary} />
+                      <Text style={[styles.medDetailLabelText, { color: Colors.light.primary }]}>{t("Frequency", "التكرار")}</Text>
+                    </View>
+                    <Text style={[styles.medDetailValueBold, isRTL && { textAlign: "right" }]}>{med.frequency}</Text>
+                  </View>
+
+                  <View style={[styles.medDetailRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={[styles.medDetailLabel, isRTL && { flexDirection: "row-reverse" }]}>
+                      <MaterialCommunityIcons name="calendar-range" size={14} color={Colors.light.primary} />
+                      <Text style={[styles.medDetailLabelText, { color: Colors.light.primary }]}>{t("Duration", "المدة")}</Text>
+                    </View>
+                    <Text style={[styles.medDetailValueBold, isRTL && { textAlign: "right" }]}>{med.duration}</Text>
+                  </View>
+                </View>
+
+                {med.warnings && med.warnings.length > 0 && (
+                  <View style={styles.medWarningBox}>
+                    <View style={[styles.medWarningHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                      <Ionicons name="warning" size={14} color={Colors.light.accent} />
+                      <Text style={styles.medWarningTitle}>{t("Warnings", "تحذيرات")}</Text>
+                    </View>
+                    {med.warnings.map((w, wi) => (
+                      <Text key={wi} style={[styles.medWarningText, isRTL && { textAlign: "right" }]}>
+                        {med.warnings.length > 1 ? `${wi + 1}. ` : ""}{w}
+                      </Text>
+                    ))}
+                  </View>
                 )}
+
                 {onOrderMedicine && (
                   <Pressable
                     style={({ pressed }) => [
@@ -298,47 +353,97 @@ const styles = StyleSheet.create({
   },
   medCard: {
     backgroundColor: Colors.light.background,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  medTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   medName: {
     fontSize: 16,
-    fontWeight: "600" as const,
+    fontWeight: "700" as const,
     color: Colors.light.text,
-    marginBottom: 2,
   },
-  medDetail: {
+  medLocalBrand: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
-    marginBottom: 8,
+    fontWeight: "500" as const,
+    color: Colors.light.primary,
+    marginTop: 2,
   },
-  medInfo: {
+  medDivider: {
+    height: 1,
+    backgroundColor: Colors.light.borderLight,
+    marginVertical: 10,
+  },
+  medDetailsGrid: {
+    gap: 8,
+  },
+  medDetailRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 24,
   },
-  medDosage: {
-    fontSize: 13,
-    color: Colors.light.primary,
+  medDetailLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 120,
+  },
+  medDetailLabelText: {
+    fontSize: 12,
     fontWeight: "500" as const,
-  },
-  medDuration: {
-    fontSize: 13,
     color: Colors.light.textTertiary,
   },
-  medWarning: {
+  medDetailValue: {
+    fontSize: 13,
+    fontWeight: "500" as const,
+    color: Colors.light.textSecondary,
+    flex: 1,
+    textAlign: "right",
+  },
+  medDetailValueBold: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    flex: 1,
+    textAlign: "right",
+  },
+  medWarningBox: {
+    backgroundColor: Colors.light.accentLight,
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 10,
+  },
+  medWarningHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  medWarningTitle: {
+    fontSize: 12,
+    fontWeight: "600" as const,
+    color: Colors.light.accent,
+  },
+  medWarningText: {
     fontSize: 12,
     color: Colors.light.accent,
-    marginTop: 6,
-    fontStyle: "italic",
+    lineHeight: 17,
+    paddingLeft: 20,
   },
   orderMedBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginTop: 10,
-    paddingVertical: 8,
+    marginTop: 12,
+    paddingVertical: 10,
     borderRadius: 10,
     backgroundColor: Colors.light.primarySurface,
     borderWidth: 1,

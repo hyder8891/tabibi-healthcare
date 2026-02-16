@@ -1,0 +1,112 @@
+This is a comprehensive, holistic audit of the entire `Tabibi Healthcare` codebase provided. It aggregates findings from the server infrastructure, database design, client-side application, and security implementation.
+
+### **Executive Summary**
+
+**Current Status:** 🛑 **CRITICAL RISK / PROTOTYPE ONLY**
+The application currently contains **severe security vulnerabilities** that constitute immediate HIPAA/GDPR violations. It is architecturally unstable for more than a handful of concurrent users and exposes patient data in server logs, databases, and client storage.
+
+---
+
+### **1. Critical Security & Compliance Violations (The "Kill List")**
+
+*These issues must be fixed before any real user touches the app.*
+
+#### **A. The "Open Book" Logging (HIPAA Violation)**
+
+In `server/index.ts`, the custom logging middleware captures and prints the **full JSON response body** to the server console.
+
+* **The Code:** `logLine += " :: " + JSON.stringify(sanitized);`
+* **The Leak:** When `/api/assess` returns a diagnosis, or `/api/auth/me` returns a profile, the logs record:
+* Patient Name & Phone Number.
+* **Medical Diagnosis & AI Assessment.**
+* **Prescribed Medications.**
+
+
+* **Impact:** Your cloud provider logs (AWS CloudWatch, etc.) now contain permanent, unencrypted records of patient health information (PHI).
+
+#### **B. Plain-Text Medical Data**
+
+Your database schema in `shared/schema.ts` does not use encryption for sensitive columns.
+
+* **The Risk:** Columns like `medicine_name`, `patient_name`, and `notes` are stored as plain text.
+* **Impact:** If the database is compromised (e.g., via SQL injection or leaked credentials), **all** patient medical history is readable.
+* **Fix:** Use column-level encryption (PGP) in Postgres or application-level encryption before saving.
+
+#### **C. The "Hybrid Auth" Trap**
+
+You are mixing **Stateless (Firebase)** and **Stateful (Express Session)** authentication.
+
+* **The Code:** The client sends a Firebase token to `/api/auth/firebase`, which verifies it and then sets a **Session Cookie**.
+* **The Vulnerability:**
+1. **Mobile Flakiness:** React Native struggles to persist cookies reliably across app restarts.
+2. **Revocation Gap:** If you ban a user in Firebase, their Express Session cookie remains valid until it expires (up to 30 days based on your config).
+
+
+* **Fix:** Switch to **100% Stateless Auth**. Send the Firebase ID Token in the `Authorization: Bearer` header for *every* request and verify it in middleware. Remove `express-session` entirely.
+
+#### **D. Insecure Local Storage**
+
+In `contexts/AuthContext.tsx`, you use `AsyncStorage` to cache the user object.
+
+* **The Code:** `await AsyncStorage.setItem(AUTH_USER_KEY, JSON.stringify(userData));`
+* **The Risk:** `AsyncStorage` is unencrypted on Android (XML) and iOS (plist). Malware or a thief with a jailbroken device can read the user's PII.
+* **Fix:** Use `expo-secure-store` for tokens and sensitive data.
+
+---
+
+### **2. Performance & Scalability Flaws**
+
+*These issues will cause the app to crash or freeze under load.*
+
+#### **A. The "Event Loop" Blocker (Server-Side DoS)**
+
+The `server/routes.ts` file processes rPPG signals (heart rate math) directly in the main thread.
+
+* **The Code:** The `/api/process-rppg` route performs heavy math (FFT, filtering) on arrays of 900+ items inside the request handler.
+* **The Impact:** Node.js is single-threaded. While calculating *one* user's heart rate (takes ~200-500ms), **the entire server freezes**. No other user can log in or fetch data.
+* **Fix:** Offload this calculation to a **Worker Thread** or a separate Python microservice.
+
+#### **B. The "UI Killer" (Client-Side)**
+
+The `app/heart-rate.tsx` file processes images on the JavaScript thread.
+
+* **The Code:** `extractRGBFromBase64Native` converts Base64 strings to byte arrays using `atob` and loops over pixels.
+* **The Impact:** This runs at 10 FPS on the JS thread. It will cause the UI to stutter, freeze, and become unresponsive on mid-range Android devices.
+* **Fix:** Use `react-native-worklets-core` or a C++ Frame Processor (`react-native-vision-camera`) to handle image processing off the JS thread.
+
+#### **C. Database Connection Exhaustion**
+
+Your `server/storage.ts` configures a connection pool with `max: 20`.
+
+* **The Impact:** You are using Neon (Serverless Postgres). Serverless environments spin up many small instances. If you scale to 5 server instances, you open 100 connections, likely hitting the database limit and causing `500 Internal Server Error` for users.
+* **Fix:** Set `max: 2` or `max: 5` for serverless deployments.
+
+---
+
+### **3. Architecture & Code Quality**
+
+#### **A. The "God Mode" Route File**
+
+`server/routes.ts` is ~650 lines long and handles:
+
+* Auth logic
+* AI integration
+* Signal processing
+* Geospatial calculations
+* Route definitions
+* **Why it's bad:** This is unmaintainable. If you need to change the AI prompt, you risk breaking the Auth logic.
+* **Refactor:** Split into `controllers/auth.ts`, `services/gemini.ts`, `services/rppg.ts`.
+
+#### **B. Fragile Third-Party Integrations**
+
+* **Firebase:** You are manually calling the Identity Toolkit REST API instead of using the `firebase-admin` SDK. This is fragile and misses out on security features like key rotation.
+* **Google Maps:** You fetch "Nearby Search" and then loop through results to fetch "Place Details" individually. This multiplies your API costs by 20x and slows down the response significantly.
+
+### **Prioritized Action Plan**
+
+1. **IMMEDIATE:** Remove the response body logging in `server/index.ts`.
+2. **IMMEDIATE:** Fix the `session` secret fallback. If `SESSION_SECRET` is missing in production, the server must crash, not use a default.
+3. **HIGH:** Refactor Auth to be stateless (Bearer Tokens). Remove `express-session`.
+4. **HIGH:** Move rPPG processing to a Worker Thread.
+5. **MEDIUM:** Encrypt sensitive DB columns.
+6. **MEDIUM:** Rewrite `heart-rate.tsx` to avoid Base64 usage (use Vision Camera).
