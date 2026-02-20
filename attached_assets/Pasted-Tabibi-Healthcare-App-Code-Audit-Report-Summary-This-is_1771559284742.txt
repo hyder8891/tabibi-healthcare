@@ -1,0 +1,133 @@
+Tabibi Healthcare App — Code Audit Report
+Summary
+This is a React Native / Expo mobile app with an Express backend targeting Iraqi patients. The codebase is generally well-structured, but there are several security gaps and code quality issues worth addressing.
+
+🔴 Critical Issues
+1. Content Security Policy (CSP) is completely disabled
+server/index.ts:226-228
+
+contentSecurityPolicy: false,
+crossOriginEmbedderPolicy: false,
+
+For a healthcare web app handling sensitive medical data, disabling CSP removes the primary browser-level defense against XSS. Even if the React Native client is the primary target, the landing page and web build are exposed.
+
+2. Geo routes lack authentication
+server/routes/geo.ts:72, 186, 213
+/api/nearby-facilities, /api/place-photo/:photoRef, and /api/place-details/:placeId are all unauthenticated. Anyone can call these endpoints and burn your Google Maps API quota. The photo proxy endpoint in particular can be abused to proxy arbitrary Google resources at your expense.
+
+3. Avicenna trending/knowledge routes lack authentication
+server/routes/avicenna.ts:153, 167
+/api/avicenna/trending and /api/avicenna/knowledge/:category are public endpoints. While the data returned may seem benign, they expose internal health analytics and Iraqi health knowledge data without any auth guard.
+
+4. eventData passed directly to AI context without sanitization
+server/avicenna.ts:321-429 — The buildAIContext function injects decrypted health data (conditions, medication history, allergies, vital trends) directly into the LLM system prompt as plain strings. If a user submitted malicious strings through the assessment or profile sync endpoints, this could cause prompt injection into the AI context. The sanitizeInput function (server/routes/ai.ts:15-36) is only applied to chat messages, not to profile/context strings.
+
+5. Encryption key falls back to DATABASE_URL in non-production
+server/encryption.ts:16
+
+return crypto.createHash("sha256").update(process.env.DATABASE_URL || "dev-key").digest();
+
+If NODE_ENV is not exactly "production", sensitive PHI/PII stored in the database could be encrypted with a predictable key derived from a connection string that may be logged or committed. Any environment that isn't tagged production (staging, preview, CI) is vulnerable.
+
+🟠 High Severity Issues
+6. Raw AI model responses (fullResponse) streamed to client
+server/routes/ai.ts:320
+
+res.write(`data: ${JSON.stringify({ done: true, fullResponse })}\n\n`);
+
+The complete LLM response — including any leaked system prompt fragments or debug text — is sent verbatim to the client. This is unnecessary and could expose internal prompting strategies.
+
+7. No input length limit on imageBase64 at the route level
+server/routes/ai.ts:64
+
+imageBase64: z.string().min(1).max(15_000_000),
+
+15 MB of base64 per request. Combined with the global 10 MB JSON body limit in server/index.ts:61, this is contradictory — the actual effective limit is 10 MB. More importantly, with a rate limit of only 10 requests/minute on the AI endpoint (aiLimiter), an authenticated attacker could still upload ~100 MB/minute of image data to Gemini on your API key.
+
+8. avicenna/knowledge/:category — no input validation on category param
+server/routes/avicenna.ts:167-170
+
+const category = req.params.category as string;
+const knowledge = await avicenna.getIraqiKnowledge(category);
+
+No validation or allowlist on category. Though Drizzle ORM prevents SQL injection here, the category string is passed directly and could cause unexpected DB query behavior if the DB schema changes. An allowlist of valid categories (e.g., seasonal_pattern, condition, medication) should be enforced.
+
+9. Medical system prompt instructs AI to never refuse image analysis
+server/routes/ai.ts:171
+
+NEVER refuse to look at or describe a medical image. You are a medical AI assistant — analyzing medical images is a core part of your role.
+
+This instruction removes the model's ability to decline harmful or adversarial images (e.g., CSAM, gore, or images crafted to manipulate the model). The constraint should be softened to allow the model to exercise its safety judgment on image content.
+
+10. Weak email validation on client
+app/auth.tsx:114
+
+if (!email.includes("@")) {
+
+This is trivially bypassable with strings like "@" or "a@". Firebase will ultimately reject malformed emails, but this is poor frontend hygiene for a healthcare app.
+
+🟡 Medium Severity Issues
+11. syncWithBackend ignores its firebaseUser parameter
+contexts/AuthContext.tsx:63-67
+
+const syncWithBackend = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
+  const res = await apiRequest("POST", "/api/auth/firebase");
+  ...
+};
+
+The firebaseUser argument is accepted but never used. The auth token is already picked up via getAuthHeaders(), so this works in practice — but it's misleading and a dead parameter that could cause confusion.
+
+12. Silent error swallowing in persistUser
+contexts/AuthContext.tsx:60
+
+} catch {}
+
+Failures to persist user state to SecureStore are silently ignored. If SecureStore is unavailable (e.g., simulator, corrupted storage), the user would appear logged out on next launch with no indication of why.
+
+13. In-memory caches for geo routes are unbounded per process restart
+server/routes/geo.ts:4-9
+The FIFO eviction at 500 and 100 entries is process-local and resets on restart. This is fine for a single-process deployment but will not work correctly behind load balancing. More importantly, place photo responses are not cached — only place details are — meaning the photo proxy endpoint has no rate protection.
+
+14. vitalTrends not encrypted
+server/avicenna.ts:176-180
+Heart rate vitals stored in vitalTrends use plain JSON.stringify, not encryptHealthData. Other fields like chronicConditions, allergyDetails, and medicationHistory are encrypted, but vital trends are stored plaintext in the DB.
+
+15. Race condition in getOrCreateHealthProfile
+server/avicenna.ts:39-43
+
+const [existing] = await db.select()...
+if (existing) return existing;
+const [profile] = await db.insert(healthEvents).values(...).returning();
+
+This is a classic TOCTOU race. Concurrent requests for a new user could both pass the check and both attempt inserts, causing a unique constraint error. This should use an upsert or be wrapped in a transaction.
+
+16. User ID accessed via unsafe cast
+server/routes/ai.ts:228, server/routes/avicenna.ts:49, etc.
+
+const userId = (req as any).userId;
+
+The requireAuth middleware correctly sets req.userId via the declared module augmentation in middleware.ts, so req.userId should be usable directly. Using (req as any).userId bypasses TypeScript's type checking unnecessarily and is inconsistent with how req.userId! is used in server/routes/orders.ts.
+
+🟢 Positive Findings
+Firebase token verification uses JWKS from Google's authoritative endpoint with proper issuer and audience checks (server/firebase-auth.ts).
+PHI in orders (patient name, phone, address, medications) is encrypted with AES-256-GCM including auth tags (server/encryption.ts, server/storage.ts).
+Zod schema validation is used consistently across all API routes.
+Audit logging is implemented for order creation and cancellation.
+Ownership checks are enforced before order access and cancellation.
+Rate limiting is layered: global API limiter + tighter AI limiter + auth limiter.
+Auth tokens are never stored directly; Firebase short-lived ID tokens are refreshed from memory.
+Sensitive auth state is stored in expo-secure-store (not AsyncStorage).
+Helmet is used with HSTS, frameguard: deny, and referrer policy.
+Input sanitization exists for LLM prompt injection patterns.
+Priority Recommendations
+Priority	Issue
+Critical	Enable CSP (or define a permissive policy rather than false)
+Critical	Add requireAuth to geo and public Avicenna routes
+Critical	Sanitize Avicenna health context before injecting into AI system prompt
+Critical	Restrict fallback encryption key to explicitly non-production environments
+High	Remove or restrict fullResponse from SSE done event
+High	Add allowlist validation for knowledge/:category param
+High	Soften "NEVER refuse image" instruction in system prompt
+Medium	Encrypt vitalTrends column
+Medium	Replace TOCTOU pattern in getOrCreateHealthProfile with upsert
+Medium	Use req.userId consistently instead of (req as any).userId
