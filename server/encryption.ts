@@ -9,11 +9,12 @@ function getEncryptionKey(): Buffer {
   if (key) {
     return crypto.createHash("sha256").update(key).digest();
   }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("ENCRYPTION_KEY environment variable is required in production");
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) {
+    throw new Error("ENCRYPTION_KEY or DATABASE_URL environment variable is required");
   }
-  console.warn("\x1b[33m⚠ WARNING: Using derived encryption key from DATABASE_URL. Set ENCRYPTION_KEY env var for production use.\x1b[0m");
-  return crypto.createHash("sha256").update(process.env.DATABASE_URL || "dev-key").digest();
+  console.warn("\x1b[33mWARNING: Using derived encryption key from DATABASE_URL. Set ENCRYPTION_KEY env var for production use.\x1b[0m");
+  return crypto.createHash("sha256").update(dbUrl).digest();
 }
 
 const encryptionKey = getEncryptionKey();

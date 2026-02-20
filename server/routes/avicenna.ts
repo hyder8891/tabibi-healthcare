@@ -46,7 +46,7 @@ export function registerAvicennaRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid event data", details: validation.error.issues.map(i => i.message) });
       }
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       const event = await avicenna.trackEvent({
         userId,
         ...validation.data,
@@ -64,7 +64,7 @@ export function registerAvicennaRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid profile data" });
       }
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       await avicenna.syncProfileFromClient(userId, validation.data);
       res.json({ success: true });
     } catch (err) {
@@ -79,7 +79,7 @@ export function registerAvicennaRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid assessment data" });
       }
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       await avicenna.enrichProfileFromAssessment(userId, validation.data);
 
       const tags: string[] = [];
@@ -119,7 +119,7 @@ export function registerAvicennaRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid vital data" });
       }
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       await avicenna.enrichProfileFromVital(userId, validation.data);
 
       if (validation.data.validReading) {
@@ -141,7 +141,7 @@ export function registerAvicennaRoutes(app: Express): void {
 
   app.get("/api/avicenna/insights", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       const insights = await avicenna.getPersonalInsights(userId);
       res.json(insights);
     } catch (err) {
@@ -150,7 +150,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/avicenna/trending", async (_req: Request, res: Response) => {
+  app.get("/api/avicenna/trending", requireAuth, async (_req: Request, res: Response) => {
     try {
       const [conditions, symptoms, medicines] = await Promise.all([
         avicenna.getTrendingConditions(7, 10),
@@ -164,9 +164,14 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/avicenna/knowledge/:category", async (req: Request, res: Response) => {
+  const VALID_KNOWLEDGE_CATEGORIES = ["seasonal_pattern", "condition", "medication", "symptom", "facility", "general"];
+
+  app.get("/api/avicenna/knowledge/:category", requireAuth, async (req: Request, res: Response) => {
     try {
       const category = req.params.category as string;
+      if (!VALID_KNOWLEDGE_CATEGORIES.includes(category)) {
+        return res.status(400).json({ error: "Invalid category", validCategories: VALID_KNOWLEDGE_CATEGORIES });
+      }
       const knowledge = await avicenna.getIraqiKnowledge(category);
       res.json(knowledge.map(k => ({
         id: k.id,
@@ -183,7 +188,7 @@ export function registerAvicennaRoutes(app: Express): void {
 
   app.get("/api/avicenna/health-profile", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       const profile = await avicenna.getHealthProfile(userId);
       if (!profile) {
         return res.json({ exists: false });

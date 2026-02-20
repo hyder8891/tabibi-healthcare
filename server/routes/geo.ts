@@ -1,4 +1,8 @@
 import type { Express, Request, Response } from "express";
+import { requireAuth } from "./middleware";
+
+const placePhotoCache = new Map<string, { data: Buffer; contentType: string; expires: number }>();
+const PLACE_PHOTO_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 // Cache for Place Details API responses
 const placeDetailsCache = new Map<string, { data: any; expires: number }>();
@@ -69,7 +73,7 @@ function setCachedNearbySearch(cacheKey: string, data: any): void {
 }
 
 export function registerGeoRoutes(app: Express): void {
-  app.get("/api/nearby-facilities", async (req: Request, res: Response) => {
+  app.get("/api/nearby-facilities", requireAuth, async (req: Request, res: Response) => {
     try {
       const { latitude, longitude, type, pagetoken } = req.query;
 
@@ -183,7 +187,7 @@ export function registerGeoRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/place-photo/:photoRef", async (req: Request, res: Response) => {
+  app.get("/api/place-photo/:photoRef", requireAuth, async (req: Request, res: Response) => {
     try {
       const { photoRef } = req.params;
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -192,6 +196,15 @@ export function registerGeoRoutes(app: Express): void {
       }
 
       const ref = Array.isArray(photoRef) ? photoRef[0] : photoRef;
+
+      const cached = placePhotoCache.get(ref);
+      if (cached && cached.expires > Date.now()) {
+        res.set("Content-Type", cached.contentType);
+        res.set("Cache-Control", "public, max-age=86400");
+        return res.send(cached.data);
+      }
+      placePhotoCache.delete(ref);
+
       const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=400&photo_reference=${encodeURIComponent(ref)}&key=${apiKey}`;
       const response = await globalThis.fetch(url);
 
@@ -199,18 +212,25 @@ export function registerGeoRoutes(app: Express): void {
         return res.status(response.status).json({ error: "Failed to fetch photo" });
       }
 
-      const buffer = await response.arrayBuffer();
+      const buffer = Buffer.from(await response.arrayBuffer());
       const contentType = response.headers.get("content-type") || "image/jpeg";
+
+      if (placePhotoCache.size > 200) {
+        const oldest = placePhotoCache.keys().next().value;
+        if (oldest) placePhotoCache.delete(oldest);
+      }
+      placePhotoCache.set(ref, { data: buffer, contentType, expires: Date.now() + PLACE_PHOTO_CACHE_TTL });
+
       res.set("Content-Type", contentType);
       res.set("Cache-Control", "public, max-age=86400");
-      res.send(Buffer.from(buffer));
+      res.send(buffer);
     } catch (error) {
       console.error("Place photo proxy error:", error instanceof Error ? error.message : "Unknown error");
       res.status(500).json({ error: "Failed to fetch photo" });
     }
   });
 
-  app.get("/api/place-details/:placeId", async (req: Request, res: Response) => {
+  app.get("/api/place-details/:placeId", requireAuth, async (req: Request, res: Response) => {
     try {
       const { placeId } = req.params;
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;

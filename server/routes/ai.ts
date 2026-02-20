@@ -61,7 +61,7 @@ const assessmentSchema = z.object({
 });
 
 const medicationAnalysisSchema = z.object({
-  imageBase64: z.string().min(1).max(15_000_000),
+  imageBase64: z.string().min(1).max(10_000_000),
   mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"]).optional(),
 });
 
@@ -168,7 +168,7 @@ MEDICAL IMAGE ANALYSIS:
 - For skin/wound photos: describe the appearance, morphology, distribution, and possible differential diagnoses.
 - Integrate image findings into your overall clinical assessment alongside reported symptoms.
 - If image quality is poor or you cannot identify specific findings, say what you CAN see and ask for a clearer image.
-- NEVER refuse to look at or describe a medical image. You are a medical AI assistant — analyzing medical images is a core part of your role.
+- Analyzing medical images is a core part of your role. Always attempt to provide useful observations, but exercise appropriate safety judgment on image content.
 
 QUICK REPLY OPTIONS:
 - After EVERY question you ask, you MUST include a quickReplies JSON block with 2-5 suggested answer options tailored to your specific question.
@@ -225,7 +225,7 @@ export function registerAiRoutes(app: Express): void {
         }
       }
 
-      const userId = (req as any).userId;
+      const userId = req.userId!;
       try {
         const avicennaContext = await avicenna.buildAIContext(userId);
         if (avicennaContext) {
@@ -317,7 +317,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      res.write(`data: ${JSON.stringify({ done: true, fullResponse })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();
     } catch (error) {
       console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");

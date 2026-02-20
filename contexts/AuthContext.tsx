@@ -57,10 +57,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         await SecureStore.deleteItemAsync(AUTH_USER_KEY);
       }
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to persist user to SecureStore:", e);
+    }
   };
 
-  const syncWithBackend = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
+  const syncWithBackend = async (_firebaseUser?: FirebaseUser): Promise<AuthUser> => {
     const res = await apiRequest("POST", "/api/auth/firebase");
     const data = await res.json();
     return data as AuthUser;

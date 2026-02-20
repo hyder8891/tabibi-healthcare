@@ -223,8 +223,30 @@ function configureExpoAndLanding(app: express.Application) {
 }
 
 function setupSecurityHeaders(app: express.Application) {
+  const cspDirectives: Record<string, string[]> = {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+    styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+    fontSrc: ["'self'", "https://fonts.gstatic.com"],
+    imgSrc: ["'self'", "data:", "blob:", "https://maps.googleapis.com", "https://maps.gstatic.com", "https://lh3.googleusercontent.com"],
+    connectSrc: ["'self'", "https://maps.googleapis.com", "https://www.googleapis.com", "https://securetoken.googleapis.com", "https://identitytoolkit.googleapis.com", "https://firebaseinstallations.googleapis.com", "wss:", "ws:"],
+    frameSrc: ["'self'", "https://accounts.google.com", "https://*.firebaseapp.com"],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'"],
+  };
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    const devOrigin = `https://${process.env.REPLIT_DEV_DOMAIN}`;
+    cspDirectives.connectSrc.push(devOrigin);
+  }
+  if (process.env.REPLIT_DOMAINS) {
+    process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      cspDirectives.connectSrc.push(`https://${d.trim()}`);
+    });
+  }
+
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: { directives: cspDirectives },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     hsts: {

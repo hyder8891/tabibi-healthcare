@@ -35,12 +35,40 @@ function safeJsonParse(str: string | null): any {
   try { return JSON.parse(str); } catch { return null; }
 }
 
+function sanitizeContextString(text: string): string {
+  const patterns = [
+    /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|rules|guidelines)/gi,
+    /disregard\s+(all\s+)?(previous|prior|above|earlier)?\s*(instructions|prompts|rules|guidelines)/gi,
+    /forget\s+(your|all|previous)\s+(instructions|prompts|rules|guidelines|training)/gi,
+    /override\s+(all\s+)?(safety|security|system)\s*(protocols?|rules?|instructions?|guidelines?)?/gi,
+    /new\s+instructions?\s*:/gi,
+    /system\s*:\s*/gi,
+    /you\s+are\s+now\s+/gi,
+    /pretend\s+(you\s+are|to\s+be)\s+/gi,
+    /act\s+as\s+(if|though)\s+/gi,
+    /reveal\s+(your|the|system)\s+(prompt|instructions|rules)/gi,
+  ];
+  let sanitized = text;
+  for (const p of patterns) {
+    sanitized = sanitized.replace(p, "");
+  }
+  return sanitized.trim();
+}
+
 export class AvicennaService {
   async getOrCreateHealthProfile(userId: string): Promise<HealthProfile> {
     const [existing] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
     if (existing) return existing;
-    const [profile] = await db.insert(healthProfiles).values({ userId }).returning();
-    return profile;
+    try {
+      const [profile] = await db.insert(healthProfiles).values({ userId }).returning();
+      return profile;
+    } catch (err: any) {
+      if (err?.code === "23505") {
+        const [raced] = await db.select().from(healthProfiles).where(eq(healthProfiles.userId, userId));
+        if (raced) return raced;
+      }
+      throw err;
+    }
   }
 
   async getHealthProfile(userId: string): Promise<HealthProfile | null> {
@@ -167,7 +195,7 @@ export class AvicennaService {
     if (!vitalData.validReading) return;
     const profile = await this.getOrCreateHealthProfile(userId);
     const trends: Array<{ type: string; value: number; date: string; confidence?: string }> =
-      safeJsonParse(profile.vitalTrends) || [];
+      decryptHealthData(profile.vitalTrends) || safeJsonParse(profile.vitalTrends) || [];
     trends.push({
       type: vitalData.type,
       value: vitalData.value,
@@ -176,7 +204,7 @@ export class AvicennaService {
     });
     if (trends.length > 100) trends.splice(0, trends.length - 100);
     await this.updateHealthProfile(userId, {
-      vitalTrends: JSON.stringify(trends),
+      vitalTrends: encryptHealthData(trends),
     });
   }
 
@@ -328,29 +356,31 @@ export class AvicennaService {
 
         const conditions = decryptHealthData(profile.chronicConditions);
         if (conditions && conditions.length > 0) {
-          context += `- Known conditions history: ${conditions.join(", ")}\n`;
+          const safeConditions = conditions.map((c: string) => sanitizeContextString(String(c)));
+          context += `- Known conditions history: ${safeConditions.join(", ")}\n`;
         }
 
         const medHistory = decryptHealthData(profile.medicationHistory);
         if (medHistory && medHistory.length > 0) {
           const recentMeds = medHistory.slice(-10);
           const medSummary = recentMeds.map((m: any) =>
-            `${m.name}${m.localBrand ? ` (${m.localBrand})` : ""} [${m.date}]`
+            `${sanitizeContextString(String(m.name || ""))}${m.localBrand ? ` (${sanitizeContextString(String(m.localBrand))})` : ""} [${m.date}]`
           ).join("; ");
           context += `- Recent medication history: ${medSummary}\n`;
         }
 
         const allergies = decryptHealthData(profile.allergyDetails);
         if (allergies && allergies.length > 0) {
-          context += `- Known allergies: ${allergies.join(", ")}\n`;
+          const safeAllergies = allergies.map((a: string) => sanitizeContextString(String(a)));
+          context += `- Known allergies: ${safeAllergies.join(", ")}\n`;
         }
 
         const familyHx = decryptHealthData(profile.familyHistory);
         if (familyHx) {
-          context += `- Family health history: ${JSON.stringify(familyHx)}\n`;
+          context += `- Family health history: ${sanitizeContextString(JSON.stringify(familyHx))}\n`;
         }
 
-        const vitals = safeJsonParse(profile.vitalTrends);
+        const vitals = decryptHealthData(profile.vitalTrends) || safeJsonParse(profile.vitalTrends);
         if (vitals && vitals.length > 0) {
           const recentVitals = vitals.slice(-5);
           const vitalSummary = recentVitals.map((v: any) =>
@@ -445,7 +475,7 @@ export class AvicennaService {
     const conditions = decryptHealthData(profile.chronicConditions) || [];
     const allergies = decryptHealthData(profile.allergyDetails) || [];
     const medHistory = decryptHealthData(profile.medicationHistory) || [];
-    const vitals: Array<{ type: string; value: number; date: string }> = safeJsonParse(profile.vitalTrends) || [];
+    const vitals: Array<{ type: string; value: number; date: string }> = decryptHealthData(profile.vitalTrends) || safeJsonParse(profile.vitalTrends) || [];
     const lastConds: string[] = safeJsonParse(profile.lastConditions) || [];
 
     const riskLevel = this.computeRiskLevel(conditions, vitals, profile.assessmentCount);
