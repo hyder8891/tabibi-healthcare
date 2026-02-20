@@ -15,7 +15,7 @@ import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { FacilityCard } from "@/components/FacilityCard";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import type { NearbyFacility } from "@/lib/types";
 
 export default function RoutingScreen() {
@@ -83,13 +83,14 @@ export default function RoutingScreen() {
   };
 
   const enrichWithPhoneNumbers = async (facilityList: NearbyFacility[], apiUrl: string) => {
+    const authHeaders = await getAuthHeaders();
     const details = await Promise.allSettled(
       facilityList
         .filter((f) => f.placeId)
         .map(async (f) => {
           try {
             const detailUrl = new URL(`/api/place-details/${f.placeId}`, apiUrl);
-            const resp = await fetch(detailUrl.toString());
+            const resp = await fetch(detailUrl.toString(), { headers: authHeaders });
             if (!resp.ok) return null;
             const d = await resp.json();
             return { placeId: f.placeId, phone: d.phone || "", internationalPhone: d.internationalPhone || "" };
@@ -132,7 +133,8 @@ export default function RoutingScreen() {
       url.searchParams.set("longitude", loc.lng.toString());
       url.searchParams.set("type", selectedType);
 
-      const response = await fetch(url.toString());
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(url.toString(), { headers: authHeaders });
       const data = await response.json();
 
       if (data.error) {
@@ -170,7 +172,8 @@ export default function RoutingScreen() {
       url.searchParams.set("type", selectedType);
       url.searchParams.set("pagetoken", nextPageToken);
 
-      const response = await fetch(url.toString());
+      const authHeaders = await getAuthHeaders();
+      const response = await fetch(url.toString(), { headers: authHeaders });
       const data = await response.json();
 
       if (!data.error) {
