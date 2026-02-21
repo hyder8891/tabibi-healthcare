@@ -71,6 +71,46 @@ export function registerOrderRoutes(app: Express): void {
     }
   });
 
+  const VALID_TRANSITIONS: Record<string, string[]> = {
+    pending: ["confirmed", "cancelled"],
+    confirmed: ["delivered", "cancelled"],
+    delivered: [],
+    cancelled: [],
+  };
+
+  app.patch("/api/orders/:id/status", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const orderId = req.params.id as string;
+      const { status } = req.body;
+      if (!status || typeof status !== "string") {
+        return res.status(400).json({ error: "Status is required" });
+      }
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      if (order.userId !== req.userId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      const allowed = VALID_TRANSITIONS[order.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(400).json({ error: `Cannot transition from '${order.status}' to '${status}'` });
+      }
+      const updatedOrder = await storage.updateOrder(orderId, { status });
+      await storage.logAuditEvent({
+        userId: req.userId!,
+        action: status,
+        resourceType: "order",
+        resourceId: orderId,
+        ipAddress: req.ip,
+      });
+      return res.json(updatedOrder);
+    } catch (error) {
+      console.error("Update order status error:", error instanceof Error ? error.message : "Unknown error");
+      return res.status(500).json({ error: "Failed to update order status" });
+    }
+  });
+
   app.patch("/api/orders/:id/cancel", requireAuth, async (req: Request, res: Response) => {
     try {
       const orderId = req.params.id as string;
@@ -81,8 +121,9 @@ export function registerOrderRoutes(app: Express): void {
       if (order.userId !== req.userId) {
         return res.status(403).json({ error: "Access denied" });
       }
-      if (order.status !== "pending") {
-        return res.status(400).json({ error: "Only pending orders can be cancelled" });
+      const allowed = VALID_TRANSITIONS[order.status] || [];
+      if (!allowed.includes("cancelled")) {
+        return res.status(400).json({ error: `Cannot cancel order with status '${order.status}'` });
       }
       const updatedOrder = await storage.updateOrder(orderId, { status: "cancelled" });
       await storage.logAuditEvent({

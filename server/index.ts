@@ -93,11 +93,40 @@ function setupRateLimiting(app: express.Application) {
     legacyHeaders: false,
   });
 
+  const geoLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    message: { error: "Too many location requests, please slow down" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const rppgLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 5,
+    message: { error: "Too many heart rate processing requests, please slow down" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
+  const avicennaLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    message: { error: "Too many requests, please slow down" },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
+
   app.use("/api/", apiLimiter);
   app.use("/api/assess", aiLimiter);
   app.use("/api/analyze-medication", aiLimiter);
   app.use("/api/check-interactions", aiLimiter);
   app.use("/api/auth/firebase", authLimiter);
+  app.use("/api/nearby-facilities", geoLimiter);
+  app.use("/api/place-photo", geoLimiter);
+  app.use("/api/place-details", geoLimiter);
+  app.use("/api/process-rppg", rppgLimiter);
+  app.use("/api/avicenna", avicennaLimiter);
 }
 
 function setupRequestLogging(app: express.Application) {

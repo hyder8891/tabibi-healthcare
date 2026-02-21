@@ -109,6 +109,11 @@ export function registerGeoRoutes(app: Express): void {
       
       const lat = parseFloat(latitude as string);
       const lng = parseFloat(longitude as string);
+
+      if (!isFinite(lat) || !isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+        return res.status(400).json({ error: "Invalid coordinates: latitude must be -90..90, longitude must be -180..180" });
+      }
+
       const isMENA = lat >= 12 && lat <= 42 && lng >= -17 && lng <= 63;
 
       const keywordMapMENA: Record<string, string> = {
@@ -147,7 +152,7 @@ export function registerGeoRoutes(app: Express): void {
 
       if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
         console.error("Google Places API error:", data.status, data.error_message);
-        return res.status(500).json({ error: `Google Places API error: ${data.status}` });
+        return res.status(500).json({ error: "Facility search is temporarily unavailable" });
       }
 
       const facilities = (data.results || []).map((place: any, index: number) => {
@@ -270,7 +275,8 @@ export function registerGeoRoutes(app: Express): void {
       const data = await response.json();
 
       if (data.status !== "OK") {
-        return res.status(400).json({ error: `Place details error: ${data.status}` });
+        console.error("Place details API error:", data.status, data.error_message);
+        return res.status(400).json({ error: "Place details unavailable" });
       }
 
       const result = data.result || {};

@@ -225,22 +225,22 @@ export function registerAiRoutes(app: Express): void {
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
         systemContext += `\n\nPATIENT PROFILE:\n`;
-        if (patientProfile.name) systemContext += `- Name: ${patientProfile.name}\n`;
+        if (patientProfile.name) systemContext += `- Name: ${sanitizeInput(patientProfile.name)}\n`;
         if (patientProfile.age) systemContext += `- Age: ${patientProfile.age}\n`;
-        if (patientProfile.gender) systemContext += `- Gender: ${patientProfile.gender}\n`;
+        if (patientProfile.gender) systemContext += `- Gender: ${sanitizeInput(patientProfile.gender)}\n`;
         if (patientProfile.weight) systemContext += `- Weight: ${patientProfile.weight} kg\n`;
         if (patientProfile.height) systemContext += `- Height: ${patientProfile.height} cm\n`;
-        if (patientProfile.bloodType) systemContext += `- Blood Type: ${patientProfile.bloodType}\n`;
+        if (patientProfile.bloodType) systemContext += `- Blood Type: ${sanitizeInput(patientProfile.bloodType)}\n`;
         if (patientProfile.isPediatric) systemContext += `- PEDIATRIC PATIENT: Use age/weight-appropriate dosing\n`;
         if (patientProfile.medications && patientProfile.medications.length > 0) {
-          systemContext += `- Current Medications: ${patientProfile.medications.join(", ")}\n`;
+          systemContext += `- Current Medications: ${patientProfile.medications.map(m => sanitizeInput(m)).join(", ")}\n`;
           systemContext += `- IMPORTANT: Check for drug interactions and ADRs with any recommendations\n`;
         }
         if (patientProfile.conditions && patientProfile.conditions.length > 0) {
-          systemContext += `- Known Conditions: ${patientProfile.conditions.join(", ")}\n`;
+          systemContext += `- Known Conditions: ${patientProfile.conditions.map(c => sanitizeInput(c)).join(", ")}\n`;
         }
         if (patientProfile.allergies && patientProfile.allergies.length > 0) {
-          systemContext += `- Allergies: ${patientProfile.allergies.join(", ")}\n`;
+          systemContext += `- Allergies: ${patientProfile.allergies.map(a => sanitizeInput(a)).join(", ")}\n`;
           systemContext += `- CRITICAL: Do NOT recommend any medications the patient is allergic to\n`;
         }
       }
@@ -328,8 +328,14 @@ Be thorough and specific. Provide your analysis in the same language the user is
       });
 
       let fullResponse = "";
+      let clientDisconnected = false;
+
+      req.on("close", () => {
+        clientDisconnected = true;
+      });
 
       for await (const chunk of stream) {
+        if (clientDisconnected) break;
         const content = chunk.text || "";
         if (content) {
           fullResponse += content;
@@ -337,7 +343,9 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      if (!clientDisconnected) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      }
       res.end();
     } catch (error) {
       console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");

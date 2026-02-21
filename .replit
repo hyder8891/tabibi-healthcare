@@ -77,3 +77,4 @@ ensurePreviewReachable = "/status"
 [userenv]
 
 [userenv.shared]
+ENCRYPTION_KEY = "f73322312daa5f35599e45a61dd406150c34a3192aa54b5c18509dbf9f21baf5"

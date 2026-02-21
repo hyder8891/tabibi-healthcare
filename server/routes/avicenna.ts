@@ -2,11 +2,15 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
+import { decrypt } from "../encryption";
 
 const trackEventSchema = z.object({
   eventType: z.string().min(1).max(100),
   category: z.enum(["symptom", "medication", "vital", "facility", "order", "scan", "assessment"]),
-  eventData: z.any().optional(),
+  eventData: z.record(z.string(), z.unknown()).refine(
+    (obj) => JSON.stringify(obj).length <= 10000,
+    { message: "eventData must be under 10KB" }
+  ).optional(),
   tags: z.array(z.string().max(200)).max(20).optional(),
   outcome: z.enum(["resolved", "recurring", "worsened", "unknown"]).optional(),
 });
@@ -173,13 +177,17 @@ export function registerAvicennaRoutes(app: Express): void {
         return res.status(400).json({ error: "Invalid category", validCategories: VALID_KNOWLEDGE_CATEGORIES });
       }
       const knowledge = await avicenna.getIraqiKnowledge(category);
-      res.json(knowledge.map(k => ({
-        id: k.id,
-        nameEn: k.nameEn,
-        nameAr: k.nameAr,
-        data: JSON.parse(k.data),
-        prevalenceRank: k.prevalenceRank,
-      })));
+      res.json(knowledge.map(k => {
+        let data = {};
+        try { data = JSON.parse(k.data); } catch { data = {}; }
+        return {
+          id: k.id,
+          nameEn: k.nameEn,
+          nameAr: k.nameAr,
+          data,
+          prevalenceRank: k.prevalenceRank,
+        };
+      }));
     } catch (err) {
       console.error("Avicenna knowledge error:", err instanceof Error ? err.message : "Unknown");
       res.status(500).json({ error: "Failed to get knowledge" });
@@ -196,7 +204,7 @@ export function registerAvicennaRoutes(app: Express): void {
       res.json({
         exists: true,
         assessmentCount: profile.assessmentCount,
-        lastConditions: profile.lastConditions ? JSON.parse(profile.lastConditions) : [],
+        lastConditions: profile.lastConditions ? (() => { try { return JSON.parse(decrypt(profile.lastConditions)); } catch { return []; } })() : [],
         region: profile.region,
         hasVitals: !!profile.vitalTrends,
         updatedAt: profile.updatedAt,

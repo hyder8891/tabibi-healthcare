@@ -2,13 +2,16 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { Worker } from "worker_threads";
 import path from "path";
+import pLimit from "p-limit";
 import { requireAuth } from "./middleware";
+
+const rppgConcurrencyLimit = pLimit(3);
 
 const rppgSchema = z.object({
   signals: z.array(z.object({
-    r: z.number(),
-    g: z.number(),
-    b: z.number(),
+    r: z.number().min(0).max(255).refine(isFinite),
+    g: z.number().min(0).max(255).refine(isFinite),
+    b: z.number().min(0).max(255).refine(isFinite),
   })).min(30).max(1000),
   fps: z.number().min(1).max(60).optional(),
 });
@@ -54,7 +57,7 @@ export function registerRppgRoutes(app: Express): void {
         });
       }
 
-      const result = await processInWorker(validation.data.signals, validation.data.fps);
+      const result = await rppgConcurrencyLimit(() => processInWorker(validation.data.signals, validation.data.fps));
       res.json(result);
     } catch (error) {
       console.error("rPPG processing error:", error instanceof Error ? error.message : "Unknown error");
