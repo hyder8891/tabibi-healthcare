@@ -35,22 +35,28 @@ export default function OrdersTabScreen() {
 
   const [orders, setOrders] = useState<MedicineOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const loadOrders = useCallback(async (cancelled?: { current: boolean }) => {
     try {
       setLoading(true);
+      setError(false);
       const authHeaders = await getAuthHeaders();
       const baseUrl = getApiUrl();
       const url = new URL("/api/orders", baseUrl);
       const res = await fetch(url.toString(), {
         headers: authHeaders,
       });
-      if (res.ok && !cancelled?.current) {
+      if (cancelled?.current) return;
+      if (res.ok) {
         const data = await res.json();
         setOrders(data);
+      } else {
+        setError(true);
       }
     } catch (err: any) {
+      if (!cancelled?.current) setError(true);
       console.error("Failed to load orders:", err);
     } finally {
       if (!cancelled?.current) setLoading(false);
@@ -195,6 +201,21 @@ export default function OrdersTabScreen() {
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={Colors.light.primary} />
+        </View>
+      ) : error ? (
+        <View style={styles.centered}>
+          <Ionicons name="cloud-offline-outline" size={56} color={Colors.light.textTertiary} />
+          <Text style={styles.emptyTitle}>{t("Couldn't load orders", "تعذر تحميل الطلبات")}</Text>
+          <Text style={styles.emptySubtitle}>
+            {t("Check your connection and try again", "تحقق من اتصالك وحاول مرة أخرى")}
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.7 }]}
+            onPress={() => loadOrders()}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.retryBtnText}>{t("Retry", "إعادة المحاولة")}</Text>
+          </Pressable>
         </View>
       ) : orders.length === 0 ? (
         <View style={styles.centered}>
@@ -362,5 +383,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "DMSans_600SemiBold",
     color: Colors.light.emergency,
+  },
+  retryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primary,
+    marginTop: 4,
+  },
+  retryBtnText: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#fff",
   },
 });
