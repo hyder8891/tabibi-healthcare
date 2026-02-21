@@ -107,13 +107,24 @@ export function registerGeoRoutes(app: Express): void {
         }
       }
       
-      const keywordMap: Record<string, string> = {
-        lab: "medical laboratory diagnostic مختبر تحليلات",
-        clinic: "medical clinic عيادة",
+      const lat = parseFloat(latitude as string);
+      const lng = parseFloat(longitude as string);
+      const isMENA = lat >= 12 && lat <= 42 && lng >= -17 && lng <= 63;
+
+      const keywordMapMENA: Record<string, string> = {
+        lab: "medical laboratory diagnostic مختبر تحليلات طبية",
+        clinic: "medical clinic عيادة طبية",
         hospital: "hospital مستشفى",
         pharmacy: "pharmacy صيدلية",
       };
-      const keyword = keywordMap[type as string] || "";
+      const keywordMapGlobal: Record<string, string> = {
+        lab: "medical laboratory diagnostic pathology",
+        clinic: "medical clinic doctor",
+        hospital: "hospital",
+        pharmacy: "pharmacy",
+      };
+      const keywordSource = isMENA ? keywordMapMENA : keywordMapGlobal;
+      const keyword = keywordSource[type as string] || "";
 
       let url: string;
       if (pagetoken) {
