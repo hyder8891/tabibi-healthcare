@@ -1,24 +1,43 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import type { AssessmentResult } from "@/lib/types";
+import type { AssessmentResult, MedicineRecommendation } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
 
 interface RecommendationCardProps {
   result: AssessmentResult;
   onFindPharmacy?: () => void;
   onFindLab?: () => void;
-  onOrderMedicine?: (med: { name: string; dosage: string; frequency: string }) => void;
+  onOrderMedicines?: (meds: { name: string; dosage: string; frequency: string }[]) => void;
 }
 
 export function RecommendationCard({
   result,
   onFindPharmacy,
   onFindLab,
-  onOrderMedicine,
+  onOrderMedicines,
 }: RecommendationCardProps) {
   const { t, isRTL } = useSettings();
+
+  const medicines = result?.recommendations?.pathwayA?.medicines || [];
+  const [selectedMeds, setSelectedMeds] = useState<Record<number, boolean>>(
+    () => Object.fromEntries(medicines.map((_, i) => [i, true]))
+  );
+
+  const toggleMed = (index: number) => {
+    setSelectedMeds((prev) => ({ ...prev, [index]: !prev[index] }));
+  };
+
+  const selectedCount = Object.values(selectedMeds).filter(Boolean).length;
+
+  const handleOrderSelected = () => {
+    if (!onOrderMedicines) return;
+    const selected = medicines
+      .filter((_, i) => selectedMeds[i])
+      .map((med) => ({ name: med.name, dosage: med.dosage, frequency: med.frequency }));
+    if (selected.length > 0) onOrderMedicines(selected);
+  };
 
   const severity = result?.assessment?.severity || "mild";
 
@@ -71,7 +90,7 @@ export function RecommendationCard({
       )}
 
       {result?.recommendations?.pathwayA?.active &&
-        result.recommendations.pathwayA.medicines?.length > 0 && (
+        medicines.length > 0 && (
           <View style={styles.section}>
             <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <MaterialCommunityIcons
@@ -81,8 +100,25 @@ export function RecommendationCard({
               />
               <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Recommended Medicines", "الأدوية الموصى بها")}</Text>
             </View>
-            {result.recommendations.pathwayA.medicines.map((med, i) => (
-              <View key={i} style={styles.medCard}>
+            {medicines.map((med, i) => (
+              <View key={i} style={[styles.medCard, !selectedMeds[i] && styles.medCardDeselected]}>
+                {onOrderMedicines && medicines.length > 1 && (
+                  <Pressable
+                    style={[styles.checkboxRow, isRTL && { flexDirection: "row-reverse" }]}
+                    onPress={() => toggleMed(i)}
+                    hitSlop={8}
+                  >
+                    <View style={[styles.checkbox, selectedMeds[i] && styles.checkboxChecked]}>
+                      {selectedMeds[i] && <Ionicons name="checkmark" size={14} color="#fff" />}
+                    </View>
+                    <Text style={[styles.checkboxLabel, isRTL && { textAlign: "right" }]}>
+                      {selectedMeds[i]
+                        ? t("Selected for order", "محدد للطلب")
+                        : t("Tap to include", "اضغط لتضمينه")}
+                    </Text>
+                  </Pressable>
+                )}
+
                 <View style={[styles.medTitleRow, isRTL && { flexDirection: "row-reverse" }]}>
                   <MaterialCommunityIcons name="pill" size={18} color={Colors.light.primary} />
                   <View style={{ flex: 1 }}>
@@ -152,22 +188,33 @@ export function RecommendationCard({
                     ))}
                   </View>
                 )}
-
-                {onOrderMedicine && (
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.orderMedBtn,
-                      isRTL && { flexDirection: "row-reverse" },
-                      pressed && { opacity: 0.8 },
-                    ]}
-                    onPress={() => onOrderMedicine({ name: med.name, dosage: med.dosage, frequency: med.frequency })}
-                  >
-                    <MaterialCommunityIcons name="truck-delivery-outline" size={16} color={Colors.light.primary} />
-                    <Text style={styles.orderMedBtnText}>{t("Order for Delivery", "اطلب للتوصيل")}</Text>
-                  </Pressable>
-                )}
               </View>
             ))}
+
+            {onOrderMedicines && (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.orderAllBtn,
+                  isRTL && { flexDirection: "row-reverse" },
+                  pressed && { opacity: 0.8 },
+                  selectedCount === 0 && styles.orderAllBtnDisabled,
+                ]}
+                onPress={handleOrderSelected}
+                disabled={selectedCount === 0}
+              >
+                <MaterialCommunityIcons name="truck-delivery-outline" size={18} color={selectedCount === 0 ? Colors.light.textTertiary : Colors.light.primary} />
+                <Text style={[styles.orderAllBtnText, selectedCount === 0 && { color: Colors.light.textTertiary }]}>
+                  {medicines.length === 1
+                    ? t("Order for Delivery", "اطلب للتوصيل")
+                    : selectedCount === medicines.length
+                      ? t(`Order All ${medicines.length} Medicines`, `اطلب جميع الأدوية (${medicines.length})`)
+                      : selectedCount > 0
+                        ? t(`Order ${selectedCount} Selected`, `اطلب ${selectedCount} أدوية محددة`)
+                        : t("Select medicines to order", "اختر الأدوية للطلب")}
+                </Text>
+              </Pressable>
+            )}
+
             {onFindPharmacy && (
               <Pressable
                 style={({ pressed }) => [
@@ -359,6 +406,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.light.borderLight,
   },
+  medCardDeselected: {
+    opacity: 0.5,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.borderLight,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.light.textTertiary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  checkboxLabel: {
+    fontSize: 12,
+    fontWeight: "500" as const,
+    color: Colors.light.textTertiary,
+  },
   medTitleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -437,20 +514,25 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     paddingLeft: 20,
   },
-  orderMedBtn: {
+  orderAllBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    marginTop: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: 8,
+    marginTop: 6,
+    marginBottom: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
     backgroundColor: Colors.light.primarySurface,
     borderWidth: 1,
     borderColor: Colors.light.primaryLight,
   },
-  orderMedBtnText: {
-    fontSize: 13,
+  orderAllBtnDisabled: {
+    backgroundColor: Colors.light.background,
+    borderColor: Colors.light.borderLight,
+  },
+  orderAllBtnText: {
+    fontSize: 14,
     fontWeight: "600" as const,
     color: Colors.light.primary,
   },

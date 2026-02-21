@@ -157,13 +157,11 @@ export default function ResultsScreen() {
                 },
               })
             }
-            onOrderMedicine={(med) =>
+            onOrderMedicines={(meds) =>
               router.push({
                 pathname: "/order",
                 params: {
-                  medicineName: med.name,
-                  medicineDosage: med.dosage,
-                  medicineFrequency: med.frequency,
+                  medicines: JSON.stringify(meds),
                 },
               })
             }

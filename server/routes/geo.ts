@@ -150,9 +150,6 @@ export function registerGeoRoutes(app: Express): void {
         return res.status(500).json({ error: `Google Places API error: ${data.status}` });
       }
 
-      const lat = parseFloat(latitude as string);
-      const lng = parseFloat(longitude as string);
-
       const facilities = (data.results || []).map((place: any, index: number) => {
         const placeLat = place.geometry?.location?.lat || lat;
         const placeLng = place.geometry?.location?.lng || lng;

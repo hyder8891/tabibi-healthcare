@@ -33,15 +33,14 @@ export default function OrderScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
-  const {
-    medicineName = "",
-    medicineDosage = "",
-    medicineFrequency = "",
-  } = useLocalSearchParams<{
-    medicineName?: string;
-    medicineDosage?: string;
-    medicineFrequency?: string;
+  const { medicines: medicinesParam = "[]" } = useLocalSearchParams<{
+    medicines?: string;
   }>();
+
+  type OrderMedicine = { name: string; dosage: string; frequency: string };
+  const medicinesList: OrderMedicine[] = (() => {
+    try { return JSON.parse(medicinesParam as string); } catch { return []; }
+  })();
 
   const [step, setStep] = useState<OrderStep>("pharmacy");
   const [profile, setProfile] = useState<PatientProfile | null>(null);
@@ -53,7 +52,6 @@ export default function OrderScreen() {
   const [patientName, setPatientName] = useState("");
   const [patientPhone, setPatientPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
@@ -137,10 +135,13 @@ export default function OrderScreen() {
       return;
     }
     const cleanPhone = phone.startsWith("+") ? phone.substring(1) : phone;
+    const medsListText = medicinesList.map((m, i) =>
+      `${i + 1}. ${m.name}${m.dosage ? ` - ${m.dosage}` : ""}${m.frequency ? ` (${m.frequency})` : ""}`
+    ).join("\n");
     const message = encodeURIComponent(
       isRTL
-        ? `مرحباً، أود طلب الدواء التالي:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nالكمية: ${quantity}\n\nهل هو متوفر لديكم؟`
-        : `Hello, I'd like to order the following medicine:\n${medicineName}${medicineDosage ? ` - ${medicineDosage}` : ""}${medicineFrequency ? ` - ${medicineFrequency}` : ""}\nQuantity: ${quantity}\n\nIs it available?`,
+        ? `مرحباً، أود طلب الأدوية التالية:\n${medsListText}\n\nهل هي متوفرة لديكم؟`
+        : `Hello, I'd like to order the following medicines:\n${medsListText}\n\nAre they available?`,
     );
     Linking.openURL(`https://wa.me/${cleanPhone}?text=${message}`).catch(() => {
       Alert.alert(t("Error", "خطأ"), t("Could not open WhatsApp. Make sure it is installed.", "تعذر فتح واتساب. تأكد من تثبيته."));
@@ -174,15 +175,18 @@ export default function OrderScreen() {
     setOrderError(null);
     try {
       const pharmacy = getPharmacyWithPhone(selectedPharmacy);
+      const allMedsName = medicinesList.map(m => m.name).join(" + ");
+      const allMedsDosage = medicinesList.map(m => m.dosage).filter(Boolean).join(" | ");
+      const allMedsFrequency = medicinesList.map(m => m.frequency).filter(Boolean).join(" | ");
       await apiRequest("POST", "/api/orders", {
         pharmacyName: pharmacy.name,
         pharmacyPhone: pharmacy.internationalPhone || pharmacy.phone || "",
         pharmacyAddress: pharmacy.address,
         pharmacyPlaceId: pharmacy.placeId || "",
-        medicineName: medicineName || "Unnamed Medicine",
-        medicineDosage: medicineDosage || "",
-        medicineFrequency: medicineFrequency || "",
-        quantity,
+        medicineName: allMedsName || "Unnamed Medicine",
+        medicineDosage: allMedsDosage || "",
+        medicineFrequency: allMedsFrequency || "",
+        quantity: 1,
         deliveryAddress: deliveryAddress.trim(),
         patientName: patientName.trim(),
         patientPhone: patientPhone.trim(),
@@ -206,12 +210,16 @@ export default function OrderScreen() {
       <View style={styles.medicineInfoCard}>
         <MaterialCommunityIcons name="pill" size={24} color={Colors.light.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.medicineTitle, isRTL && { textAlign: "right" }]}>{medicineName}</Text>
-          {medicineDosage ? (
-            <Text style={[styles.medicineDetail, isRTL && { textAlign: "right" }]}>
-              {medicineDosage}{medicineFrequency ? ` | ${medicineFrequency}` : ""}
+          <Text style={[styles.medicineTitle, isRTL && { textAlign: "right" }]}>
+            {medicinesList.length > 1
+              ? t(`${medicinesList.length} Medicines`, `${medicinesList.length} أدوية`)
+              : medicinesList[0]?.name || t("Medicine", "دواء")}
+          </Text>
+          {medicinesList.map((med, i) => (
+            <Text key={i} style={[styles.medicineDetail, isRTL && { textAlign: "right" }]}>
+              {medicinesList.length > 1 ? `${i + 1}. ` : ""}{med.name}{med.dosage ? ` - ${med.dosage}` : ""}
             </Text>
-          ) : null}
+          ))}
         </View>
       </View>
 
@@ -318,25 +326,6 @@ export default function OrderScreen() {
         />
 
         <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
-          {t("Quantity", "الكمية")}
-        </Text>
-        <View style={[styles.quantityRow, isRTL && { flexDirection: "row-reverse" }]}>
-          <Pressable
-            style={styles.quantityBtn}
-            onPress={() => setQuantity(Math.max(1, quantity - 1))}
-          >
-            <Ionicons name="remove" size={20} color={Colors.light.primary} />
-          </Pressable>
-          <Text style={styles.quantityText}>{quantity}</Text>
-          <Pressable
-            style={styles.quantityBtn}
-            onPress={() => setQuantity(Math.min(10, quantity + 1))}
-          >
-            <Ionicons name="add" size={20} color={Colors.light.primary} />
-          </Pressable>
-        </View>
-
-        <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
           {t("Notes (optional)", "ملاحظات (اختياري)")}
         </Text>
         <TextInput
@@ -358,13 +347,14 @@ export default function OrderScreen() {
         <View style={[styles.confirmRow, isRTL && { flexDirection: "row-reverse" }]}>
           <MaterialCommunityIcons name="pill" size={20} color={Colors.light.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.confirmLabel, isRTL && { textAlign: "right" }]}>{t("Medicine", "الدواء")}</Text>
-            <Text style={[styles.confirmValue, isRTL && { textAlign: "right" }]}>
-              {medicineName}{medicineDosage ? ` - ${medicineDosage}` : ""}
+            <Text style={[styles.confirmLabel, isRTL && { textAlign: "right" }]}>
+              {medicinesList.length > 1 ? t("Medicines", "الأدوية") : t("Medicine", "الدواء")}
             </Text>
-            <Text style={[styles.confirmSub, isRTL && { textAlign: "right" }]}>
-              {t("Qty:", "الكمية:")} {quantity}
-            </Text>
+            {medicinesList.map((med, i) => (
+              <Text key={i} style={[styles.confirmValue, isRTL && { textAlign: "right" }]}>
+                {medicinesList.length > 1 ? `${i + 1}. ` : ""}{med.name}{med.dosage ? ` - ${med.dosage}` : ""}
+              </Text>
+            ))}
           </View>
         </View>
 
