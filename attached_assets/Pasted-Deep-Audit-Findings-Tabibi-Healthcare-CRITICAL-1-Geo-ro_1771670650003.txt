@@ -1,0 +1,118 @@
+Deep Audit Findings — Tabibi Healthcare
+🔴 CRITICAL
+1. Geo routes have zero authentication (server/routes/geo.ts)
+/api/nearby-facilities, /api/place-photo/:photoRef, and /api/place-details/:placeId have no requireAuth middleware. Any anonymous request burns your Google Maps API quota.
+
+2. pagetoken injected unsanitized into Google API URL (server/routes/geo.ts:108)
+The pagetoken query param is interpolated directly into the upstream Google URL with no format validation — a potential URL-manipulation vector.
+
+3. PHI fields stored as plain text (server/avicenna.ts:147,178,190)
+chronicConditions, medicationHistory, and allergyDetails are encrypted (good), but lastConditions (recent diagnoses), vitalTrends (heart rate history), and preferredPharmacies are stored as plain JSON in the database. Inconsistent and a data-protection gap.
+
+4. Content Security Policy disabled (server/index.ts:228)
+contentSecurityPolicy: false in the Helmet config. The web landing page has no XSS protection.
+
+5. No rate limits on geo, rPPG, or Avicenna routes
+The only per-route limiters are on auth and AI. Google Maps proxy calls and worker-thread rPPG processing have only the global 200 req/15 min limit — far too loose.
+
+6. eventData: z.any() on Avicenna track (server/routes/avicenna.ts:9)
+Clients can store arbitrary JSON blobs of any size and shape in health_events — no schema, no size bound.
+
+🟠 HIGH
+7. SSE streaming: client disconnect not handled (server/routes/ai.ts:301)
+If a user navigates away mid-assessment, the server keeps streaming tokens and burning Gemini API credits. No req.on("close", ...) listener.
+
+8. orders.updatedAt is never actually updated (server/storage.ts:115-119)
+updateOrder modifies order rows but doesn't set updatedAt: new Date(). The field always holds the creation time.
+
+9. assessmentCount incremented non-atomically (server/avicenna.ts:153)
+
+assessmentCount: profile.assessmentCount + 1
+
+This is a read-modify-write without a DB-level atomic operation. Concurrent requests can silently drop increments.
+
+10. (req as any).userId type bypass (multiple avicenna route handlers)
+The auth middleware correctly sets req.userId on the typed Express interface, but several avicenna route handlers bypass TypeScript with (req as any).userId. If the middleware chain ever changes, this fails silently.
+
+11. No audit logging for AI/health events (server/routes/ai.ts, server/routes/rppg.ts)
+Orders are audit-logged. But calls to /api/assess, /api/analyze-medication, /api/check-interactions, and /api/process-rppg (which handle the most sensitive PHI) are never logged.
+
+12. JSON.parse(k.data) unguarded in knowledge route (server/routes/avicenna.ts:175)
+If any row in iraqiHealthKnowledge has malformed data, the .map() throws an unhandled 500 crash.
+
+13. Two separate Neon DB connection pools (server/storage.ts:11, server/avicenna.ts:12)
+storage.ts and avicenna.ts each create their own Pool, consuming up to 5+3=8 connections against the same database for no reason.
+
+🟡 MEDIUM (Performance & Reliability)
+14. Missing database indexes (migrations/)
+No indexes on:
+
+health_events(user_id) — full table scan on every event fetch
+population_analytics(period, period_date, category, item_name) — full scan on every trending query
+orders(user_id) — full scan on user order history
+15. getPersonalInsights runs sequential DB queries (server/avicenna.ts:505–529)
+getTrendingConditions + seasonal knowledge + profile fetch run one after another. They're independent and should be parallelized with Promise.all.
+
+16. getUserOrders has no pagination (server/storage.ts:110)
+Returns all orders for a user with no LIMIT. Unbounded growth.
+
+17. Worker thread spawned per rPPG request — no concurrency cap (server/routes/rppg.ts:16)
+Each /api/process-rppg call spawns a new OS thread. Under burst traffic this can overwhelm the server. p-limit is already in the dependencies.
+
+18. staleTime: Infinity on all React Query queries (lib/query-client.ts:117)
+Data never auto-refreshes. If server state changes (e.g. order status update), the UI shows stale data forever.
+
+🔵 LOW (Code Quality)
+19. console.log as the only logger (server/index.ts:11)
+No log levels, no timestamps, no structure. Makes production debugging painful.
+
+20. Async IIFE has no top-level catch (server/index.ts:266)
+
+(async () => { ... })();
+// ^ unhandled rejection if DB/startup fails
+
+21. No user account deletion endpoint (GDPR)
+There is no /api/account/delete — required for right-to-erasure under GDPR, PDPA, and similar laws.
+
+22. expo-file-system used but not in package.json
+app/assessment.tsx imports expo-file-system for base64 conversion, but it's not an explicit dependency. It works transitively but could break on package updates.
+
+Summary Table
+Severity	Count	Examples
+🔴 Critical	6	Unauthenticated geo routes, unencrypted PHI, CSP off
+🟠 High	7	No SSE disconnect, non-atomic counter, missing audit logs
+🟡 Medium	5	Missing indexes, no pagination, no concurrency cap
+🔵 Low	4	No logger, no GDPR delete, missing top-level catch
+Want me to proceed with implementing all of these? I can do them all at once or priority-by-priority — your call.
+
+No changes made whatsoever — I only read files.
+
+My findings are in my previous message. Here's a quick recap of the severity breakdown:
+
+What I Found (Summary)
+🔴 Critical (6 issues)
+Geo routes have no auth — /api/nearby-facilities, /api/place-photo, /api/place-details are open to anyone, burning your Google Maps quota
+pagetoken injected unsanitized into Google API URL — URL manipulation risk
+3 PHI fields stored as plain text — lastConditions, vitalTrends, preferredPharmacies are unencrypted while other health fields are encrypted
+CSP is disabled — contentSecurityPolicy: false in Helmet, XSS protection missing on web
+No rate limits on geo/rPPG/Avicenna routes — only AI and auth have specific limits
+eventData: z.any() on health event tracking — arbitrary data can be written to DB
+🟠 High (7 issues)
+SSE streaming doesn't handle client disconnect — keeps burning Gemini API tokens after user navigates away
+orders.updatedAt is never updated — always shows creation time
+assessmentCount incremented non-atomically — concurrent requests can lose increments
+(req as any).userId type bypass in Avicenna routes
+No audit logging for AI calls — most sensitive PHI access is unlogged
+JSON.parse(k.data) unguarded in knowledge route — malformed DB row crashes the endpoint
+Two separate DB connection pools — storage.ts and avicenna.ts each create their own
+🟡 Medium (5 issues)
+Missing DB indexes on health_events(user_id), population_analytics, orders(user_id) — full table scans
+getPersonalInsights runs queries sequentially — should use Promise.all
+getUserOrders has no pagination — unbounded result set
+No concurrency cap on rPPG worker threads — burst load spawns unlimited OS threads
+staleTime: Infinity on all React Query queries — UI never refreshes stale data
+🔵 Low (4 issues)
+No structured logger — just console.log, no levels or timestamps
+Async server IIFE has no top-level catch — startup failures are unhandled
+No user data deletion endpoint — GDPR right-to-erasure is missing
+expo-file-system not in package.json — used but only transitively available
