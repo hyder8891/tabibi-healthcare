@@ -107,11 +107,22 @@ export function registerGeoRoutes(app: Express): void {
         }
       }
       
+      const keywordMap: Record<string, string> = {
+        lab: "medical laboratory diagnostic مختبر تحليلات",
+        clinic: "medical clinic عيادة",
+        hospital: "hospital مستشفى",
+        pharmacy: "pharmacy صيدلية",
+      };
+      const keyword = keywordMap[type as string] || "";
+
       let url: string;
       if (pagetoken) {
         url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?pagetoken=${pagetoken}&key=${apiKey}`;
       } else {
         url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${latitude},${longitude}&radius=10000&type=${googleType}&key=${apiKey}`;
+        if (keyword) {
+          url += `&keyword=${encodeURIComponent(keyword)}`;
+        }
       }
 
       const response = await globalThis.fetch(url);
