@@ -37,7 +37,7 @@ export default function OrdersTabScreen() {
   const [loading, setLoading] = useState(true);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
-  const loadOrders = useCallback(async (signal?: AbortSignal) => {
+  const loadOrders = useCallback(async (cancelled?: { current: boolean }) => {
     try {
       setLoading(true);
       const authHeaders = await getAuthHeaders();
@@ -45,26 +45,23 @@ export default function OrdersTabScreen() {
       const url = new URL("/api/orders", baseUrl);
       const res = await fetch(url.toString(), {
         headers: authHeaders,
-        signal,
       });
-      if (res.ok && !signal?.aborted) {
+      if (res.ok && !cancelled?.current) {
         const data = await res.json();
         setOrders(data);
       }
     } catch (err: any) {
-      if (err?.name !== "AbortError") {
-        console.error("Failed to load orders:", err);
-      }
+      console.error("Failed to load orders:", err);
     } finally {
-      if (!signal?.aborted) setLoading(false);
+      if (!cancelled?.current) setLoading(false);
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      const controller = new AbortController();
-      loadOrders(controller.signal);
-      return () => controller.abort();
+      const cancelled = { current: false };
+      loadOrders(cancelled);
+      return () => { cancelled.current = true; };
     }, [loadOrders]),
   );
 

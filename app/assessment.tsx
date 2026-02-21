@@ -341,6 +341,40 @@ export default function AssessmentScreen() {
                   }
                 }
 
+                if (parsedEmergency && parsedResult) {
+                  if (parsedResult.assessment) {
+                    parsedResult.assessment.severity = "severe";
+                  }
+                  setAssessmentResult({ ...parsedResult });
+                } else if (parsedEmergency && !parsedResult) {
+                  parsedResult = {
+                    assessment: {
+                      condition: parsedEmergency.condition || "Emergency",
+                      confidence: "high",
+                      severity: "severe",
+                      description: parsedEmergency.action || "Seek immediate medical attention",
+                    },
+                    pathway: "B",
+                    recommendations: {
+                      pathwayA: { active: false, medicines: [] },
+                      pathwayB: {
+                        active: true,
+                        tests: [{
+                          name: "Emergency evaluation",
+                          type: "lab",
+                          urgency: "emergency",
+                          reason: parsedEmergency.condition,
+                          facilityType: "hospital",
+                          capabilities: ["emergency"],
+                        }],
+                      },
+                    },
+                    warnings: [parsedEmergency.action || "Seek immediate emergency care"],
+                    followUp: "Go to the nearest emergency room immediately",
+                  };
+                  setAssessmentResult(parsedResult);
+                }
+
                 const replies = extractQuickReplies(fullText);
                 if (replies.length > 0) {
                   setQuickReplies(replies);
@@ -612,15 +646,18 @@ export default function AssessmentScreen() {
                       },
                     })
                   }
-                  onOrderMedicine={(med) =>
-                    router.push({
-                      pathname: "/order",
-                      params: {
-                        medicineName: med.name,
-                        medicineDosage: `${med.dosage} - ${med.frequency}`,
-                      },
-                    })
-                  }
+                  onOrderMedicines={(meds) => {
+                    const first = meds[0];
+                    if (first) {
+                      router.push({
+                        pathname: "/order",
+                        params: {
+                          medicineName: first.name,
+                          medicineDosage: `${first.dosage} - ${first.frequency}`,
+                        },
+                      });
+                    }
+                  }}
                 />
               </View>
             ) : null

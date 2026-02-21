@@ -39,17 +39,17 @@ export function RecommendationCard({
     if (selected.length > 0) onOrderMedicines(selected);
   };
 
-  const severity = result?.assessment?.severity || "mild";
+  const severity = result?.assessment?.severity || "moderate";
 
   const severityColor =
-    severity === "severe"
+    severity === "severe" || severity === "urgent"
       ? Colors.light.emergency
       : severity === "moderate"
         ? Colors.light.warning
         : Colors.light.success;
 
   const severityBg =
-    severity === "severe"
+    severity === "severe" || severity === "urgent"
       ? Colors.light.emergencyLight
       : severity === "moderate"
         ? Colors.light.warningLight
@@ -62,7 +62,7 @@ export function RecommendationCard({
           <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
           <Text style={[styles.severityText, { color: severityColor }]}>
             {isRTL
-              ? (severity === "severe" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
+              ? (severity === "severe" || severity === "urgent" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
               : severity.toUpperCase()}
           </Text>
         </View>

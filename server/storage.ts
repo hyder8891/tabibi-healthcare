@@ -36,18 +36,30 @@ function encryptOrder(order: InsertOrder): InsertOrder {
   };
 }
 
+function safeDecrypt(value: string): string;
+function safeDecrypt(value: null): null;
+function safeDecrypt(value: string | null): string | null;
+function safeDecrypt(value: string | null): string | null {
+  if (!value) return value;
+  try {
+    return decrypt(value);
+  } catch {
+    return value;
+  }
+}
+
 function decryptOrder(order: Order): Order {
   return {
     ...order,
-    medicineName: order.medicineName ? decrypt(order.medicineName) : order.medicineName,
-    medicineDosage: order.medicineDosage ? decrypt(order.medicineDosage) : order.medicineDosage,
-    patientName: order.patientName ? decrypt(order.patientName) : order.patientName,
-    patientPhone: order.patientPhone ? decrypt(order.patientPhone) : order.patientPhone,
-    notes: order.notes ? decrypt(order.notes) : order.notes,
-    deliveryAddress: order.deliveryAddress ? decrypt(order.deliveryAddress) : order.deliveryAddress,
-    pharmacyPhone: order.pharmacyPhone ? decrypt(order.pharmacyPhone) : order.pharmacyPhone,
-    pharmacyAddress: order.pharmacyAddress ? decrypt(order.pharmacyAddress) : order.pharmacyAddress,
-    medicineFrequency: order.medicineFrequency ? decrypt(order.medicineFrequency) : order.medicineFrequency,
+    medicineName: safeDecrypt(order.medicineName) as string,
+    medicineDosage: safeDecrypt(order.medicineDosage) as string,
+    patientName: safeDecrypt(order.patientName) as string,
+    patientPhone: safeDecrypt(order.patientPhone) as string,
+    notes: safeDecrypt(order.notes),
+    deliveryAddress: safeDecrypt(order.deliveryAddress),
+    pharmacyPhone: safeDecrypt(order.pharmacyPhone),
+    pharmacyAddress: safeDecrypt(order.pharmacyAddress),
+    medicineFrequency: safeDecrypt(order.medicineFrequency),
   };
 }
 

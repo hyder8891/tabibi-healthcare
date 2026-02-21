@@ -33,7 +33,7 @@ export function AssessmentCard({
 
   const severity = assessment.result?.assessment?.severity;
   const severityColor = severity
-    ? severity === "severe"
+    ? severity === "severe" || severity === "urgent"
       ? Colors.light.emergency
       : severity === "moderate"
         ? Colors.light.warning
