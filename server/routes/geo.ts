@@ -1,4 +1,14 @@
 import type { Express, Request, Response } from "express";
+import rateLimit from "express-rate-limit";
+import { requireAuth } from "./middleware";
+
+const geoLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // Cache for Place Details API responses
 const placeDetailsCache = new Map<string, { data: any; expires: number }>();
@@ -69,7 +79,7 @@ function setCachedNearbySearch(cacheKey: string, data: any): void {
 }
 
 export function registerGeoRoutes(app: Express): void {
-  app.get("/api/nearby-facilities", async (req: Request, res: Response) => {
+  app.get("/api/nearby-facilities", geoLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const { latitude, longitude, type, pagetoken } = req.query;
 
@@ -183,7 +193,7 @@ export function registerGeoRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/place-photo/:photoRef", async (req: Request, res: Response) => {
+  app.get("/api/place-photo/:photoRef", geoLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const { photoRef } = req.params;
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;
@@ -210,7 +220,7 @@ export function registerGeoRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/place-details/:placeId", async (req: Request, res: Response) => {
+  app.get("/api/place-details/:placeId", geoLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const { placeId } = req.params;
       const apiKey = process.env.GOOGLE_MAPS_API_KEY;

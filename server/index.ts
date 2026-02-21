@@ -5,10 +5,11 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import * as fs from "fs";
 import * as path from "path";
+import { logger } from "./logger";
 
 const app = express();
 app.set("trust proxy", 1);
-const log = console.log;
+const log = logger.info;
 
 declare module "http" {
   interface IncomingMessage {
@@ -224,7 +225,16 @@ function configureExpoAndLanding(app: express.Application) {
 
 function setupSecurityHeaders(app: express.Application) {
   app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+        connectSrc: ["'self'"],
+        frameSrc: ["'none'"],
+      },
+    },
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: { policy: "cross-origin" },
     hsts: {
@@ -287,4 +297,4 @@ function setupErrorHandler(app: express.Application) {
       log(`express server serving on port ${port}`);
     },
   );
-})();
+})().catch((err) => { console.error("Fatal startup error:", err); process.exit(1); });

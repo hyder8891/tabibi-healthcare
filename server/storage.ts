@@ -8,7 +8,7 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL environment variable is required");
 }
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   max: 5,
   idleTimeoutMillis: 30000,
@@ -19,7 +19,7 @@ pool.on("error", (err: Error) => {
   console.error("Unexpected database pool error:", err.message);
 });
 
-const db = drizzle(pool);
+export const db = drizzle(pool);
 
 function encryptOrder(order: InsertOrder): InsertOrder {
   return {
@@ -114,7 +114,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order> {
     const encryptedData = encryptOrder(data as InsertOrder) as Partial<InsertOrder>;
-    const [order] = await db.update(orders).set(encryptedData).where(eq(orders.id, id)).returning();
+    const [order] = await db.update(orders).set({ ...encryptedData, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
     return decryptOrder(order);
   }
 

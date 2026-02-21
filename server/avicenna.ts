@@ -1,7 +1,6 @@
 import { eq, desc, sql, and, gte } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import { Pool } from "@neondatabase/serverless";
 import { encrypt, decrypt } from "./encryption";
+import { db } from "./storage";
 import {
   healthProfiles, healthEvents, populationAnalytics, iraqiHealthKnowledge,
   type HealthProfile, type InsertHealthProfile,
@@ -9,19 +8,11 @@ import {
   type PopulationAnalytic, type IraqiHealthKnowledge,
 } from "@shared/schema";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL!,
-  max: 3,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 5000,
-});
-const db = drizzle(pool);
-
 function encryptHealthData(data: any): string {
   return encrypt(JSON.stringify(data));
 }
 
-function decryptHealthData(encrypted: string | null): any {
+export function decryptHealthData(encrypted: string | null): any {
   if (!encrypted) return null;
   try {
     return JSON.parse(decrypt(encrypted));
@@ -144,7 +135,7 @@ export class AvicennaService {
       if (medHistory.length > 50) medHistory.splice(0, medHistory.length - 50);
     }
 
-    const lastConditions: string[] = safeJsonParse(profile.lastConditions) || [];
+    const lastConditions: string[] = decryptHealthData(profile.lastConditions) || [];
     if (assessmentData.condition) {
       lastConditions.unshift(assessmentData.condition);
       if (lastConditions.length > 10) lastConditions.pop();
@@ -153,8 +144,8 @@ export class AvicennaService {
     await this.updateHealthProfile(userId, {
       chronicConditions: encryptHealthData(currentConditions),
       medicationHistory: encryptHealthData(medHistory),
-      assessmentCount: profile.assessmentCount + 1,
-      lastConditions: JSON.stringify(lastConditions),
+      assessmentCount: sql`${healthProfiles.assessmentCount} + 1` as unknown as number,
+      lastConditions: encryptHealthData(lastConditions),
     });
   }
 
@@ -167,7 +158,7 @@ export class AvicennaService {
     if (!vitalData.validReading) return;
     const profile = await this.getOrCreateHealthProfile(userId);
     const trends: Array<{ type: string; value: number; date: string; confidence?: string }> =
-      safeJsonParse(profile.vitalTrends) || [];
+      decryptHealthData(profile.vitalTrends) || [];
     trends.push({
       type: vitalData.type,
       value: vitalData.value,
@@ -176,7 +167,7 @@ export class AvicennaService {
     });
     if (trends.length > 100) trends.splice(0, trends.length - 100);
     await this.updateHealthProfile(userId, {
-      vitalTrends: JSON.stringify(trends),
+      vitalTrends: encryptHealthData(trends),
     });
   }
 
@@ -350,7 +341,7 @@ export class AvicennaService {
           context += `- Family health history: ${JSON.stringify(familyHx)}\n`;
         }
 
-        const vitals = safeJsonParse(profile.vitalTrends);
+        const vitals = decryptHealthData(profile.vitalTrends);
         if (vitals && vitals.length > 0) {
           const recentVitals = vitals.slice(-5);
           const vitalSummary = recentVitals.map((v: any) =>
@@ -363,7 +354,7 @@ export class AvicennaService {
           context += `- Total assessments: ${profile.assessmentCount}\n`;
         }
 
-        const lastConds = safeJsonParse(profile.lastConditions);
+        const lastConds = decryptHealthData(profile.lastConditions);
         if (lastConds && lastConds.length > 0) {
           context += `- Recent diagnosed conditions: ${lastConds.slice(0, 5).join(", ")}\n`;
           const recurrences = lastConds.filter((c: string, i: number) => lastConds.indexOf(c) !== i);
@@ -445,8 +436,8 @@ export class AvicennaService {
     const conditions = decryptHealthData(profile.chronicConditions) || [];
     const allergies = decryptHealthData(profile.allergyDetails) || [];
     const medHistory = decryptHealthData(profile.medicationHistory) || [];
-    const vitals: Array<{ type: string; value: number; date: string }> = safeJsonParse(profile.vitalTrends) || [];
-    const lastConds: string[] = safeJsonParse(profile.lastConditions) || [];
+    const vitals: Array<{ type: string; value: number; date: string }> = decryptHealthData(profile.vitalTrends) || [];
+    const lastConds: string[] = decryptHealthData(profile.lastConditions) || [];
 
     const riskLevel = this.computeRiskLevel(conditions, vitals, profile.assessmentCount);
 
@@ -502,11 +493,14 @@ export class AvicennaService {
 
     const now = new Date();
     const month = now.getMonth() + 1;
-    const seasonal = await db.select().from(iraqiHealthKnowledge)
-      .where(and(
-        eq(iraqiHealthKnowledge.category, "seasonal_pattern"),
-        eq(iraqiHealthKnowledge.isActive, true),
-      ));
+    const [seasonal, trending] = await Promise.all([
+      db.select().from(iraqiHealthKnowledge)
+        .where(and(
+          eq(iraqiHealthKnowledge.category, "seasonal_pattern"),
+          eq(iraqiHealthKnowledge.isActive, true),
+        )),
+      this.getTrendingConditions(7, 5),
+    ]);
     const relevantSeasonal = seasonal.filter(s => {
       const data = safeJsonParse(s.data);
       return data?.months?.includes(month);
@@ -525,8 +519,6 @@ export class AvicennaService {
         priority: 3,
       });
     }
-
-    const trending = await this.getTrendingConditions(7, 5);
 
     return {
       healthSummary: {

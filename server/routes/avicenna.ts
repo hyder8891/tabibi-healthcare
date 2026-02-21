@@ -1,12 +1,32 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "./middleware";
-import { avicenna } from "../avicenna";
+import { avicenna, decryptHealthData } from "../avicenna";
+
+const avicennaWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const avicennaReadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const trackEventSchema = z.object({
   eventType: z.string().min(1).max(100),
   category: z.enum(["symptom", "medication", "vital", "facility", "order", "scan", "assessment"]),
-  eventData: z.any().optional(),
+  eventData: z.unknown().optional().refine(
+    (v) => v === undefined || JSON.stringify(v).length < 2048,
+    "eventData must be under 2KB"
+  ),
   tags: z.array(z.string().max(200)).max(20).optional(),
   outcome: z.enum(["resolved", "recurring", "worsened", "unknown"]).optional(),
 });
@@ -40,7 +60,7 @@ const vitalDataSchema = z.object({
 });
 
 export function registerAvicennaRoutes(app: Express): void {
-  app.post("/api/avicenna/track", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/avicenna/track", avicennaWriteLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const validation = trackEventSchema.safeParse(req.body);
       if (!validation.success) {
@@ -58,7 +78,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/avicenna/sync-profile", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/avicenna/sync-profile", avicennaWriteLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const validation = syncProfileSchema.safeParse(req.body);
       if (!validation.success) {
@@ -73,7 +93,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/avicenna/assessment-outcome", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/avicenna/assessment-outcome", avicennaWriteLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const validation = assessmentOutcomeSchema.safeParse(req.body);
       if (!validation.success) {
@@ -113,7 +133,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.post("/api/avicenna/vital", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/avicenna/vital", avicennaWriteLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const validation = vitalDataSchema.safeParse(req.body);
       if (!validation.success) {
@@ -139,7 +159,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/avicenna/insights", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/avicenna/insights", avicennaReadLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
       const insights = await avicenna.getPersonalInsights(userId);
@@ -172,7 +192,7 @@ export function registerAvicennaRoutes(app: Express): void {
         id: k.id,
         nameEn: k.nameEn,
         nameAr: k.nameAr,
-        data: JSON.parse(k.data),
+        data: (() => { try { return JSON.parse(k.data); } catch { return {}; } })(),
         prevalenceRank: k.prevalenceRank,
       })));
     } catch (err) {
@@ -181,7 +201,7 @@ export function registerAvicennaRoutes(app: Express): void {
     }
   });
 
-  app.get("/api/avicenna/health-profile", requireAuth, async (req: Request, res: Response) => {
+  app.get("/api/avicenna/health-profile", avicennaReadLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = (req as any).userId;
       const profile = await avicenna.getHealthProfile(userId);
@@ -191,7 +211,7 @@ export function registerAvicennaRoutes(app: Express): void {
       res.json({
         exists: true,
         assessmentCount: profile.assessmentCount,
-        lastConditions: profile.lastConditions ? JSON.parse(profile.lastConditions) : [],
+        lastConditions: decryptHealthData(profile.lastConditions) || [],
         region: profile.region,
         hasVitals: !!profile.vitalTrends,
         updatedAt: profile.updatedAt,

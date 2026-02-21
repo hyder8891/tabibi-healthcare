@@ -2,7 +2,19 @@ import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import { Worker } from "worker_threads";
 import path from "path";
+import rateLimit from "express-rate-limit";
 import { requireAuth } from "./middleware";
+
+const rppgLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many requests, please try again later" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+let activeWorkers = 0;
+const MAX_CONCURRENT_WORKERS = 3;
 
 const rppgSchema = z.object({
   signals: z.array(z.object({
@@ -45,16 +57,25 @@ function processInWorker(signals: Array<{r: number, g: number, b: number}>, fps?
 }
 
 export function registerRppgRoutes(app: Express): void {
-  app.post("/api/process-rppg", requireAuth, async (req: Request, res: Response) => {
+  app.post("/api/process-rppg", rppgLimiter, requireAuth, async (req: Request, res: Response) => {
     try {
       const validation = rppgSchema.safeParse(req.body);
       if (!validation.success) {
-        return res.status(400).json({ 
-          error: "At least 30 RGB signal samples are required (10+ seconds of data)" 
+        return res.status(400).json({
+          error: "At least 30 RGB signal samples are required (10+ seconds of data)"
         });
       }
 
-      const result = await processInWorker(validation.data.signals, validation.data.fps);
+      if (activeWorkers >= MAX_CONCURRENT_WORKERS) {
+        return res.status(429).json({ error: "Processing queue full, please try again shortly" });
+      }
+      activeWorkers++;
+      let result: any;
+      try {
+        result = await processInWorker(validation.data.signals, validation.data.fps);
+      } finally {
+        activeWorkers--;
+      }
       res.json(result);
     } catch (error) {
       console.error("rPPG processing error:", error instanceof Error ? error.message : "Unknown error");

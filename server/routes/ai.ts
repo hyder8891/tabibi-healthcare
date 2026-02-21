@@ -308,8 +308,11 @@ Be thorough and specific. Provide your analysis in the same language the user is
       });
 
       let fullResponse = "";
+      let aborted = false;
+      req.on("close", () => { aborted = true; });
 
       for await (const chunk of stream) {
+        if (aborted) break;
         const content = chunk.text || "";
         if (content) {
           fullResponse += content;
