@@ -627,43 +627,44 @@ export default function AssessmentScreen() {
           }
         />
 
-        {pendingImage && (
-          <View style={styles.imagePreviewContainer}>
-            <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} />
-            <Pressable
-              style={styles.removeImageButton}
-              onPress={() => setPendingImage(null)}
-            >
-              <Ionicons name="close-circle" size={22} color={Colors.light.emergency} />
-            </Pressable>
-          </View>
-        )}
-
-        {quickReplies.length > 0 && !isLoading && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickRepliesContainer}
-            keyboardShouldPersistTaps="handled"
-          >
-            {quickReplies.map((reply, i) => (
+        <View style={styles.bottomBar}>
+          {pendingImage && (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} />
               <Pressable
-                key={i}
-                style={({ pressed }) => [
-                  styles.quickReplyPill,
-                  pressed && styles.quickReplyPillPressed,
-                ]}
-                onPress={() => handleQuickReply(reply)}
+                style={styles.removeImageButton}
+                onPress={() => setPendingImage(null)}
               >
-                <Text style={styles.quickReplyText}>{reply}</Text>
+                <Ionicons name="close-circle" size={22} color={Colors.light.emergency} />
               </Pressable>
-            ))}
-          </ScrollView>
-        )}
+            </View>
+          )}
 
-        <View
-          style={[styles.inputContainer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}
-        >
+          {quickReplies.length > 0 && !isLoading && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickRepliesContainer}
+              keyboardShouldPersistTaps="handled"
+            >
+              {quickReplies.map((reply, i) => (
+                <Pressable
+                  key={i}
+                  style={({ pressed }) => [
+                    styles.quickReplyPill,
+                    pressed && styles.quickReplyPillPressed,
+                  ]}
+                  onPress={() => handleQuickReply(reply)}
+                >
+                  <Text style={styles.quickReplyText}>{reply}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+
+          <View
+            style={[styles.inputContainer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}
+          >
           <View style={styles.inputWrapper}>
             <Pressable
               style={styles.attachButton}
@@ -706,6 +707,7 @@ export default function AssessmentScreen() {
               )}
             </Pressable>
           </View>
+        </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -898,6 +900,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.textSecondary,
+  },
+  bottomBar: {
+    backgroundColor: Colors.light.background,
   },
   quickRepliesContainer: {
     paddingHorizontal: 16,
