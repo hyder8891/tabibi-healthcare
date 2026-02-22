@@ -40,18 +40,15 @@ export interface MedGemmaMessage {
   content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
-function formatContentForAPI(content: MedGemmaMessage["content"]): Array<{type: string; text?: string; image_url?: {url: string}}> {
-  if (typeof content === "string") {
-    return [{ type: "text", text: content }];
+function formatMessageForAPI(msg: MedGemmaMessage): { role: string; content: string | Array<{type: string; text?: string; image_url?: {url: string}}> } {
+  if (typeof msg.content === "string") {
+    return { role: msg.role, content: msg.content };
   }
-  return content;
+  return { role: msg.role, content: msg.content };
 }
 
 function buildRequestBody(messages: MedGemmaMessage[], maxTokens: number) {
-  const formattedMessages = messages.map(m => ({
-    role: m.role,
-    content: formatContentForAPI(m.content),
-  }));
+  const formattedMessages = messages.map(formatMessageForAPI);
 
   return {
     instances: [
@@ -99,6 +96,18 @@ export async function callMedGemma(
   const token = await getAccessToken();
   const body = buildRequestBody(messages, options?.maxTokens ?? 4096);
 
+  console.log("[MedGemma] Request URL:", PREDICT_URL);
+  console.log("[MedGemma] Messages count:", messages.length);
+  console.log("[MedGemma] Roles:", messages.map(m => m.role).join(", "));
+  console.log("[MedGemma] Last user message preview:", 
+    (() => {
+      const lastUser = [...messages].reverse().find(m => m.role === "user");
+      if (!lastUser) return "(none)";
+      const c = typeof lastUser.content === "string" ? lastUser.content : JSON.stringify(lastUser.content);
+      return c.substring(0, 200);
+    })()
+  );
+
   const response = await fetch(PREDICT_URL, {
     method: "POST",
     headers: {
@@ -110,12 +119,16 @@ export async function callMedGemma(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("MedGemma API error:", response.status, errorText.substring(0, 500));
+    console.error("[MedGemma] API error:", response.status, errorText.substring(0, 500));
     throw new Error(`MedGemma API error: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
   const result = await response.json();
-  return extractResponseText(result);
+  console.log("[MedGemma] Raw response structure:", JSON.stringify(result).substring(0, 500));
+  
+  const text = extractResponseText(result);
+  console.log("[MedGemma] Extracted response preview:", text.substring(0, 300));
+  return text;
 }
 
 export function buildImageContent(base64Data: string, mimeType: string, textPrompt: string): MedGemmaMessage["content"] {
