@@ -350,15 +350,18 @@ Be thorough and specific. Provide your analysis in the same language the user is
         config: {
           systemInstruction: systemContext,
           maxOutputTokens: 4096,
+          thinkingConfig: { thinkingBudget: 0 },
         },
       });
 
       for await (const chunk of stream) {
         if (clientDisconnected) break;
-        const content = chunk.text || "";
-        if (content) {
-          fullResponse += content;
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        if (chunk.candidates?.[0]?.content?.parts) {
+          for (const part of chunk.candidates[0].content.parts) {
+            if (part.thought || !part.text) continue;
+            fullResponse += part.text;
+            res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
+          }
         }
       }
 
