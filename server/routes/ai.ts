@@ -420,7 +420,10 @@ Support both Arabic and English text on medication packaging.`;
         }],
         config: { maxOutputTokens: 2048 },
       });
-      const text = response.text || "";
+      let text = response.text || "";
+      console.log("[MedScan] Raw response:", text.substring(0, 500));
+
+      text = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
 
       let medications;
       try {
@@ -502,7 +505,10 @@ Respond ONLY with JSON:
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: { maxOutputTokens: 4096 },
       });
-      const text = interactionResponse.text || "";
+      let text = interactionResponse.text || "";
+      console.log("[Interactions] Raw response:", text.substring(0, 500));
+
+      text = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
 
       let result;
       try {
@@ -512,9 +518,15 @@ Respond ONLY with JSON:
         } else {
           result = { error: "Could not analyze interactions" };
         }
-      } catch {
+      } catch (parseErr) {
+        console.error("[Interactions] JSON parse error:", parseErr);
         result = { error: "Could not analyze interactions" };
       }
+
+      console.log("[Interactions] Parsed result keys:", Object.keys(result));
+      console.log("[Interactions] Interactions count:", result.interactions?.length);
+      console.log("[Interactions] Overall risk:", result.overallRisk);
+      console.log("[Interactions] Summary:", result.summary?.substring(0, 200));
 
       res.json(result);
     } catch (error) {

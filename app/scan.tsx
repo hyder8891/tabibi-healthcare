@@ -19,7 +19,7 @@ import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import Colors from "@/constants/colors";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { getMedications, saveMedications, getProfile, saveProfile } from "@/lib/storage";
 import type { ScannedMedication } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
@@ -130,10 +130,11 @@ export default function ScanScreen() {
     try {
       const apiUrl = getApiUrl();
       const url = new URL("/api/analyze-medication", apiUrl);
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ imageBase64: base64, mimeType }),
       });
 
@@ -224,10 +225,11 @@ export default function ScanScreen() {
     try {
       const apiUrl = getApiUrl();
       const url = new URL("/api/check-interactions", apiUrl);
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch(url.toString(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({ medications: medicationList.map((m) => m.name), language: settings.language }),
       });
 
