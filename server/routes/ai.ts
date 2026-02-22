@@ -9,7 +9,7 @@ const ai = new GoogleGenAI({
 });
 
 const MODEL_FLASH = "gemini-2.5-flash";
-const MODEL_PRO = "gemini-3-1-pro";
+const MODEL_PRO = "gemini-2.5-pro";
 
 function sanitizeInput(text: string): string {
   const injectionPatterns = [
