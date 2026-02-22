@@ -3,8 +3,9 @@ import { GoogleAuth } from "google-auth-library";
 const PROJECT_ID = "agents-487805";
 const LOCATION = "europe-west4";
 const ENDPOINT_ID = "mg-endpoint-85c58ff5-5aae-4b2e-a011-1b6480ee6a7e";
+const DEDICATED_DNS = "2510904126817173504.europe-west4-897097421776.prediction.vertexai.goog";
 
-const VERTEX_AI_BASE = `https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}`;
+const VERTEX_AI_BASE = `https://${DEDICATED_DNS}/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}`;
 
 let authClient: GoogleAuth | null = null;
 

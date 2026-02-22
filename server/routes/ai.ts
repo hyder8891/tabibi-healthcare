@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
-import { streamMedGemmaChat, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
+import { streamMedGemmaChat, callMedGemma, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -288,7 +288,7 @@ export function registerAiRoutes(app: Express): void {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.imageData && lastMessage.role === "user") {
         try {
-          const imageResponse = await ai.models.generateContent({
+          const ocrResponse = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: [
               {
@@ -301,17 +301,16 @@ export function registerAiRoutes(app: Express): void {
                     },
                   },
                   {
-                    text: `You are a medical imaging expert. Thoroughly analyze this medical image. Describe:
-1. The imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
-2. The anatomical region shown
-3. All visible findings - normal and abnormal
-4. Any pathology, lesions, masses, fractures, signal abnormalities, or other notable observations
-5. Clinical significance of the findings
+                    text: `Extract and describe everything visible in this medical image in thorough detail:
+1. Identify the image type (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, prescription, medication label, etc.)
+2. Describe the anatomical region or content shown
+3. List ALL visible text, values, measurements, and labels
+4. Describe all visual features: structures, abnormalities, colors, patterns, morphology
+5. Note any pathology, lesions, masses, fractures, signal abnormalities visible
+6. If lab results: list every value with units and reference ranges if shown
+7. If medication/prescription: extract all drug names, dosages, instructions
 
-If this is a lab result, read all values and flag abnormal ones.
-If this is a skin/wound photo, describe morphology and differential diagnoses.
-If this is a prescription or medication label, extract the medication information.
-Be thorough and specific. Provide your analysis in the same language the user is using.`,
+Be exhaustive. Provide your description in the same language the user is using.`,
                   },
                 ],
               },
@@ -320,7 +319,17 @@ Be thorough and specific. Provide your analysis in the same language the user is
               maxOutputTokens: 2048,
             },
           });
-          imageAnalysis = imageResponse.text || "";
+          const ocrText = ocrResponse.text || "";
+
+          if (isMedGemmaConfigured() && ocrText) {
+            imageAnalysis = await callMedGemma([
+              { role: "system", content: "You are a medical imaging expert and clinical diagnostician. Analyze medical image descriptions and provide thorough clinical interpretation." },
+              { role: "user", content: `Based on the following detailed description extracted from a medical image, provide a thorough clinical analysis including findings, abnormalities, differential diagnoses, and clinical significance:\n\n${ocrText}` },
+            ], { temperature: 0.3, maxTokens: 2048 });
+          } else {
+            imageAnalysis = ocrText;
+          }
+
           console.log("Image analysis completed:", imageAnalysis.substring(0, 200));
         } catch (imgErr) {
           console.error("Image analysis error:", imgErr);
@@ -440,20 +449,42 @@ Be thorough and specific. Provide your analysis in the same language the user is
       }
       const { imageBase64, mimeType } = validation.data;
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                inlineData: {
-                  data: imageBase64,
-                  mimeType: mimeType || "image/jpeg",
+      let ocrText = "";
+      try {
+        const ocrResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  inlineData: {
+                    data: imageBase64,
+                    mimeType: mimeType || "image/jpeg",
+                  },
                 },
-              },
-              {
-                text: `Analyze this medication image. Extract ALL visible drug information and respond ONLY with a JSON array:
+                {
+                  text: `Extract ALL visible text from this medication image. Include brand name, generic name, active ingredients, dosage, form, manufacturer, warnings, and any other text visible on the packaging or label. Support both Arabic and English text. Return the extracted text as plain text, organized by category.`,
+                },
+              ],
+            },
+          ],
+          config: {
+            maxOutputTokens: 2048,
+          },
+        });
+        ocrText = ocrResponse.text || "";
+      } catch (ocrErr) {
+        console.error("Medication OCR error:", ocrErr instanceof Error ? ocrErr.message : "Unknown");
+        return res.status(500).json({ error: "Failed to read medication image" });
+      }
+
+      const medAnalysisPrompt = `You are a clinical pharmacist. Based on the following text extracted from a medication image, provide a comprehensive medication analysis.
+
+EXTRACTED TEXT FROM MEDICATION IMAGE:
+${ocrText}
+
+Respond ONLY with a JSON array:
 [
   {
     "name": "Brand name",
@@ -469,18 +500,23 @@ Be thorough and specific. Provide your analysis in the same language the user is
     "warnings": ["warning1"]
   }
 ]
-If you cannot identify the medication, return: [{"error": "Could not identify medication", "suggestion": "Try taking a clearer photo of the medication label"}]
-Support both Arabic and English text on medication packaging.`,
-              },
-            ],
-          },
-        ],
-        config: {
-          maxOutputTokens: 2048,
-        },
-      });
+If you cannot identify the medication from the text, return: [{"error": "Could not identify medication", "suggestion": "Try taking a clearer photo of the medication label"}]`;
 
-      const text = response.text || "";
+      let text: string;
+      if (isMedGemmaConfigured()) {
+        text = await callMedGemma([
+          { role: "system", content: "You are a clinical pharmacist expert. Analyze medications and provide structured drug information." },
+          { role: "user", content: medAnalysisPrompt },
+        ], { temperature: 0.3, maxTokens: 2048 });
+      } else {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: medAnalysisPrompt }] }],
+          config: { maxOutputTokens: 2048 },
+        });
+        text = response.text || "";
+      }
+
       let medications;
       try {
         const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -556,24 +592,21 @@ Respond ONLY with JSON:
 }${langInstruction}`;
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: promptText,
-              },
-            ],
-          },
-        ],
-        config: {
-          maxOutputTokens: 4096,
-        },
-      });
+      let text: string;
+      if (isMedGemmaConfigured()) {
+        text = await callMedGemma([
+          { role: "system", content: "You are a clinical pharmacologist expert specializing in drug-drug interactions. Provide accurate, evidence-based interaction analysis." },
+          { role: "user", content: promptText },
+        ], { temperature: 0.3, maxTokens: 4096 });
+      } else {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: promptText }] }],
+          config: { maxOutputTokens: 4096 },
+        });
+        text = response.text || "";
+      }
 
-      const text = response.text || "";
       let result;
       try {
         const jsonMatch = text.match(/\{[\s\S]*\}/);
