@@ -2,10 +2,9 @@ import { GoogleAuth } from "google-auth-library";
 
 const PROJECT_ID = "agents-487805";
 const LOCATION = "europe-west4";
-const ENDPOINT_ID = "mg-endpoint-85c58ff5-5aae-4b2e-a011-1b6480ee6a7e";
-const DEDICATED_DNS = "2510904126817173504.europe-west4-897097421776.prediction.vertexai.goog";
+const ENDPOINT_ID = "2510904126817173504";
 
-const VERTEX_AI_BASE = `https://${DEDICATED_DNS}/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}`;
+const VERTEX_AI_BASE = `https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}`;
 
 let authClient: GoogleAuth | null = null;
 
@@ -38,7 +37,7 @@ async function getAccessToken(): Promise<string> {
 
 export interface MedGemmaMessage {
   role: "system" | "user" | "assistant";
-  content: string;
+  content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
 export interface MedGemmaStreamChunk {
@@ -56,7 +55,7 @@ export async function streamMedGemmaChat(
   const token = await getAccessToken();
 
   const body = {
-    model: "google/medgemma-27b-text-it",
+    model: "google/medgemma-1.5-4b-it",
     messages,
     stream: true,
     temperature: options?.temperature ?? 0.7,
@@ -75,7 +74,7 @@ export async function streamMedGemmaChat(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("MedGemma API error:", response.status, errorText);
+    console.error("MedGemma API error:", response.status, errorText.substring(0, 500));
     throw new Error(`MedGemma API error: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
@@ -141,7 +140,7 @@ export async function callMedGemma(
   const token = await getAccessToken();
 
   const body = {
-    model: "google/medgemma-27b-text-it",
+    model: "google/medgemma-1.5-4b-it",
     messages,
     stream: false,
     temperature: options?.temperature ?? 0.7,
@@ -160,12 +159,27 @@ export async function callMedGemma(
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error("MedGemma API error:", response.status, errorText);
+    console.error("MedGemma API error:", response.status, errorText.substring(0, 500));
     throw new Error(`MedGemma API error: ${response.status} - ${errorText.substring(0, 200)}`);
   }
 
   const result = await response.json();
   return result.choices?.[0]?.message?.content || "";
+}
+
+export function buildImageContent(base64Data: string, mimeType: string, textPrompt: string): MedGemmaMessage["content"] {
+  return [
+    {
+      type: "image_url",
+      image_url: {
+        url: `data:${mimeType};base64,${base64Data}`,
+      },
+    },
+    {
+      type: "text",
+      text: textPrompt,
+    },
+  ];
 }
 
 export function isMedGemmaConfigured(): boolean {
