@@ -58,7 +58,7 @@ export async function callMedGemma(
           ? [{ type: "text", text: m.content }]
           : m.content,
       })),
-      max_tokens: options?.maxTokens ?? 1024,
+      max_tokens: options?.maxTokens ?? 4096,
       temperature: options?.temperature ?? 0.4,
       top_p: 0.8,
     }],
@@ -96,6 +96,21 @@ export async function callMedGemma(
     } else {
       text = JSON.stringify(prediction);
       console.error("[MedGemma] Unexpected prediction structure, returning raw");
+    }
+  }
+
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+  text = text.replace(/\bthought[\s\S]*?\.\.\./gi, (match) => {
+    if (match.length > 50 && /\d\.\s*\*\*/.test(match)) return "";
+    return match;
+  }).trim();
+  if (/^thought/i.test(text)) {
+    const firstNewlineBlock = text.indexOf("\n\n");
+    if (firstNewlineBlock > 0 && firstNewlineBlock < 500) {
+      const beforeBlock = text.substring(0, firstNewlineBlock);
+      if (/\d\.\s*\*\*/.test(beforeBlock) || /Identify|Assess|Apply|safety rule/i.test(beforeBlock)) {
+        text = text.substring(firstNewlineBlock).trim();
+      }
     }
   }
 
