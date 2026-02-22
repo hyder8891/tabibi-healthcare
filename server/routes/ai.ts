@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
+import { streamMedGemmaChat, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -327,33 +328,9 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
-        const parts: any[] = [];
-        if (m.content) {
-          let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
-          if (m === lastMessage && imageAnalysis) {
-            content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
-          }
-          parts.push({ text: content });
-        }
-        return {
-          role: m.role === "user" ? "user" : "model",
-          parts,
-        };
-      });
-
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
-
-      const stream = await ai.models.generateContentStream({
-        model: "gemini-2.5-flash",
-        contents: chatMessages,
-        config: {
-          systemInstruction: systemContext,
-          maxOutputTokens: 4096,
-        },
-      });
 
       let fullResponse = "";
       let clientDisconnected = false;
@@ -362,18 +339,87 @@ Be thorough and specific. Provide your analysis in the same language the user is
         clientDisconnected = true;
       });
 
-      for await (const chunk of stream) {
-        if (clientDisconnected) break;
-        const content = chunk.text || "";
-        if (content) {
-          fullResponse += content;
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+      const useMedGemma = isMedGemmaConfigured();
+
+      if (useMedGemma) {
+        const medgemmaMessages: MedGemmaMessage[] = [
+          { role: "system", content: systemContext },
+        ];
+
+        for (const m of messages) {
+          let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
+          if (m === lastMessage && imageAnalysis) {
+            content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
+          }
+          medgemmaMessages.push({
+            role: m.role === "user" ? "user" : "assistant",
+            content,
+          });
+        }
+
+        const stream = await streamMedGemmaChat(medgemmaMessages, {
+          temperature: 0.7,
+          maxTokens: 4096,
+        });
+
+        const reader = stream.getReader();
+        while (true) {
+          if (clientDisconnected) {
+            reader.cancel();
+            break;
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value.done) {
+            if (!clientDisconnected) {
+              res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+            }
+            break;
+          }
+          if (value.content) {
+            fullResponse += value.content;
+            res.write(`data: ${JSON.stringify({ content: value.content })}\n\n`);
+          }
+        }
+      } else {
+        const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
+          const parts: any[] = [];
+          if (m.content) {
+            let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
+            if (m === lastMessage && imageAnalysis) {
+              content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
+            }
+            parts.push({ text: content });
+          }
+          return {
+            role: m.role === "user" ? "user" : "model",
+            parts,
+          };
+        });
+
+        const stream = await ai.models.generateContentStream({
+          model: "gemini-2.5-flash",
+          contents: chatMessages,
+          config: {
+            systemInstruction: systemContext,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        for await (const chunk of stream) {
+          if (clientDisconnected) break;
+          const content = chunk.text || "";
+          if (content) {
+            fullResponse += content;
+            res.write(`data: ${JSON.stringify({ content })}\n\n`);
+          }
+        }
+
+        if (!clientDisconnected) {
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         }
       }
 
-      if (!clientDisconnected) {
-        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-      }
       res.end();
     } catch (error) {
       console.error("Assessment error:", error instanceof Error ? error.message : "Unknown error");
