@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
-import { callMedGemma, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -12,6 +11,9 @@ const ai = new GoogleGenAI({
     baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
   },
 });
+
+const MODEL_FLASH = "gemini-2.5-flash";
+const MODEL_PRO = "gemini-2.5-pro";
 
 function sanitizeInput(text: string): string {
   const injectionPatterns = [
@@ -301,7 +303,7 @@ If this is a prescription or medication label, extract the medication informatio
 Be thorough and specific. Provide your analysis in the same language the user is using.`;
 
           const imageResponse = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: MODEL_PRO,
             contents: [{
               role: "user",
               parts: [
@@ -331,78 +333,41 @@ Be thorough and specific. Provide your analysis in the same language the user is
         clientDisconnected = true;
       });
 
-      const useMedGemma = isMedGemmaConfigured();
-
-      if (useMedGemma) {
-        const medgemmaMessages: MedGemmaMessage[] = [
-          { role: "system", content: systemContext },
-        ];
-
-        for (const m of messages) {
+      const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
+        const parts: any[] = [];
+        if (m.content) {
           let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
           if (m === lastMessage && imageAnalysis) {
             content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
           }
-          medgemmaMessages.push({
-            role: m.role === "user" ? "user" : "assistant",
-            content,
-          });
+          parts.push({ text: content });
         }
+        return {
+          role: m.role === "user" ? "user" : "model",
+          parts,
+        };
+      });
 
-        fullResponse = await callMedGemma(medgemmaMessages, {
-          maxTokens: 4096,
-        });
+      const stream = await ai.models.generateContentStream({
+        model: MODEL_FLASH,
+        contents: chatMessages,
+        config: {
+          systemInstruction: systemContext,
+          maxOutputTokens: 4096,
+        },
+      });
 
-        if (!clientDisconnected && fullResponse) {
-          const chunkSize = 20;
-          for (let i = 0; i < fullResponse.length; i += chunkSize) {
-            if (clientDisconnected) break;
-            const chunk = fullResponse.substring(i, i + chunkSize);
-            res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
-          }
-          if (!clientDisconnected) {
-            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-          }
-        } else if (!clientDisconnected) {
-          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      for await (const chunk of stream) {
+        if (clientDisconnected) break;
+        const content = chunk.text || "";
+        if (content) {
+          fullResponse += content;
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
         }
-      } else {
-        const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
-          const parts: any[] = [];
-          if (m.content) {
-            let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
-            if (m === lastMessage && imageAnalysis) {
-              content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
-            }
-            parts.push({ text: content });
-          }
-          return {
-            role: m.role === "user" ? "user" : "model",
-            parts,
-          };
-        });
+      }
 
-        const stream = await ai.models.generateContentStream({
-          model: "gemini-2.5-flash",
-          contents: chatMessages,
-          config: {
-            systemInstruction: systemContext,
-            maxOutputTokens: 4096,
-          },
-        });
-
-        for await (const chunk of stream) {
-          if (clientDisconnected) break;
-          const content = chunk.text || "";
-          if (content) {
-            fullResponse += content;
-            res.write(`data: ${JSON.stringify({ content })}\n\n`);
-          }
-        }
-
-        if (!clientDisconnected) {
-          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-        }
+      if (!clientDisconnected) {
+        res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       }
 
       res.end();
@@ -445,7 +410,7 @@ If you cannot identify the medication, return: [{"error": "Could not identify me
 Support both Arabic and English text on medication packaging.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: MODEL_PRO,
         contents: [{
           role: "user",
           parts: [
@@ -533,7 +498,7 @@ Respond ONLY with JSON:
       }
 
       const interactionResponse = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: MODEL_PRO,
         contents: [{ role: "user", parts: [{ text: promptText }] }],
         config: { maxOutputTokens: 4096 },
       });
