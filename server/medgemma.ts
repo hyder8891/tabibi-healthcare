@@ -40,24 +40,6 @@ export interface MedGemmaMessage {
   content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
-function flattenMessages(messages: MedGemmaMessage[]): string {
-  const parts: string[] = [];
-  for (const msg of messages) {
-    const label = msg.role === "system" ? "SYSTEM" : msg.role === "user" ? "USER" : "ASSISTANT";
-    let text: string;
-    if (typeof msg.content === "string") {
-      text = msg.content;
-    } else {
-      text = msg.content
-        .filter(p => p.type === "text" && p.text)
-        .map(p => p.text!)
-        .join("\n");
-    }
-    parts.push(`${label}: ${text}`);
-  }
-  return parts.join("\n");
-}
-
 export async function callMedGemma(
   messages: MedGemmaMessage[],
   options?: {
@@ -66,20 +48,25 @@ export async function callMedGemma(
   }
 ): Promise<string> {
   const token = await getAccessToken();
-  const prompt = flattenMessages(messages);
 
   const body = {
-    instances: [{ content: prompt }],
-    parameters: {
-      maxOutputTokens: options?.maxTokens ?? 1024,
+    instances: [{
+      "@requestFormat": "chatCompletions",
+      messages: messages.map(m => ({
+        role: m.role,
+        content: typeof m.content === "string"
+          ? [{ type: "text", text: m.content }]
+          : m.content,
+      })),
+      max_tokens: options?.maxTokens ?? 1024,
       temperature: options?.temperature ?? 0.4,
-      topP: 0.8,
-    },
+      top_p: 0.8,
+    }],
   };
 
   console.log("[MedGemma] Request URL:", PREDICT_URL);
-  console.log("[MedGemma] Prompt length:", prompt.length);
-  console.log("[MedGemma] Prompt tail (last 300 chars):", prompt.substring(prompt.length - 300));
+  console.log("[MedGemma] Messages count:", messages.length);
+  console.log("[MedGemma] Roles:", messages.map(m => m.role).join(", "));
 
   const response = await fetch(PREDICT_URL, {
     method: "POST",
@@ -102,7 +89,9 @@ export async function callMedGemma(
   let text = "";
   if (result.predictions && result.predictions.length > 0) {
     const prediction = result.predictions[0];
-    if (typeof prediction === "string") {
+    if (prediction.choices?.[0]?.message?.content) {
+      text = prediction.choices[0].message.content;
+    } else if (typeof prediction === "string") {
       text = prediction;
     } else if (prediction.content) {
       text = prediction.content;
