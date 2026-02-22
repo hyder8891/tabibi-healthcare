@@ -89,14 +89,10 @@ export async function callMedGemma(
   let text = "";
   if (result.predictions && result.predictions.length > 0) {
     const prediction = result.predictions[0];
-    if (prediction.choices?.[0]?.message?.content) {
-      text = prediction.choices[0].message.content;
+    if (Array.isArray(prediction) && prediction[0]?.message?.content) {
+      text = prediction[0].message.content;
     } else if (typeof prediction === "string") {
       text = prediction;
-    } else if (prediction.content) {
-      text = prediction.content;
-    } else if (prediction.candidates?.[0]?.content?.parts?.[0]?.text) {
-      text = prediction.candidates[0].content.parts[0].text;
     } else {
       text = JSON.stringify(prediction);
       console.error("[MedGemma] Unexpected prediction structure, returning raw");
