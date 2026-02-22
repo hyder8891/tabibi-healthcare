@@ -7,7 +7,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - **Frontend**: Expo SDK 54, React Native, Expo Router (file-based routing)
 - **Backend**: Express.js with TypeScript on port 5000
 - **Auth**: Firebase Authentication (stateless Bearer token, jose JWKS verification)
-- **AI**: MedGemma 1.5 4B multimodal (via Vertex AI) for all medical AI — symptom assessment, medical imaging, medication analysis, drug interactions; Gemini Flash as fallback only
+- **AI**: Gemini 2.5 Flash for conversational symptom assessment (streaming SSE), Gemini 2.5 Pro for medical imaging analysis, medication OCR, and drug interaction checking
 - **Database**: PostgreSQL (Neon) with Drizzle ORM, AES-256-GCM encryption for sensitive fields
 - **Storage**: expo-secure-store for auth tokens, AsyncStorage for non-sensitive data
 - **Maps**: expo-location for GPS, Google Places API with in-memory caching
@@ -35,7 +35,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 **Modular route structure** (`server/routes/`):
 - `middleware.ts` - requireAuth (Bearer token verification via jose JWKS), Zod validation helpers
 - `auth.ts` - POST /api/auth/firebase (verify + upsert user), GET /api/auth/me
-- `ai.ts` - POST /api/assess (SSE streaming via MedGemma 27B, falls back to Gemini Flash), POST /api/analyze-medication, POST /api/check-interactions
+- `ai.ts` - POST /api/assess (SSE streaming via Gemini 2.5 Flash), POST /api/analyze-medication (Gemini 2.5 Pro), POST /api/check-interactions (Gemini 2.5 Pro)
 - `rppg.ts` - POST /api/process-rppg (delegated to Worker Thread for non-blocking processing)
 - `geo.ts` - GET /api/nearby-facilities (cached 5min), GET /api/place-details/:placeId (cached 1hr), GET /api/place-photo/:ref
 - `orders.ts` - CRUD + cancel for medicine delivery orders
@@ -43,7 +43,6 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 **Security & Infrastructure** (`server/`):
 - `firebase-auth.ts` - jose JWKS-based Firebase JWT verification with Google's public keys (automatic key rotation)
 - `encryption.ts` - AES-256-GCM encryption for sensitive DB columns (order patient data, medicine info, addresses)
-- `medgemma.ts` - MedGemma 1.5 4B multimodal client via Vertex AI rawPredict (OpenAI-compatible format, streaming SSE, multimodal image+text, google-auth-library for service account auth)
 - `rppg-worker.js` - Worker Thread for CPU-intensive rPPG signal processing (10s timeout)
 - `storage.ts` - Drizzle ORM data access layer with encrypt/decrypt on order fields
 
@@ -77,7 +76,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
-- Feb 22, 2026: MedGemma 1.5 4B multimodal integration - replaced Gemini Flash with MedGemma 1.5 4B via Vertex AI rawPredict (OpenAI-compatible format) for ALL medical AI: symptom assessment (streaming SSE), medical image analysis (multimodal), medication scanning (multimodal), drug interactions. google-auth-library for service account auth with automatic token refresh. Gemini Flash retained only as fallback if GOOGLE_CLOUD_SERVICE_ACCOUNT not configured.
+- Feb 22, 2026: Removed MedGemma 4B (too small, leaked thinking blocks, refused images, ignored system prompts). Switched to dual Gemini model architecture: Gemini 2.5 Flash for conversational symptom Q&A (fast streaming SSE), Gemini 2.5 Pro for all clinical decision-making (medical image analysis, medication OCR scanning, drug interaction checking, final assessment recommendations). Deleted server/medgemma.ts.
 - Feb 21, 2026: Security audit remediation (23 findings) - mandatory ENCRYPTION_KEY (no DATABASE_URL fallback), decrypt() throws on malformed data, all PHI fields encrypted (lastConditions, vitalTrends, preferredPharmacies), profile field sanitization in AI prompts, bounded Zod schemas (no z.any()), geo coordinate validation (-90..90, -180..180), rPPG RGB validation (0..255+finite), rate limiters on geo/rPPG/Avicenna routes, SSE client disconnect handling, atomic SQL increments for counters with race-condition handling, order state machine enforcement (valid transitions only), DB pool consolidation (single shared pool), DB indexes on health_events/orders/population_analytics, generic error responses (no Google API internals leaked), React Query staleTime=5min with 2-retry exponential backoff excluding 4xx, AbortController cleanup on orders screen, rPPG worker concurrency cap via p-limit.
 - Feb 21, 2026: Consolidated medicine ordering - single "Order Selected" button instead of per-medicine buttons, checkboxes to deselect medicines already at home, multi-medicine WhatsApp message and order submission. Geo-aware facility search keywords (Arabic+English for MENA region, English-only globally). Expanded AI medication guidance: condition-appropriate drug classes (NSAIDs for inflammation, antispasmodics for colic, antihistamines for allergies, etc.), expanded Iraqi brand list (Voltaren, Buscopan, Cataflam, Claritine, Imodium, Duspatalin, Zantac, ORS), specific test names required (never vague "medical imaging"), deeper assessment questioning (5-7 questions minimum for complex conditions).
 - Feb 16, 2026: Video-based heart rate capture for accurate 30fps data. Replaced takePictureAsync loop (1.6fps) with recordAsync for 25s video at native 30fps, then extract frames at 10fps using expo-video-thumbnails (250 frames total, batch of 5). Raw RGB from 1x1 pixel resize per frame. Video file (10-30MB) deleted immediately after extraction. Manual "Start Recording" button with fallback if takePictureAsync fails in video mode. Autocorrelation minLag fixed to enforce 40-180 BPM range. UI shows recording countdown → frame analysis progress with valid frame count.
