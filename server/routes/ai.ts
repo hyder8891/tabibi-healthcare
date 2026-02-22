@@ -5,11 +5,7 @@ import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
 
 const ai = new GoogleGenAI({
-  apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-  httpOptions: {
-    apiVersion: "",
-    baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-  },
+  apiKey: process.env.GEMINI_API_KEY,
 });
 
 const MODEL_FLASH = "gemini-2.5-flash";
