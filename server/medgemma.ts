@@ -44,43 +44,40 @@ function cleanMedGemmaResponse(text: string): string {
   text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
 
   if (/^thought/i.test(text)) {
-    const planMatch = text.match(/\*?\*?Plan:\*?\*?\s*\n?\d+\./i);
-    if (planMatch && planMatch.index !== undefined) {
-      let afterPlan = text.substring(planMatch.index);
-      const planStepsEnd = afterPlan.search(/(?:^|\n)(?![*\d\s.])(?![\s]*\d)/m);
-      if (planStepsEnd > 0) {
-        text = afterPlan.substring(planStepsEnd).trim();
+    const planIdx = text.search(/\*?\*?Plan:\*?\*?\s*/i);
+    if (planIdx >= 0) {
+      const afterPlan = text.substring(planIdx);
+      const arabicAfterPlan = afterPlan.search(/[\u0600-\u06FF]{2,}/);
+      if (arabicAfterPlan > 0) {
+        text = afterPlan.substring(arabicAfterPlan).trim();
       }
     }
 
     if (/^thought/i.test(text)) {
-      const segments = text.split(/(?=[\u0600-\u06FF]{2,})/);
-      for (let i = segments.length - 1; i >= 0; i--) {
-        const segment = segments.slice(i).join("");
-        if (/[\u0600-\u06FF]/.test(segment) && segment.length > 10) {
-          const hasEnglishReasoning = /\d+\.\s*\*\*|Plan:|Assess|Identify|need to|Ask about/i.test(segment);
-          if (!hasEnglishReasoning || segment.length > 100) {
-            const cleaned = segment.replace(/^\s*\d+\.\s*(?:Step|Acknowledge|Ask|Include|Provide)[^\n]*\n*/gi, "").trim();
-            if (/[\u0600-\u06FF]/.test(cleaned) && cleaned.length > 10) {
-              text = cleaned;
-              break;
-            }
+      const allArabicPositions: number[] = [];
+      const arabicBlockRegex = /[\u0600-\u06FF]{3,}/g;
+      let m;
+      while ((m = arabicBlockRegex.exec(text)) !== null) {
+        allArabicPositions.push(m.index);
+      }
+      if (allArabicPositions.length > 0) {
+        const lastArabicStart = allArabicPositions[allArabicPositions.length - 1];
+        for (const pos of allArabicPositions) {
+          const candidate = text.substring(pos);
+          if (!/\d+\.\s*\*\*(?:Acknowledge|Ask|Include|Provide|Identify|Assess|Check|Step)/i.test(candidate)) {
+            text = candidate.trim();
+            break;
           }
         }
       }
     }
 
     if (/^thought/i.test(text)) {
-      const lastNumberedStep = text.match(/.*\d+\.\s*(?:Step|Acknowledge|Ask|Include|Provide|Check|Assess)[^\n]*/gi);
-      if (lastNumberedStep) {
-        const lastStep = lastNumberedStep[lastNumberedStep.length - 1];
-        const lastStepIdx = text.lastIndexOf(lastStep);
-        if (lastStepIdx >= 0) {
-          text = text.substring(lastStepIdx + lastStep.length).trim();
-        }
-      }
+      text = text.replace(/^thought[\s\S]*?(?=[\u0600-\u06FF])/i, "").trim();
     }
   }
+
+  text = text.replace(/^\d+\.\s*\*\*[^*]*\*\*[^\n]*\n*/gm, "").trim();
 
   const disclaimerPatterns = [
     /\*\*ملاحظة هامة:?\*\*[^\n]*(?:\n[^\n]*)*?(?=\n\*\*|\n\n|$)/g,
@@ -90,12 +87,20 @@ function cleanMedGemmaResponse(text: string): string {
     /لست بديلاً عن الطبيب[^.]*\./g,
     /يرجى استشارة طبيب متخصص[^.]*\./g,
     /يرجى طلب المساعدة الطبية الفورية[^.]*\./g,
+    /هذا ليس تشخيصاً طبياً[^.]*\./g,
+    /يجب عليك مراجعة الطبيب[^.]*\./g,
+    /أنصحك بمراجعة طبيب[^.]*\./g,
     /I am unable to provide a medical diagnosis[^.]*\./gi,
+    /I cannot provide medical advice[^.]*\./gi,
     /please consult a qualified health[^.]*\./gi,
     /consult a doctor[^.]*\./gi,
     /Analyzing medical images requires specialized[^.]*\./gi,
     /If you have a medical image[^.]*\./gi,
     /providing such interpretations can have serious consequences[^.]*\./gi,
+    /It is important to note that I am an AI[^.]*\./gi,
+    /I am not a substitute for[^.]*\./gi,
+    /seek medical attention[^.]*\./gi,
+    /This is not a medical diagnosis[^.]*\./gi,
   ];
 
   for (const pattern of disclaimerPatterns) {
