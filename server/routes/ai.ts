@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
-import { callMedGemma, buildImageContent, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
+import { callMedGemma, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -300,30 +300,18 @@ If this is a skin/wound photo, describe morphology and differential diagnoses.
 If this is a prescription or medication label, extract the medication information.
 Be thorough and specific. Provide your analysis in the same language the user is using.`;
 
-          if (isMedGemmaConfigured()) {
-            const imageContent = buildImageContent(
-              lastMessage.imageData,
-              lastMessage.mimeType || "image/jpeg",
-              imagePrompt
-            );
-            imageAnalysis = await callMedGemma([
-              { role: "system", content: "You are a medical imaging expert and clinical diagnostician." },
-              { role: "user", content: imageContent },
-            ], { temperature: 0.3, maxTokens: 2048 });
-          } else {
-            const imageResponse = await ai.models.generateContent({
-              model: "gemini-2.5-flash",
-              contents: [{
-                role: "user",
-                parts: [
-                  { inlineData: { data: lastMessage.imageData, mimeType: lastMessage.mimeType || "image/jpeg" } },
-                  { text: imagePrompt },
-                ],
-              }],
-              config: { maxOutputTokens: 2048 },
-            });
-            imageAnalysis = imageResponse.text || "";
-          }
+          const imageResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{
+              role: "user",
+              parts: [
+                { inlineData: { data: lastMessage.imageData, mimeType: lastMessage.mimeType || "image/jpeg" } },
+                { text: imagePrompt },
+              ],
+            }],
+            config: { maxOutputTokens: 2048 },
+          });
+          imageAnalysis = imageResponse.text || "";
 
           console.log("Image analysis completed:", imageAnalysis.substring(0, 200));
         } catch (imgErr) {
@@ -456,27 +444,18 @@ Be thorough and specific. Provide your analysis in the same language the user is
 If you cannot identify the medication, return: [{"error": "Could not identify medication", "suggestion": "Try taking a clearer photo of the medication label"}]
 Support both Arabic and English text on medication packaging.`;
 
-      let text: string;
-      if (isMedGemmaConfigured()) {
-        const imageContent = buildImageContent(imageBase64, mimeType || "image/jpeg", medPrompt);
-        text = await callMedGemma([
-          { role: "system", content: "You are a clinical pharmacist expert. Analyze medication images and provide structured drug information." },
-          { role: "user", content: imageContent },
-        ], { temperature: 0.3, maxTokens: 2048 });
-      } else {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{
-            role: "user",
-            parts: [
-              { inlineData: { data: imageBase64, mimeType: mimeType || "image/jpeg" } },
-              { text: medPrompt },
-            ],
-          }],
-          config: { maxOutputTokens: 2048 },
-        });
-        text = response.text || "";
-      }
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { data: imageBase64, mimeType: mimeType || "image/jpeg" } },
+            { text: medPrompt },
+          ],
+        }],
+        config: { maxOutputTokens: 2048 },
+      });
+      const text = response.text || "";
 
       let medications;
       try {
@@ -553,20 +532,12 @@ Respond ONLY with JSON:
 }${langInstruction}`;
       }
 
-      let text: string;
-      if (isMedGemmaConfigured()) {
-        text = await callMedGemma([
-          { role: "system", content: "You are a clinical pharmacologist expert specializing in drug-drug interactions. Provide accurate, evidence-based interaction analysis." },
-          { role: "user", content: promptText },
-        ], { temperature: 0.3, maxTokens: 4096 });
-      } else {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: [{ role: "user", parts: [{ text: promptText }] }],
-          config: { maxOutputTokens: 4096 },
-        });
-        text = response.text || "";
-      }
+      const interactionResponse = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: promptText }] }],
+        config: { maxOutputTokens: 4096 },
+      });
+      const text = interactionResponse.text || "";
 
       let result;
       try {
