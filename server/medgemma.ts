@@ -40,6 +40,42 @@ export interface MedGemmaMessage {
   content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
+function cleanMedGemmaResponse(text: string): string {
+  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
+
+  if (/^thought/i.test(text)) {
+    const arabicStart = text.search(/[\u0600-\u06FF]/);
+    if (arabicStart > 0) {
+      const beforeArabic = text.substring(0, arabicStart);
+      if (/\d\.\s*\*\*|Plan:|Assess|Identify|Apply|safety rule|Follow-up|Ask about|need to/i.test(beforeArabic)) {
+        text = text.substring(arabicStart).trim();
+      }
+    }
+  }
+
+  const disclaimerPatterns = [
+    /\*\*ملاحظة هامة:?\*\*[^*]*(?:\*[^*]*)*(?:\.\s*|\n)/g,
+    /ملاحظة هامة:[^\n]*\n?/g,
+    /أنا هنا للمساعدة في تقييم الأعراض[^.]*\./g,
+    /ولكنني لست بديلاً عن الطبيب[^.]*\./g,
+    /لست بديلاً عن الطبيب[^.]*\./g,
+    /يرجى استشارة طبيب متخصص[^.]*\./g,
+    /يرجى طلب المساعدة الطبية الفورية[^.]*\./g,
+    /I am unable to provide a medical diagnosis[^.]*\./gi,
+    /please consult a qualified health[^.]*\./gi,
+    /consult a doctor[^.]*\./gi,
+    /Analyzing medical images requires specialized[^.]*\./gi,
+  ];
+
+  for (const pattern of disclaimerPatterns) {
+    text = text.replace(pattern, "").trim();
+  }
+
+  text = text.replace(/\n{3,}/g, "\n\n").trim();
+
+  return text;
+}
+
 export async function callMedGemma(
   messages: MedGemmaMessage[],
   options?: {
@@ -99,22 +135,9 @@ export async function callMedGemma(
     }
   }
 
-  text = text.replace(/<thought>[\s\S]*?<\/thought>/gi, "").trim();
-  text = text.replace(/\bthought[\s\S]*?\.\.\./gi, (match) => {
-    if (match.length > 50 && /\d\.\s*\*\*/.test(match)) return "";
-    return match;
-  }).trim();
-  if (/^thought/i.test(text)) {
-    const firstNewlineBlock = text.indexOf("\n\n");
-    if (firstNewlineBlock > 0 && firstNewlineBlock < 500) {
-      const beforeBlock = text.substring(0, firstNewlineBlock);
-      if (/\d\.\s*\*\*/.test(beforeBlock) || /Identify|Assess|Apply|safety rule/i.test(beforeBlock)) {
-        text = text.substring(firstNewlineBlock).trim();
-      }
-    }
-  }
+  text = cleanMedGemmaResponse(text);
 
-  console.log("[MedGemma] Extracted response preview:", text.substring(0, 300));
+  console.log("[MedGemma] Cleaned response preview:", text.substring(0, 300));
   return text;
 }
 
