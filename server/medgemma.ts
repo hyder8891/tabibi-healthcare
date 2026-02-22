@@ -1,10 +1,10 @@
 import { GoogleAuth } from "google-auth-library";
 
-const PROJECT_ID = "agents-487805";
+const PROJECT_NUMBER = "897097421776";
 const LOCATION = "europe-west4";
-const ENDPOINT_ID = "2510904126817173504";
+const ENDPOINT_ID = "mg-endpoint-85c58ff5-5aae-4b2e-a011-1b6480ee6a7e";
 
-const VERTEX_AI_BASE = `https://${LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${PROJECT_ID}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}`;
+const PREDICT_URL = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}:predict`;
 
 let authClient: GoogleAuth | null = null;
 
@@ -40,94 +40,53 @@ export interface MedGemmaMessage {
   content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
-export interface MedGemmaStreamChunk {
-  content: string;
-  done: boolean;
+function formatContentForAPI(content: MedGemmaMessage["content"]): Array<{type: string; text?: string; image_url?: {url: string}}> {
+  if (typeof content === "string") {
+    return [{ type: "text", text: content }];
+  }
+  return content;
 }
 
-export async function streamMedGemmaChat(
-  messages: MedGemmaMessage[],
-  options?: {
-    temperature?: number;
-    maxTokens?: number;
-  }
-): Promise<ReadableStream<MedGemmaStreamChunk>> {
-  const token = await getAccessToken();
+function buildRequestBody(messages: MedGemmaMessage[], maxTokens: number) {
+  const formattedMessages = messages.map(m => ({
+    role: m.role,
+    content: formatContentForAPI(m.content),
+  }));
 
-  const body = {
-    model: "google/medgemma-1.5-4b-it",
-    messages,
-    stream: true,
-    temperature: options?.temperature ?? 0.7,
-    max_tokens: options?.maxTokens ?? 4096,
-    top_p: 0.95,
+  return {
+    instances: [
+      {
+        "@requestFormat": "chatCompletions",
+        messages: formattedMessages,
+        max_tokens: maxTokens,
+      },
+    ],
   };
+}
 
-  const response = await fetch(`${VERTEX_AI_BASE}:rawPredict`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("MedGemma API error:", response.status, errorText.substring(0, 500));
-    throw new Error(`MedGemma API error: ${response.status} - ${errorText.substring(0, 200)}`);
-  }
-
-  if (!response.body) {
-    throw new Error("MedGemma returned no response body");
-  }
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  return new ReadableStream<MedGemmaStreamChunk>({
-    async pull(controller) {
-      while (true) {
-        const { done, value } = await reader.read();
-
-        if (done) {
-          controller.enqueue({ content: "", done: true });
-          controller.close();
-          return;
-        }
-
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith("data: ")) continue;
-
-          const data = trimmed.slice(6);
-          if (data === "[DONE]") {
-            controller.enqueue({ content: "", done: true });
-            controller.close();
-            return;
-          }
-
-          try {
-            const parsed = JSON.parse(data);
-            const delta = parsed.choices?.[0]?.delta?.content;
-            if (delta) {
-              controller.enqueue({ content: delta, done: false });
-            }
-          } catch {
-          }
-        }
+function extractResponseText(result: any): string {
+  try {
+    if (result.predictions && result.predictions.length > 0) {
+      const prediction = result.predictions[0];
+      if (prediction.choices && prediction.choices.length > 0) {
+        return prediction.choices[0].message?.content || "";
       }
-    },
-    cancel() {
-      reader.cancel();
-    },
-  });
+      if (typeof prediction === "string") {
+        return prediction;
+      }
+      if (prediction.content) {
+        return prediction.content;
+      }
+    }
+    if (result.choices && result.choices.length > 0) {
+      return result.choices[0].message?.content || "";
+    }
+    console.error("Unexpected MedGemma response structure:", JSON.stringify(result).substring(0, 500));
+    return "";
+  } catch (e) {
+    console.error("Error extracting MedGemma response:", e);
+    return "";
+  }
 }
 
 export async function callMedGemma(
@@ -138,17 +97,9 @@ export async function callMedGemma(
   }
 ): Promise<string> {
   const token = await getAccessToken();
+  const body = buildRequestBody(messages, options?.maxTokens ?? 4096);
 
-  const body = {
-    model: "google/medgemma-1.5-4b-it",
-    messages,
-    stream: false,
-    temperature: options?.temperature ?? 0.7,
-    max_tokens: options?.maxTokens ?? 4096,
-    top_p: 0.95,
-  };
-
-  const response = await fetch(`${VERTEX_AI_BASE}:rawPredict`, {
+  const response = await fetch(PREDICT_URL, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -164,7 +115,7 @@ export async function callMedGemma(
   }
 
   const result = await response.json();
-  return result.choices?.[0]?.message?.content || "";
+  return extractResponseText(result);
 }
 
 export function buildImageContent(base64Data: string, mimeType: string, textPrompt: string): MedGemmaMessage["content"] {

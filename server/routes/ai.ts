@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
-import { streamMedGemmaChat, callMedGemma, buildImageContent, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
+import { callMedGemma, buildImageContent, isMedGemmaConfigured, type MedGemmaMessage } from "../medgemma";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
@@ -361,29 +361,22 @@ Be thorough and specific. Provide your analysis in the same language the user is
           });
         }
 
-        const stream = await streamMedGemmaChat(medgemmaMessages, {
-          temperature: 0.7,
+        fullResponse = await callMedGemma(medgemmaMessages, {
           maxTokens: 4096,
         });
 
-        const reader = stream.getReader();
-        while (true) {
-          if (clientDisconnected) {
-            reader.cancel();
-            break;
+        if (!clientDisconnected && fullResponse) {
+          const chunkSize = 20;
+          for (let i = 0; i < fullResponse.length; i += chunkSize) {
+            if (clientDisconnected) break;
+            const chunk = fullResponse.substring(i, i + chunkSize);
+            res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
           }
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value.done) {
-            if (!clientDisconnected) {
-              res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-            }
-            break;
+          if (!clientDisconnected) {
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
           }
-          if (value.content) {
-            fullResponse += value.content;
-            res.write(`data: ${JSON.stringify({ content: value.content })}\n\n`);
-          }
+        } else if (!clientDisconnected) {
+          res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
         }
       } else {
         const chatMessages = messages.map((m: { role: string; content: string; imageData?: string; mimeType?: string }) => {
