@@ -2,9 +2,9 @@ import { GoogleAuth } from "google-auth-library";
 
 const PROJECT_NUMBER = "897097421776";
 const LOCATION = "europe-west4";
-const ENDPOINT_ID = "mg-endpoint-85c58ff5-5aae-4b2e-a011-1b6480ee6a7e";
+const MODEL_ID = "medgemma-1.5-4b-it";
 
-const PREDICT_URL = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/endpoints/${ENDPOINT_ID}:predict`;
+const PREDICT_URL = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
 
 let authClient: GoogleAuth | null = null;
 
@@ -40,50 +40,22 @@ export interface MedGemmaMessage {
   content: string | Array<{type: string; text?: string; image_url?: {url: string}}>;
 }
 
-function formatMessageForAPI(msg: MedGemmaMessage): { role: string; content: string | Array<{type: string; text?: string; image_url?: {url: string}}> } {
-  if (typeof msg.content === "string") {
-    return { role: msg.role, content: msg.content };
-  }
-  return { role: msg.role, content: msg.content };
-}
-
-function buildRequestBody(messages: MedGemmaMessage[], maxTokens: number) {
-  const formattedMessages = messages.map(formatMessageForAPI);
-
-  return {
-    instances: [
-      {
-        "@requestFormat": "chatCompletions",
-        messages: formattedMessages,
-        max_tokens: maxTokens,
-      },
-    ],
-  };
-}
-
-function extractResponseText(result: any): string {
-  try {
-    if (result.predictions && result.predictions.length > 0) {
-      const prediction = result.predictions[0];
-      if (prediction.choices && prediction.choices.length > 0) {
-        return prediction.choices[0].message?.content || "";
-      }
-      if (typeof prediction === "string") {
-        return prediction;
-      }
-      if (prediction.content) {
-        return prediction.content;
-      }
+function flattenMessages(messages: MedGemmaMessage[]): string {
+  const parts: string[] = [];
+  for (const msg of messages) {
+    const label = msg.role === "system" ? "SYSTEM" : msg.role === "user" ? "USER" : "ASSISTANT";
+    let text: string;
+    if (typeof msg.content === "string") {
+      text = msg.content;
+    } else {
+      text = msg.content
+        .filter(p => p.type === "text" && p.text)
+        .map(p => p.text!)
+        .join("\n");
     }
-    if (result.choices && result.choices.length > 0) {
-      return result.choices[0].message?.content || "";
-    }
-    console.error("Unexpected MedGemma response structure:", JSON.stringify(result).substring(0, 500));
-    return "";
-  } catch (e) {
-    console.error("Error extracting MedGemma response:", e);
-    return "";
+    parts.push(`${label}: ${text}`);
   }
+  return parts.join("\n");
 }
 
 export async function callMedGemma(
@@ -94,19 +66,20 @@ export async function callMedGemma(
   }
 ): Promise<string> {
   const token = await getAccessToken();
-  const body = buildRequestBody(messages, options?.maxTokens ?? 4096);
+  const prompt = flattenMessages(messages);
+
+  const body = {
+    instances: [{ content: prompt }],
+    parameters: {
+      maxOutputTokens: options?.maxTokens ?? 1024,
+      temperature: options?.temperature ?? 0.4,
+      topP: 0.8,
+    },
+  };
 
   console.log("[MedGemma] Request URL:", PREDICT_URL);
-  console.log("[MedGemma] Messages count:", messages.length);
-  console.log("[MedGemma] Roles:", messages.map(m => m.role).join(", "));
-  console.log("[MedGemma] Last user message preview:", 
-    (() => {
-      const lastUser = [...messages].reverse().find(m => m.role === "user");
-      if (!lastUser) return "(none)";
-      const c = typeof lastUser.content === "string" ? lastUser.content : JSON.stringify(lastUser.content);
-      return c.substring(0, 200);
-    })()
-  );
+  console.log("[MedGemma] Prompt length:", prompt.length);
+  console.log("[MedGemma] Prompt tail (last 300 chars):", prompt.substring(prompt.length - 300));
 
   const response = await fetch(PREDICT_URL, {
     method: "POST",
@@ -124,9 +97,23 @@ export async function callMedGemma(
   }
 
   const result = await response.json();
-  console.log("[MedGemma] Raw response structure:", JSON.stringify(result).substring(0, 500));
-  
-  const text = extractResponseText(result);
+  console.log("[MedGemma] Raw response:", JSON.stringify(result).substring(0, 500));
+
+  let text = "";
+  if (result.predictions && result.predictions.length > 0) {
+    const prediction = result.predictions[0];
+    if (typeof prediction === "string") {
+      text = prediction;
+    } else if (prediction.content) {
+      text = prediction.content;
+    } else if (prediction.candidates?.[0]?.content?.parts?.[0]?.text) {
+      text = prediction.candidates[0].content.parts[0].text;
+    } else {
+      text = JSON.stringify(prediction);
+      console.error("[MedGemma] Unexpected prediction structure, returning raw");
+    }
+  }
+
   console.log("[MedGemma] Extracted response preview:", text.substring(0, 300));
   return text;
 }
