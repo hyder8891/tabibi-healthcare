@@ -4,7 +4,7 @@ const PROJECT_NUMBER = "897097421776";
 const LOCATION = "europe-west4";
 const MODEL_ID = "medgemma-1.5-4b-it";
 
-const PREDICT_URL = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_NUMBER}/locations/${LOCATION}/publishers/google/models/${MODEL_ID}:predict`;
+const PREDICT_URL = `https://europe-west4-aiplatform.googleapis.com/v1/projects/897097421776/locations/europe-west4/endpoints/mg-endpoint-4663c30d-2d44-4f75-910e-8e92fbc02145:predict`;
 
 let authClient: GoogleAuth | null = null;
 
