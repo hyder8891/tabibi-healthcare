@@ -266,41 +266,8 @@ export default function AssessmentScreen() {
       let parsedResult: AssessmentResult | null = null;
       let parsedEmergency: EmergencyAlert | null = null;
 
-      const stripThinking = (text: string) => {
-        if (/^thought/i.test(text)) {
-          const planIdx = text.search(/\*?\*?Plan:\*?\*?\s*/i);
-          if (planIdx >= 0) {
-            const afterPlan = text.substring(planIdx);
-            const arabicStart = afterPlan.search(/[\u0600-\u06FF]{2,}/);
-            if (arabicStart > 0) {
-              text = afterPlan.substring(arabicStart).trim();
-            }
-          }
-          if (/^thought/i.test(text)) {
-            const arabicBlockRegex = /[\u0600-\u06FF]{3,}/g;
-            let m;
-            const positions: number[] = [];
-            while ((m = arabicBlockRegex.exec(text)) !== null) {
-              positions.push(m.index);
-            }
-            for (const pos of positions) {
-              const candidate = text.substring(pos);
-              if (!/\d+\.\s*\*\*(?:Acknowledge|Ask|Include|Provide|Identify|Assess|Check|Step)/i.test(candidate)) {
-                text = candidate.trim();
-                break;
-              }
-            }
-          }
-          if (/^thought/i.test(text)) {
-            text = text.replace(/^thought[\s\S]*?(?=[\u0600-\u06FF])/i, "").trim();
-          }
-        }
-        text = text.replace(/^\d+\.\s*\*\*[^*]*\*\*[^\n]*\n*/gm, "").trim();
-        return text;
-      };
-
       const stripJson = (text: string) => {
-        return stripThinking(text)
+        return text
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
