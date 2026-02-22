@@ -1,0 +1,80 @@
+Okay, building on Replit is a great way to develop and test! To connect your Replit application to your MedGemma model on Vertex AI, you'll need to handle authentication and then use the Google Cloud client library to send your prediction requests.
+
+Here's a step-by-step guide:
+
+Step 1: Create a Google Cloud Service Account Key
+
+Since Replit is an external environment, you'll use a Google Cloud Service Account key for authentication.
+
+Go to IAM & Admin -> Service Accounts: In your Google Cloud Console, navigate to "IAM & Admin" and then "Service Accounts."
+Create Service Account:
+Click "+ CREATE SERVICE ACCOUNT."
+Give it a descriptive name (e.g., medgemma-replit-access ).
+Click "DONE."
+Grant Permissions:
+Click on the newly created service account's email address.
+Go to the "PERMISSIONS" tab.
+Click "GRANT ACCESS."
+Add the role Vertex AI User (or a more specific role like Vertex AI Predictor if available and you want stricter control). This role allows the service account to invoke predictions on your Vertex AI endpoint.
+Click "SAVE."
+Create Key:
+Go to the "KEYS" tab for your service account.
+Click "ADD KEY" -> "Create new key."
+Select "JSON" as the key type and click "CREATE."
+A JSON file will be downloaded to your computer. Keep this file secure and do not share it publicly.
+Step 2: Securely Store the Service Account Key in Replit
+
+You should never hardcode your service account key directly into your Replit code. Use Replit Secrets for this.
+
+Open your Replit project.
+Go to the "Secrets" tab (usually a padlock icon on the left sidebar).
+Add a new secret:
+For the "Key" field, enter GOOGLE_APPLICATION_CREDENTIALS .
+For the "Value" field, paste the entire content of the JSON key file you downloaded in Step 1.
+Click "Add new secret."
+This environment variable GOOGLE_APPLICATION_CREDENTIALS is automatically recognized by Google Cloud client libraries, so they will use this key for authentication.
+Step 3: Install the Google Cloud Vertex AI Client Library
+
+In your Replit project's pyproject.toml (or requirements.txt if you're using an older setup), add the google-cloud-aiplatform library.
+
+For pyproject.toml :
+
+[tool.poetry.dependencies]
+python = ">=3.8.0,<3.12"
+google-cloud-aiplatform = "^1.39.0" # Use the latest stable version
+Generated code may be subject to license restrictions not shown here. Use code with care. Learn more 
+
+Then run poetry install in the Replit shell.
+
+For requirements.txt :
+
+google-cloud-aiplatform
+Generated code may be subject to license restrictions not shown here. Use code with care. Learn more 
+
+Then run pip install -r requirements.txt in the Replit shell.
+
+Step 4: Write Python Code to Call MedGemma
+
+Now you can write your Python code to interact with the MedGemma endpoint. Remember to use Base64 encoding for images for robustness.
+
+import os
+import base64
+import requests
+from google.cloud import aiplatform
+
+# --- Configuration ---
+PROJECT_ID = "agents-487805"
+LOCATION = "europe-west4" # Your endpoint's region
+ENDPOINT_ID = "mg-endpoint-85c58ff5-5aae-4b2e-a011-1b6480ee6a7e"
+
+
+Generated code may be subject to license restrictions not shown here. Use code with care. Learn more 
+
+Explanation of the Code:
+
+PROJECT_ID , LOCATION , ENDPOINT_ID : These are set to your specific Google Cloud project, the region where your endpoint is deployed ( europe-west4 ), and your endpoint ID.
+get_base64_image_from_url : This helper function fetches the image from the provided URL and converts it to a Base64 string, which is the recommended way to send images to Vertex AI models.
+predict_medgemma : This function constructs the instances and parameters payload as discussed, initializes the aiplatform client, and calls the predict method on your endpoint.
+Response Parsing: The code includes logic to parse the response and extract the text content from the model's prediction.
+Error Handling: Basic try-except blocks are included for network requests and API calls.
+With these steps, your Replit application should be able to securely authenticate and send requests to your MedGemma model on Vertex AI. Remember to test thoroughly!
