@@ -324,6 +324,12 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  setupCors(app);
+  setupSecurityHeaders(app);
+  setupBodyParsing(app);
+  setupRateLimiting(app);
+  setupRequestLogging(app);
+
   app.get("/health", async (_req, res) => {
     try {
       const { pool } = await import("./storage");
@@ -353,12 +359,6 @@ function setupErrorHandler(app: express.Application) {
       res.status(404).send("Terms of service not found");
     }
   });
-
-  setupCors(app);
-  setupSecurityHeaders(app);
-  setupBodyParsing(app);
-  setupRateLimiting(app);
-  setupRequestLogging(app);
 
   configureExpoAndLanding(app);
 

@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { Stack, router, useSegments, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,12 +23,19 @@ import Colors from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
 
+const PUBLIC_ROUTES = ["privacy", "terms"];
+
 function RootLayoutNav() {
   const { user, isLoading } = useAuth();
   const [checkedOnboarding, setCheckedOnboarding] = useState(false);
+  const segments = useSegments();
 
   useEffect(() => {
     if (isLoading) return;
+    const firstSegment = segments[0] as string | undefined;
+    if (firstSegment && PUBLIC_ROUTES.includes(firstSegment)) {
+      return;
+    }
     if (!user) {
       router.replace("/auth");
       return;
@@ -41,7 +48,7 @@ function RootLayoutNav() {
       }
       setCheckedOnboarding(true);
     });
-  }, [user, isLoading]);
+  }, [user, isLoading, segments]);
 
   if (isLoading) {
     return (
@@ -114,6 +121,18 @@ function RootLayoutNav() {
           headerShown: false,
           presentation: "modal",
           animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
+        name="privacy"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="terms"
+        options={{
+          headerShown: false,
         }}
       />
     </Stack>
