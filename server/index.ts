@@ -30,6 +30,13 @@ function setupCors(app: express.Application) {
       });
     }
 
+    if (process.env.ALLOWED_ORIGINS) {
+      process.env.ALLOWED_ORIGINS.split(",").forEach((o) => {
+        const trimmed = o.trim();
+        if (trimmed) origins.add(trimmed);
+      });
+    }
+
     if (process.env.NODE_ENV !== "production") {
       origins.add("http://localhost:8081");
       origins.add("http://127.0.0.1:8081");
@@ -320,6 +327,36 @@ function setupErrorHandler(app: express.Application) {
   setupBodyParsing(app);
   setupRateLimiting(app);
   setupRequestLogging(app);
+
+  app.get("/health", async (_req, res) => {
+    try {
+      const { pool } = await import("./storage");
+      await pool.query("SELECT 1");
+      res.json({ status: "ok", timestamp: Date.now(), database: "connected" });
+    } catch (err) {
+      res.status(503).json({ status: "degraded", timestamp: Date.now(), database: "disconnected" });
+    }
+  });
+
+  app.get("/privacy", (_req, res) => {
+    const privacyPath = path.resolve(process.cwd(), "server", "templates", "privacy.html");
+    if (fs.existsSync(privacyPath)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(fs.readFileSync(privacyPath, "utf-8"));
+    } else {
+      res.status(404).send("Privacy policy not found");
+    }
+  });
+
+  app.get("/terms", (_req, res) => {
+    const termsPath = path.resolve(process.cwd(), "server", "templates", "terms.html");
+    if (fs.existsSync(termsPath)) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.send(fs.readFileSync(termsPath, "utf-8"));
+    } else {
+      res.status(404).send("Terms of service not found");
+    }
+  });
 
   configureExpoAndLanding(app);
 

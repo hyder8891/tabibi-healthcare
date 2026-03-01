@@ -960,55 +960,56 @@ export default function HeartRateScreen() {
       });
 
       recordingRef.current = false;
-
-      if (!measureActiveRef.current) {
-        try { await FileSystem.deleteAsync(video.uri, { idempotent: true }); } catch {}
-        return;
-      }
-
-      setState("processing");
-
-      const durationMs = MEASUREMENT_DURATION * 1000;
-      const intervalMs = Math.round(1000 / EXTRACT_FPS);
-      const totalFrames = Math.floor(durationMs / intervalMs);
-      setAnalyzeProgress({ current: 0, total: totalFrames });
-
+      const videoUri = video.uri;
       const redValues: number[] = [];
       const greenValues: number[] = [];
       const timestamps: number[] = [];
 
-      for (let i = 0; i < totalFrames; i += EXTRACT_BATCH_SIZE) {
-        if (!measureActiveRef.current) break;
-
-        const batch: Promise<{ rgb: { r: number; g: number; b: number }; timeMs: number }>[] = [];
-        for (let j = 0; j < EXTRACT_BATCH_SIZE && (i + j) < totalFrames; j++) {
-          const frameIdx = i + j;
-          const timeMs = frameIdx * intervalMs;
-          batch.push(
-            VideoThumbnails.getThumbnailAsync(video.uri, { time: timeMs })
-              .then(async (thumb) => {
-                const rgb = await extractRGBNative(thumb.uri);
-                try { await FileSystem.deleteAsync(thumb.uri, { idempotent: true }); } catch {}
-                return { rgb, timeMs };
-              })
-              .catch(() => ({ rgb: { r: -1, g: -1, b: -1 } as { r: number; g: number; b: number }, timeMs }))
-          );
+      try {
+        if (!measureActiveRef.current) {
+          return;
         }
 
-        const results = await Promise.all(batch);
-        for (const { rgb, timeMs } of results) {
-          if (rgb.r >= 0 && isFingerCovering(rgb.r, rgb.g, rgb.b, true)) {
-            redValues.push(rgb.r);
-            greenValues.push(rgb.g);
-            timestamps.push(timeMs);
+        setState("processing");
+
+        const durationMs = MEASUREMENT_DURATION * 1000;
+        const intervalMs = Math.round(1000 / EXTRACT_FPS);
+        const totalFrames = Math.floor(durationMs / intervalMs);
+        setAnalyzeProgress({ current: 0, total: totalFrames });
+
+        for (let i = 0; i < totalFrames; i += EXTRACT_BATCH_SIZE) {
+          if (!measureActiveRef.current) break;
+
+          const batch: Promise<{ rgb: { r: number; g: number; b: number }; timeMs: number }>[] = [];
+          for (let j = 0; j < EXTRACT_BATCH_SIZE && (i + j) < totalFrames; j++) {
+            const frameIdx = i + j;
+            const timeMs = frameIdx * intervalMs;
+            batch.push(
+              VideoThumbnails.getThumbnailAsync(video.uri, { time: timeMs })
+                .then(async (thumb) => {
+                  const rgb = await extractRGBNative(thumb.uri);
+                  try { await FileSystem.deleteAsync(thumb.uri, { idempotent: true }); } catch {}
+                  return { rgb, timeMs };
+                })
+                .catch(() => ({ rgb: { r: -1, g: -1, b: -1 } as { r: number; g: number; b: number }, timeMs }))
+            );
           }
+
+          const results = await Promise.all(batch);
+          for (const { rgb, timeMs } of results) {
+            if (rgb.r >= 0 && isFingerCovering(rgb.r, rgb.g, rgb.b, true)) {
+              redValues.push(rgb.r);
+              greenValues.push(rgb.g);
+              timestamps.push(timeMs);
+            }
+          }
+
+          setAnalyzeProgress({ current: Math.min(i + EXTRACT_BATCH_SIZE, totalFrames), total: totalFrames });
+          setSampleCount(redValues.length);
         }
-
-        setAnalyzeProgress({ current: Math.min(i + EXTRACT_BATCH_SIZE, totalFrames), total: totalFrames });
-        setSampleCount(redValues.length);
+      } finally {
+        try { await FileSystem.deleteAsync(videoUri, { idempotent: true }); } catch {}
       }
-
-      try { await FileSystem.deleteAsync(video.uri, { idempotent: true }); } catch {}
 
       if (!measureActiveRef.current) return;
 
@@ -1322,8 +1323,8 @@ export default function HeartRateScreen() {
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
                   {IS_MOBILE
                     ? t(
-                        "Cover the back camera and flash completely with your fingertip. The circle will turn green when your finger is properly placed.",
-                        "غطِّ الكاميرا الخلفية والفلاش بالكامل بطرف إصبعك. ستتحول الدائرة إلى اللون الأخضر عندما يكون إصبعك موضوعاً بشكل صحيح."
+                        "Cover the back camera and flash completely with your fingertip. The flashlight will turn on during measurement. The circle will turn green when your finger is properly placed.",
+                        "غطِّ الكاميرا الخلفية والفلاش بالكامل بطرف إصبعك. سيتم تشغيل ضوء الفلاش أثناء القياس. ستتحول الدائرة إلى اللون الأخضر عندما يكون إصبعك موضوعاً بشكل صحيح."
                       )
                     : t(
                         "Hold your phone steady and look at the camera. Ensure good, natural lighting on your face. Stay very still during measurement.",

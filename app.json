@@ -19,6 +19,7 @@
     },
     "android": {
       "package": "com.tabibi.health",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -33,11 +34,44 @@
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://tabibi.health"
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 23,
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34
+          }
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Tabibi needs camera access for heart rate measurement and medication scanning.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Tabibi needs your location to find nearby pharmacies, clinics, and hospitals.",
+          "locationAlwaysPermission": "Tabibi needs your location to find nearby pharmacies, clinics, and hospitals.",
+          "locationWhenInUsePermission": "Tabibi needs your location to find nearby pharmacies, clinics, and hospitals."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Tabibi needs camera access to scan medication labels.",
+          "photosPermission": "Tabibi needs photo library access to select medication images."
+        }
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "experiments": {
       "typedRoutes": true,

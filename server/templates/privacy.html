@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <title>Tabibi - Privacy Policy</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafa;
+        color: #1a1a1a;
+        line-height: 1.7;
+        min-height: 100vh;
+      }
+      .header {
+        background: linear-gradient(135deg, #0F766E 0%, #0d9488 100%);
+        color: #fff;
+        padding: 48px 20px 40px;
+        text-align: center;
+      }
+      .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+      .header p { font-size: 14px; opacity: 0.85; }
+      .container {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 20px 60px;
+      }
+      .lang-toggle {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 32px;
+      }
+      .lang-toggle button {
+        padding: 8px 20px;
+        border: 2px solid #0F766E;
+        border-radius: 8px;
+        background: #fff;
+        color: #0F766E;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .lang-toggle button.active {
+        background: #0F766E;
+        color: #fff;
+      }
+      .section { margin-bottom: 28px; }
+      .section h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0F766E;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e0f2f1;
+      }
+      .section h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #115e59;
+        margin: 16px 0 8px;
+      }
+      .section p, .section li {
+        font-size: 15px;
+        color: #333;
+        margin-bottom: 8px;
+      }
+      .section ul {
+        padding-left: 24px;
+        margin-bottom: 12px;
+      }
+      .section li { margin-bottom: 4px; }
+      .effective { text-align: center; color: #666; font-size: 13px; margin-top: 40px; }
+      .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: #0F766E;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .back-link:hover { text-decoration: underline; }
+      [dir="rtl"] .section ul { padding-left: 0; padding-right: 24px; }
+      .lang-section { display: none; }
+      .lang-section.active { display: block; }
+      @media (min-width: 768px) {
+        .header h1 { font-size: 34px; }
+        .container { padding: 40px 32px 80px; }
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0d0d0d; color: #e0e0e0; }
+        .header { background: linear-gradient(135deg, #0F766E 0%, #115e59 100%); }
+        .section h2 { color: #2dd4bf; border-bottom-color: #1a3a38; }
+        .section h3 { color: #5eead4; }
+        .section p, .section li { color: #ccc; }
+        .effective { color: #888; }
+        .lang-toggle button { background: #1a1a1a; border-color: #2dd4bf; color: #2dd4bf; }
+        .lang-toggle button.active { background: #0F766E; color: #fff; border-color: #0F766E; }
+        .back-link { color: #2dd4bf; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Privacy Policy</h1>
+      <p>Tabibi Healthcare Application</p>
+    </div>
+    <div class="container">
+      <a href="/" class="back-link">&larr; Back to Home</a>
+      <div class="lang-toggle">
+        <button class="active" onclick="showLang('en')">English</button>
+        <button onclick="showLang('ar')">العربية</button>
+      </div>
+
+      <div id="lang-en" class="lang-section active">
+        <div class="section">
+          <h2>1. Introduction</h2>
+          <p>Tabibi ("we", "our", "us") is a healthcare assistance application designed to help users assess symptoms, manage medications, and access nearby medical facilities. This Privacy Policy explains how we collect, use, store, and protect your personal and health-related information.</p>
+        </div>
+
+        <div class="section">
+          <h2>2. Information We Collect</h2>
+          <h3>2.1 Health Data</h3>
+          <p>We collect health-related information that you voluntarily provide, including:</p>
+          <ul>
+            <li>Symptoms and medical conditions you report during assessments</li>
+            <li>Medications you scan or manually enter</li>
+            <li>Vital signs such as heart rate readings obtained through the camera-based rPPG monitor</li>
+            <li>Assessment history and AI-generated health recommendations</li>
+          </ul>
+          <h3>2.2 Authentication Data</h3>
+          <p>We use Firebase Authentication to manage user accounts. This may include:</p>
+          <ul>
+            <li>Email address</li>
+            <li>Display name</li>
+            <li>Firebase User ID (UID)</li>
+            <li>Authentication tokens</li>
+          </ul>
+          <h3>2.3 Location Data</h3>
+          <p>When you use the nearby facilities feature, we access your device location through Google Maps to find hospitals, pharmacies, and clinics near you. Location data is used only for this purpose and is not stored permanently.</p>
+          <h3>2.4 Camera and Image Data</h3>
+          <p>We access your device camera for two features:</p>
+          <ul>
+            <li><strong>Heart Rate Monitor:</strong> The camera captures short video of your fingertip to measure heart rate using remote photoplethysmography (rPPG). Video files are temporarily stored on the server for processing and are automatically deleted immediately after analysis.</li>
+            <li><strong>Medication Scanner:</strong> The camera captures images of medication packaging for AI-powered identification and interaction checking.</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>3. How We Use Your Information</h2>
+          <ul>
+            <li>Provide AI-powered symptom assessments and health recommendations</li>
+            <li>Identify medications and check for drug interactions</li>
+            <li>Measure heart rate through camera-based analysis</li>
+            <li>Locate nearby healthcare facilities</li>
+            <li>Maintain your assessment history for personal reference</li>
+            <li>Improve the accuracy and quality of our services</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>4. Data Storage and Security</h2>
+          <p>We take the security of your health data seriously:</p>
+          <ul>
+            <li><strong>Encryption:</strong> All sensitive health data stored in our database is encrypted using AES-256 encryption before storage.</li>
+            <li><strong>Database:</strong> Your data is stored in a secure Neon PostgreSQL database with encrypted connections.</li>
+            <li><strong>Temporary Files:</strong> Video files captured for heart rate analysis are stored temporarily and deleted immediately after processing. They are never retained or shared.</li>
+            <li><strong>Authentication:</strong> User authentication is handled securely through Firebase Authentication with industry-standard protocols.</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>5. Third-Party Services</h2>
+          <p>Tabibi integrates with the following third-party services:</p>
+          <ul>
+            <li><strong>Firebase Authentication:</strong> For secure user account management and authentication (Google LLC).</li>
+            <li><strong>Google Gemini AI:</strong> For AI-powered symptom assessment, medication identification, and health recommendations (Google LLC).</li>
+            <li><strong>Google Maps Platform:</strong> For locating nearby healthcare facilities and displaying map data (Google LLC).</li>
+            <li><strong>Neon PostgreSQL:</strong> For secure, encrypted database storage of user and health data (Neon Inc.).</li>
+          </ul>
+          <p>Each third-party service operates under its own privacy policy. We encourage you to review their policies.</p>
+        </div>
+
+        <div class="section">
+          <h2>6. Data Sharing</h2>
+          <p>We do not sell, trade, or rent your personal or health information to third parties. Your data is shared with third-party services only as necessary to provide app functionality as described above.</p>
+        </div>
+
+        <div class="section">
+          <h2>7. Data Retention</h2>
+          <p>Your health assessment data is retained as long as your account is active. You may request deletion of your data at any time by contacting us. Temporary files (such as heart rate video recordings) are deleted immediately after processing.</p>
+        </div>
+
+        <div class="section">
+          <h2>8. Your Rights</h2>
+          <p>You have the right to:</p>
+          <ul>
+            <li>Access the personal data we hold about you</li>
+            <li>Request correction of inaccurate data</li>
+            <li>Request deletion of your data</li>
+            <li>Withdraw consent for data processing</li>
+            <li>Export your data in a portable format</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>9. Children's Privacy</h2>
+          <p>Tabibi is not intended for use by children under the age of 13. We do not knowingly collect personal information from children under 13.</p>
+        </div>
+
+        <div class="section">
+          <h2>10. Changes to This Policy</h2>
+          <p>We may update this Privacy Policy from time to time. We will notify users of significant changes through the app or by updating the effective date below.</p>
+        </div>
+
+        <div class="section">
+          <h2>11. Contact Us</h2>
+          <p>If you have questions about this Privacy Policy or your data, please contact us through the app's settings page.</p>
+        </div>
+      </div>
+
+      <div id="lang-ar" class="lang-section" dir="rtl">
+        <div class="section">
+          <h2>١. المقدمة</h2>
+          <p>طبيبي ("نحن"، "لنا") هو تطبيق مساعدة صحية مصمم لمساعدة المستخدمين في تقييم الأعراض وإدارة الأدوية والوصول إلى المرافق الطبية القريبة. توضح سياسة الخصوصية هذه كيفية جمع واستخدام وتخزين وحماية معلوماتك الشخصية والصحية.</p>
+        </div>
+
+        <div class="section">
+          <h2>٢. المعلومات التي نجمعها</h2>
+          <h3>٢.١ البيانات الصحية</h3>
+          <p>نجمع المعلومات الصحية التي تقدمها طوعاً، بما في ذلك:</p>
+          <ul>
+            <li>الأعراض والحالات الطبية التي تبلغ عنها خلال التقييمات</li>
+            <li>الأدوية التي تقوم بمسحها أو إدخالها يدوياً</li>
+            <li>العلامات الحيوية مثل قراءات معدل ضربات القلب المُحصلة من خلال مراقب rPPG القائم على الكاميرا</li>
+            <li>سجل التقييمات والتوصيات الصحية المُولدة بالذكاء الاصطناعي</li>
+          </ul>
+          <h3>٢.٢ بيانات المصادقة</h3>
+          <p>نستخدم مصادقة Firebase لإدارة حسابات المستخدمين. قد يشمل ذلك:</p>
+          <ul>
+            <li>عنوان البريد الإلكتروني</li>
+            <li>اسم العرض</li>
+            <li>معرف مستخدم Firebase (UID)</li>
+            <li>رموز المصادقة</li>
+          </ul>
+          <h3>٢.٣ بيانات الموقع</h3>
+          <p>عند استخدام ميزة المرافق القريبة، نصل إلى موقع جهازك عبر خرائط Google للعثور على المستشفيات والصيدليات والعيادات القريبة منك. تُستخدم بيانات الموقع لهذا الغرض فقط ولا يتم تخزينها بشكل دائم.</p>
+          <h3>٢.٤ بيانات الكاميرا والصور</h3>
+          <p>نصل إلى كاميرا جهازك لميزتين:</p>
+          <ul>
+            <li><strong>مراقب معدل ضربات القلب:</strong> تلتقط الكاميرا فيديو قصير لطرف إصبعك لقياس معدل ضربات القلب باستخدام تقنية التصوير الضوئي عن بُعد (rPPG). يتم تخزين ملفات الفيديو مؤقتاً على الخادم للمعالجة ويتم حذفها تلقائياً فور الانتهاء من التحليل.</li>
+            <li><strong>ماسح الأدوية:</strong> تلتقط الكاميرا صوراً لعبوات الأدوية للتعرف عليها والتحقق من التفاعلات الدوائية بواسطة الذكاء الاصطناعي.</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٣. كيف نستخدم معلوماتك</h2>
+          <ul>
+            <li>تقديم تقييمات الأعراض والتوصيات الصحية المدعومة بالذكاء الاصطناعي</li>
+            <li>التعرف على الأدوية والتحقق من التفاعلات الدوائية</li>
+            <li>قياس معدل ضربات القلب من خلال تحليل الكاميرا</li>
+            <li>تحديد المرافق الصحية القريبة</li>
+            <li>الاحتفاظ بسجل تقييماتك للرجوع الشخصي</li>
+            <li>تحسين دقة وجودة خدماتنا</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٤. تخزين البيانات والأمان</h2>
+          <p>نأخذ أمان بياناتك الصحية على محمل الجد:</p>
+          <ul>
+            <li><strong>التشفير:</strong> يتم تشفير جميع البيانات الصحية الحساسة المخزنة في قاعدة بياناتنا باستخدام تشفير AES-256 قبل التخزين.</li>
+            <li><strong>قاعدة البيانات:</strong> يتم تخزين بياناتك في قاعدة بيانات Neon PostgreSQL آمنة مع اتصالات مشفرة.</li>
+            <li><strong>الملفات المؤقتة:</strong> يتم تخزين ملفات الفيديو الملتقطة لتحليل معدل ضربات القلب مؤقتاً ويتم حذفها فوراً بعد المعالجة. لا يتم الاحتفاظ بها أو مشاركتها أبداً.</li>
+            <li><strong>المصادقة:</strong> يتم التعامل مع مصادقة المستخدم بشكل آمن من خلال مصادقة Firebase ببروتوكولات متوافقة مع معايير الصناعة.</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٥. خدمات الطرف الثالث</h2>
+          <p>يتكامل طبيبي مع خدمات الطرف الثالث التالية:</p>
+          <ul>
+            <li><strong>مصادقة Firebase:</strong> لإدارة حسابات المستخدمين والمصادقة الآمنة (Google LLC).</li>
+            <li><strong>Google Gemini AI:</strong> لتقييم الأعراض والتعرف على الأدوية والتوصيات الصحية المدعومة بالذكاء الاصطناعي (Google LLC).</li>
+            <li><strong>منصة خرائط Google:</strong> لتحديد المرافق الصحية القريبة وعرض بيانات الخريطة (Google LLC).</li>
+            <li><strong>Neon PostgreSQL:</strong> لتخزين بيانات المستخدم والبيانات الصحية بشكل آمن ومشفر (Neon Inc.).</li>
+          </ul>
+          <p>تعمل كل خدمة طرف ثالث بموجب سياسة خصوصية خاصة بها. نشجعك على مراجعة سياساتهم.</p>
+        </div>
+
+        <div class="section">
+          <h2>٦. مشاركة البيانات</h2>
+          <p>لا نبيع أو نتاجر أو نؤجر معلوماتك الشخصية أو الصحية لأطراف ثالثة. تتم مشاركة بياناتك مع خدمات الطرف الثالث فقط حسب الضرورة لتوفير وظائف التطبيق كما هو موضح أعلاه.</p>
+        </div>
+
+        <div class="section">
+          <h2>٧. الاحتفاظ بالبيانات</h2>
+          <p>يتم الاحتفاظ ببيانات تقييمك الصحي طالما أن حسابك نشط. يمكنك طلب حذف بياناتك في أي وقت عن طريق الاتصال بنا. يتم حذف الملفات المؤقتة (مثل تسجيلات فيديو معدل ضربات القلب) فوراً بعد المعالجة.</p>
+        </div>
+
+        <div class="section">
+          <h2>٨. حقوقك</h2>
+          <p>لديك الحق في:</p>
+          <ul>
+            <li>الوصول إلى البيانات الشخصية التي نحتفظ بها عنك</li>
+            <li>طلب تصحيح البيانات غير الدقيقة</li>
+            <li>طلب حذف بياناتك</li>
+            <li>سحب الموافقة على معالجة البيانات</li>
+            <li>تصدير بياناتك بتنسيق قابل للنقل</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٩. خصوصية الأطفال</h2>
+          <p>طبيبي غير مخصص للاستخدام من قبل الأطفال دون سن ١٣ عاماً. نحن لا نجمع عن عمد معلومات شخصية من الأطفال دون ١٣ عاماً.</p>
+        </div>
+
+        <div class="section">
+          <h2>١٠. التغييرات على هذه السياسة</h2>
+          <p>قد نقوم بتحديث سياسة الخصوصية هذه من وقت لآخر. سنقوم بإخطار المستخدمين بالتغييرات الجوهرية من خلال التطبيق أو عن طريق تحديث تاريخ السريان أدناه.</p>
+        </div>
+
+        <div class="section">
+          <h2>١١. اتصل بنا</h2>
+          <p>إذا كانت لديك أسئلة حول سياسة الخصوصية هذه أو بياناتك، يرجى الاتصال بنا من خلال صفحة إعدادات التطبيق.</p>
+        </div>
+      </div>
+
+      <p class="effective">Effective Date: January 2025 | تاريخ السريان: يناير ٢٠٢٥</p>
+    </div>
+    <script>
+      function showLang(lang) {
+        document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+        document.getElementById('lang-ar').classList.toggle('active', lang === 'ar');
+        var btns = document.querySelectorAll('.lang-toggle button');
+        btns[0].classList.toggle('active', lang === 'en');
+        btns[1].classList.toggle('active', lang === 'ar');
+      }
+    </script>
+  </body>
+</html>

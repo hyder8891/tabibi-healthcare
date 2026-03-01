@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+  <head>
+    <title>Tabibi - Terms of Service</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f8fafa;
+        color: #1a1a1a;
+        line-height: 1.7;
+        min-height: 100vh;
+      }
+      .header {
+        background: linear-gradient(135deg, #0F766E 0%, #0d9488 100%);
+        color: #fff;
+        padding: 48px 20px 40px;
+        text-align: center;
+      }
+      .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+      .header p { font-size: 14px; opacity: 0.85; }
+      .container {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 32px 20px 60px;
+      }
+      .lang-toggle {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        margin-bottom: 32px;
+      }
+      .lang-toggle button {
+        padding: 8px 20px;
+        border: 2px solid #0F766E;
+        border-radius: 8px;
+        background: #fff;
+        color: #0F766E;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .lang-toggle button.active {
+        background: #0F766E;
+        color: #fff;
+      }
+      .section { margin-bottom: 28px; }
+      .section h2 {
+        font-size: 20px;
+        font-weight: 700;
+        color: #0F766E;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #e0f2f1;
+      }
+      .section h3 {
+        font-size: 16px;
+        font-weight: 600;
+        color: #115e59;
+        margin: 16px 0 8px;
+      }
+      .section p, .section li {
+        font-size: 15px;
+        color: #333;
+        margin-bottom: 8px;
+      }
+      .section ul {
+        padding-left: 24px;
+        margin-bottom: 12px;
+      }
+      .section li { margin-bottom: 4px; }
+      .disclaimer-box {
+        background: #fef3c7;
+        border: 2px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 28px;
+      }
+      .disclaimer-box h3 {
+        color: #92400e;
+        font-size: 17px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .disclaimer-box p {
+        color: #78350f;
+        font-size: 15px;
+        margin: 0;
+      }
+      .effective { text-align: center; color: #666; font-size: 13px; margin-top: 40px; }
+      .back-link {
+        display: inline-block;
+        margin-bottom: 20px;
+        color: #0F766E;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+      }
+      .back-link:hover { text-decoration: underline; }
+      [dir="rtl"] .section ul { padding-left: 0; padding-right: 24px; }
+      .lang-section { display: none; }
+      .lang-section.active { display: block; }
+      @media (min-width: 768px) {
+        .header h1 { font-size: 34px; }
+        .container { padding: 40px 32px 80px; }
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0d0d0d; color: #e0e0e0; }
+        .header { background: linear-gradient(135deg, #0F766E 0%, #115e59 100%); }
+        .section h2 { color: #2dd4bf; border-bottom-color: #1a3a38; }
+        .section h3 { color: #5eead4; }
+        .section p, .section li { color: #ccc; }
+        .effective { color: #888; }
+        .lang-toggle button { background: #1a1a1a; border-color: #2dd4bf; color: #2dd4bf; }
+        .lang-toggle button.active { background: #0F766E; color: #fff; border-color: #0F766E; }
+        .back-link { color: #2dd4bf; }
+        .disclaimer-box { background: #422006; border-color: #b45309; }
+        .disclaimer-box h3 { color: #fbbf24; }
+        .disclaimer-box p { color: #fcd34d; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Terms of Service</h1>
+      <p>Tabibi Healthcare Application</p>
+    </div>
+    <div class="container">
+      <a href="/" class="back-link">&larr; Back to Home</a>
+      <div class="lang-toggle">
+        <button class="active" onclick="showLang('en')">English</button>
+        <button onclick="showLang('ar')">العربية</button>
+      </div>
+
+      <div id="lang-en" class="lang-section active">
+        <div class="disclaimer-box">
+          <h3>Important Medical Disclaimer</h3>
+          <p>Tabibi is for informational purposes only and does not provide medical diagnoses, treatment plans, or professional medical advice. Always consult a qualified healthcare professional for medical decisions. In case of a medical emergency, call your local emergency services immediately.</p>
+        </div>
+
+        <div class="section">
+          <h2>1. Acceptance of Terms</h2>
+          <p>By downloading, installing, or using the Tabibi application ("App"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, do not use the App.</p>
+        </div>
+
+        <div class="section">
+          <h2>2. Description of Service</h2>
+          <p>Tabibi is a healthcare assistance application that provides:</p>
+          <ul>
+            <li>AI-powered symptom assessment and health information</li>
+            <li>Medication identification through camera scanning</li>
+            <li>Drug interaction checking</li>
+            <li>Camera-based heart rate measurement (rPPG)</li>
+            <li>Nearby healthcare facility locator</li>
+            <li>Health assessment history tracking</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>3. Not Medical Advice</h2>
+          <p>The information provided by Tabibi is for informational and educational purposes only. The App:</p>
+          <ul>
+            <li>Does NOT provide medical diagnoses</li>
+            <li>Does NOT replace professional medical consultation</li>
+            <li>Does NOT prescribe medications or treatments</li>
+            <li>Should NOT be used for emergency medical situations</li>
+            <li>Should NOT be the sole basis for any medical decisions</li>
+          </ul>
+          <p>AI-generated assessments and recommendations are based on general health information and may not account for your complete medical history, allergies, or individual circumstances. Always verify information with a qualified healthcare provider.</p>
+        </div>
+
+        <div class="section">
+          <h2>4. User Responsibilities</h2>
+          <p>As a user of Tabibi, you agree to:</p>
+          <ul>
+            <li>Provide accurate health information when using the App</li>
+            <li>Not rely solely on the App for medical decisions</li>
+            <li>Seek professional medical help for serious symptoms or emergencies</li>
+            <li>Keep your account credentials secure</li>
+            <li>Use the App in compliance with applicable laws and regulations</li>
+            <li>Not misuse or attempt to reverse-engineer the App</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>5. Account and Authentication</h2>
+          <p>You may need to create an account to access certain features. You are responsible for maintaining the confidentiality of your account and for all activities under your account. Authentication is managed through Firebase Authentication.</p>
+        </div>
+
+        <div class="section">
+          <h2>6. Heart Rate Measurement</h2>
+          <p>The camera-based heart rate measurement feature uses remote photoplethysmography (rPPG) technology. Results are approximate and intended for informational purposes only. They should not be used as a substitute for medical-grade heart rate monitoring devices. Accuracy may vary based on lighting conditions, camera quality, and other factors.</p>
+        </div>
+
+        <div class="section">
+          <h2>7. Medication Scanning</h2>
+          <p>The medication scanning feature uses AI to identify medications from images. While we strive for accuracy, the identification may not always be correct. Always verify medication information with a pharmacist or healthcare provider before making any decisions based on scan results.</p>
+        </div>
+
+        <div class="section">
+          <h2>8. Privacy</h2>
+          <p>Your use of the App is also governed by our <a href="/privacy" style="color: #0F766E; font-weight: 500;">Privacy Policy</a>, which describes how we collect, use, and protect your data.</p>
+        </div>
+
+        <div class="section">
+          <h2>9. Limitation of Liability</h2>
+          <p>To the maximum extent permitted by law, Tabibi and its developers shall not be liable for any direct, indirect, incidental, special, or consequential damages arising from your use of the App, including but not limited to damages related to health decisions made based on information provided by the App.</p>
+        </div>
+
+        <div class="section">
+          <h2>10. Modifications to Terms</h2>
+          <p>We reserve the right to modify these Terms at any time. Continued use of the App after changes constitutes acceptance of the modified Terms. We will notify users of significant changes through the App.</p>
+        </div>
+
+        <div class="section">
+          <h2>11. Termination</h2>
+          <p>We may suspend or terminate your access to the App at any time for violation of these Terms or for any other reason at our discretion.</p>
+        </div>
+
+        <div class="section">
+          <h2>12. Contact</h2>
+          <p>For questions about these Terms, please contact us through the App's settings page.</p>
+        </div>
+      </div>
+
+      <div id="lang-ar" class="lang-section" dir="rtl">
+        <div class="disclaimer-box">
+          <h3>إخلاء مسؤولية طبية مهم</h3>
+          <p>طبيبي مخصص للأغراض المعلوماتية فقط ولا يقدم تشخيصات طبية أو خطط علاج أو نصائح طبية مهنية. استشر دائماً متخصصاً صحياً مؤهلاً لاتخاذ القرارات الطبية. في حالة الطوارئ الطبية، اتصل بخدمات الطوارئ المحلية فوراً.</p>
+        </div>
+
+        <div class="section">
+          <h2>١. قبول الشروط</h2>
+          <p>بتنزيل أو تثبيت أو استخدام تطبيق طبيبي ("التطبيق")، فإنك توافق على الالتزام بشروط الخدمة هذه ("الشروط"). إذا كنت لا توافق على هذه الشروط، فلا تستخدم التطبيق.</p>
+        </div>
+
+        <div class="section">
+          <h2>٢. وصف الخدمة</h2>
+          <p>طبيبي هو تطبيق مساعدة صحية يوفر:</p>
+          <ul>
+            <li>تقييم الأعراض والمعلومات الصحية المدعومة بالذكاء الاصطناعي</li>
+            <li>التعرف على الأدوية من خلال مسح الكاميرا</li>
+            <li>التحقق من التفاعلات الدوائية</li>
+            <li>قياس معدل ضربات القلب القائم على الكاميرا (rPPG)</li>
+            <li>محدد المرافق الصحية القريبة</li>
+            <li>تتبع سجل التقييمات الصحية</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٣. ليس نصيحة طبية</h2>
+          <p>المعلومات التي يقدمها طبيبي هي لأغراض معلوماتية وتعليمية فقط. التطبيق:</p>
+          <ul>
+            <li>لا يقدم تشخيصات طبية</li>
+            <li>لا يحل محل الاستشارة الطبية المهنية</li>
+            <li>لا يصف الأدوية أو العلاجات</li>
+            <li>لا ينبغي استخدامه في حالات الطوارئ الطبية</li>
+            <li>لا ينبغي أن يكون الأساس الوحيد لأي قرارات طبية</li>
+          </ul>
+          <p>التقييمات والتوصيات المُولدة بالذكاء الاصطناعي تستند إلى معلومات صحية عامة وقد لا تأخذ في الاعتبار تاريخك الطبي الكامل أو الحساسية أو الظروف الفردية. تحقق دائماً من المعلومات مع مقدم رعاية صحية مؤهل.</p>
+        </div>
+
+        <div class="section">
+          <h2>٤. مسؤوليات المستخدم</h2>
+          <p>كمستخدم لطبيبي، توافق على:</p>
+          <ul>
+            <li>تقديم معلومات صحية دقيقة عند استخدام التطبيق</li>
+            <li>عدم الاعتماد فقط على التطبيق في القرارات الطبية</li>
+            <li>طلب المساعدة الطبية المهنية للأعراض الخطيرة أو حالات الطوارئ</li>
+            <li>الحفاظ على أمان بيانات اعتماد حسابك</li>
+            <li>استخدام التطبيق وفقاً للقوانين واللوائح المعمول بها</li>
+            <li>عدم إساءة استخدام التطبيق أو محاولة الهندسة العكسية له</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <h2>٥. الحساب والمصادقة</h2>
+          <p>قد تحتاج إلى إنشاء حساب للوصول إلى ميزات معينة. أنت مسؤول عن الحفاظ على سرية حسابك وعن جميع الأنشطة تحت حسابك. تتم إدارة المصادقة من خلال مصادقة Firebase.</p>
+        </div>
+
+        <div class="section">
+          <h2>٦. قياس معدل ضربات القلب</h2>
+          <p>تستخدم ميزة قياس معدل ضربات القلب القائمة على الكاميرا تقنية التصوير الضوئي عن بُعد (rPPG). النتائج تقريبية ومخصصة للأغراض المعلوماتية فقط. لا ينبغي استخدامها كبديل لأجهزة مراقبة معدل ضربات القلب الطبية. قد تختلف الدقة بناءً على ظروف الإضاءة وجودة الكاميرا وعوامل أخرى.</p>
+        </div>
+
+        <div class="section">
+          <h2>٧. مسح الأدوية</h2>
+          <p>تستخدم ميزة مسح الأدوية الذكاء الاصطناعي للتعرف على الأدوية من الصور. بينما نسعى للدقة، قد لا يكون التعرف صحيحاً دائماً. تحقق دائماً من معلومات الأدوية مع صيدلي أو مقدم رعاية صحية قبل اتخاذ أي قرارات بناءً على نتائج المسح.</p>
+        </div>
+
+        <div class="section">
+          <h2>٨. الخصوصية</h2>
+          <p>يخضع استخدامك للتطبيق أيضاً لـ <a href="/privacy" style="color: #0F766E; font-weight: 500;">سياسة الخصوصية</a> الخاصة بنا، والتي تصف كيفية جمع واستخدام وحماية بياناتك.</p>
+        </div>
+
+        <div class="section">
+          <h2>٩. تحديد المسؤولية</h2>
+          <p>إلى أقصى حد يسمح به القانون، لن يكون طبيبي ومطوروه مسؤولين عن أي أضرار مباشرة أو غير مباشرة أو عرضية أو خاصة أو تبعية ناتجة عن استخدامك للتطبيق، بما في ذلك على سبيل المثال لا الحصر الأضرار المتعلقة بالقرارات الصحية المتخذة بناءً على المعلومات المقدمة من التطبيق.</p>
+        </div>
+
+        <div class="section">
+          <h2>١٠. تعديل الشروط</h2>
+          <p>نحتفظ بالحق في تعديل هذه الشروط في أي وقت. يشكل الاستمرار في استخدام التطبيق بعد التغييرات قبولاً للشروط المعدلة. سنقوم بإخطار المستخدمين بالتغييرات الجوهرية من خلال التطبيق.</p>
+        </div>
+
+        <div class="section">
+          <h2>١١. الإنهاء</h2>
+          <p>يجوز لنا تعليق أو إنهاء وصولك إلى التطبيق في أي وقت بسبب انتهاك هذه الشروط أو لأي سبب آخر وفقاً لتقديرنا.</p>
+        </div>
+
+        <div class="section">
+          <h2>١٢. الاتصال</h2>
+          <p>لأي أسئلة حول هذه الشروط، يرجى الاتصال بنا من خلال صفحة إعدادات التطبيق.</p>
+        </div>
+      </div>
+
+      <p class="effective">Effective Date: January 2025 | تاريخ السريان: يناير ٢٠٢٥</p>
+    </div>
+    <script>
+      function showLang(lang) {
+        document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+        document.getElementById('lang-ar').classList.toggle('active', lang === 'ar');
+        var btns = document.querySelectorAll('.lang-toggle button');
+        btns[0].classList.toggle('active', lang === 'en');
+        btns[1].classList.toggle('active', lang === 'ar');
+      }
+    </script>
+  </body>
+</html>

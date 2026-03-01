@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, real, boolean, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, real, boolean, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -55,7 +55,10 @@ export const orders = pgTable("orders", {
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("orders_user_id_idx").on(table.userId),
+  index("orders_user_status_idx").on(table.userId, table.status),
+]);
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
@@ -109,7 +112,10 @@ export const healthEvents = pgTable("health_events", {
   tags: text("tags"),
   outcome: text("outcome"),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (table) => [
+  index("health_events_user_id_idx").on(table.userId),
+  index("health_events_user_created_idx").on(table.userId, table.createdAt),
+]);
 
 export const insertHealthEventSchema = createInsertSchema(healthEvents).omit({ id: true, createdAt: true });
 export type InsertHealthEvent = z.infer<typeof insertHealthEventSchema>;
@@ -126,7 +132,10 @@ export const populationAnalytics = pgTable("population_analytics", {
   region: text("region"),
   metadata: text("metadata"),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("pop_analytics_period_category_idx").on(table.period, table.category),
+  index("pop_analytics_category_item_idx").on(table.category, table.itemName),
+]);
 
 export const insertPopulationAnalyticSchema = createInsertSchema(populationAnalytics).omit({ id: true, updatedAt: true });
 export type InsertPopulationAnalytic = z.infer<typeof insertPopulationAnalyticSchema>;

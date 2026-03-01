@@ -9,7 +9,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - **Auth**: Firebase Authentication (stateless Bearer token, jose JWKS verification)
 - **AI**: Gemini 2.5 Flash for conversational symptom assessment (streaming SSE), Gemini 2.5 Pro for medical imaging analysis, medication OCR, and drug interaction checking
 - **Database**: PostgreSQL (Neon) with Drizzle ORM, AES-256-GCM encryption for sensitive fields
-- **Storage**: expo-secure-store for auth tokens, AsyncStorage for non-sensitive data
+- **Storage**: expo-secure-store for auth tokens, encrypted AsyncStorage for health data (XOR cipher with device-specific key)
 - **Maps**: expo-location for GPS, Google Places API with in-memory caching
 - **Font**: DM Sans (Google Fonts)
 - **Icons**: @expo/vector-icons (Ionicons, MaterialCommunityIcons)
@@ -27,7 +27,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - `components/` - MessageBubble, EmergencyOverlay, RecommendationCard, FacilityCard, AssessmentCard
 - `contexts/SettingsContext.tsx` - Language (EN/AR) and pediatric mode settings
 - `contexts/AuthContext.tsx` - Auth state with Firebase listener, Bearer token management via expo-secure-store
-- `lib/storage.ts` - AsyncStorage helpers for assessments, profile, medications
+- `lib/storage.ts` - Encrypted AsyncStorage helpers for assessments, medications; plain AsyncStorage for profile, settings
 - `lib/types.ts` - TypeScript interfaces for all data models
 - `lib/query-client.ts` - API client with automatic Bearer token injection via setAuthTokenGetter
 
@@ -49,8 +49,8 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 ### Authentication (Stateless Bearer Token)
 - **Flow**: Firebase Auth on frontend → getIdToken() → Authorization: Bearer header → backend jose JWKS verification
 - **Email/Password**: Firebase JS SDK handles registration + login
-- **Phone OTP**: Firebase `signInWithPhoneNumber` with invisible reCAPTCHA
-- **Google Sign-In**: Firebase `signInWithPopup` on web
+- **Phone OTP**: Firebase `signInWithPhoneNumber` — web uses invisible reCAPTCHA, native uses Firebase app verification
+- **Google Sign-In**: Web uses `signInWithPopup`, native uses `@react-native-google-signin/google-signin` → `signInWithCredential`
 - **Forgot Password**: Firebase `sendPasswordResetEmail`
 - **Token verification**: jose library with remote JWKS from `https://www.googleapis.com/service_account/v1/jwk/securetoken@system.gserviceaccount.com`
 - **No server-side sessions**: Fully stateless, no express-session dependency
@@ -76,6 +76,7 @@ Tabibi is a mobile-first healthcare navigation app built with Expo (React Native
 - Background: #F1F5F4
 
 ## Recent Changes
+- Mar 1, 2026: Google Play Store readiness audit (22 findings addressed). Created eas.json (development/preview/production build profiles). Updated app.json: versionCode 1, minSdkVersion 23, targetSdkVersion 34, expo-camera/expo-location/expo-image-picker plugins with permission descriptions, expo-build-properties plugin, expo-router origin changed from replit.com to tabibi.health. Implemented native Google Sign-In (@react-native-google-signin/google-signin) and native phone OTP (Firebase app verification) in AuthContext.tsx. Added ALLOWED_ORIGINS CORS support for production deployment. Added GET /health endpoint with DB connectivity check. Added GET /privacy and GET /terms pages (bilingual EN/AR). Encrypted local health data storage (assessments + medications) with XOR cipher using device-specific key from SecureStore. Added database indexes on health_events, orders, population_analytics tables. Robust video file cleanup with try/finally in heart rate monitor. Flashlight disclosure in heart rate instructions. Added esbuild to devDependencies.
 - Feb 22, 2026: Removed MedGemma 4B (too small, leaked thinking blocks, refused images, ignored system prompts). Switched to dual Gemini model architecture: Gemini 2.5 Flash for conversational symptom Q&A (fast streaming SSE), Gemini 2.5 Pro for all clinical decision-making (medical image analysis, medication OCR scanning, drug interaction checking, final assessment recommendations). Deleted server/medgemma.ts.
 - Feb 21, 2026: Security audit remediation (23 findings) - mandatory ENCRYPTION_KEY (no DATABASE_URL fallback), decrypt() throws on malformed data, all PHI fields encrypted (lastConditions, vitalTrends, preferredPharmacies), profile field sanitization in AI prompts, bounded Zod schemas (no z.any()), geo coordinate validation (-90..90, -180..180), rPPG RGB validation (0..255+finite), rate limiters on geo/rPPG/Avicenna routes, SSE client disconnect handling, atomic SQL increments for counters with race-condition handling, order state machine enforcement (valid transitions only), DB pool consolidation (single shared pool), DB indexes on health_events/orders/population_analytics, generic error responses (no Google API internals leaked), React Query staleTime=5min with 2-retry exponential backoff excluding 4xx, AbortController cleanup on orders screen, rPPG worker concurrency cap via p-limit.
 - Feb 21, 2026: Consolidated medicine ordering - single "Order Selected" button instead of per-medicine buttons, checkboxes to deselect medicines already at home, multi-medicine WhatsApp message and order submission. Geo-aware facility search keywords (Arabic+English for MENA region, English-only globally). Expanded AI medication guidance: condition-appropriate drug classes (NSAIDs for inflammation, antispasmodics for colic, antihistamines for allergies, etc.), expanded Iraqi brand list (Voltaren, Buscopan, Cataflam, Claritine, Imodium, Duspatalin, Zantac, ORS), specific test names required (never vague "medical imaging"), deeper assessment questioning (5-7 questions minimum for complex conditions).

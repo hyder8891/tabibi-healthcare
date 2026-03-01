@@ -11,12 +11,27 @@ import {
   sendPasswordResetEmail,
   signInWithPopup,
   signInWithPhoneNumber,
+  signInWithCredential,
   RecaptchaVerifier,
+  GoogleAuthProvider,
   googleProvider,
   type FirebaseUser,
   type ConfirmationResult,
 } from "@/lib/firebase";
 import { Platform } from "react-native";
+
+let GoogleSignin: any = null;
+if (Platform.OS !== "web") {
+  try {
+    const gsModule = require("@react-native-google-signin/google-signin");
+    GoogleSignin = gsModule.GoogleSignin;
+    GoogleSignin.configure({
+      webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
+      offlineAccess: false,
+    });
+  } catch (e) {
+  }
+}
 
 const AUTH_USER_KEY = "tabibi_auth_user";
 
@@ -164,7 +179,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(backendUser);
       await persistUser(backendUser);
     } else {
-      throw new Error("Google sign-in on native requires additional setup");
+      if (!GoogleSignin) {
+        throw new Error("Google Sign-In is not available. Please install @react-native-google-signin/google-signin.");
+      }
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const signInResult = await GoogleSignin.signIn();
+      const idToken = signInResult?.data?.idToken ?? signInResult?.idToken;
+      if (!idToken) {
+        throw new Error("Failed to get ID token from Google Sign-In.");
+      }
+      const credential = GoogleAuthProvider.credential(idToken);
+      const cred = await signInWithCredential(auth, credential);
+      firebaseUserRef.current = cred.user;
+      const backendUser = await syncWithBackend(cred.user);
+      setUser(backendUser);
+      await persistUser(backendUser);
     }
   }, []);
 
@@ -178,7 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
       confirmationResultRef.current = confirmation;
     } else {
-      throw new Error("Phone auth on native requires additional setup");
+      if (__DEV__) {
+        (auth as any).settings.appVerificationDisabledForTesting = true;
+      }
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
+      confirmationResultRef.current = confirmation;
     }
   }, []);
 
