@@ -226,8 +226,10 @@ function configureExpoAndLanding(app: express.Application) {
 
   log("Serving static Expo files with dynamic manifest routing");
 
+  const publicPages = ["/privacy", "/terms", "/health"];
+
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.path.startsWith("/api")) {
+    if (req.path.startsWith("/api") || publicPages.includes(req.path)) {
       return next();
     }
 
@@ -322,12 +324,6 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
-  setupCors(app);
-  setupSecurityHeaders(app);
-  setupBodyParsing(app);
-  setupRateLimiting(app);
-  setupRequestLogging(app);
-
   app.get("/health", async (_req, res) => {
     try {
       const { pool } = await import("./storage");
@@ -357,6 +353,12 @@ function setupErrorHandler(app: express.Application) {
       res.status(404).send("Terms of service not found");
     }
   });
+
+  setupCors(app);
+  setupSecurityHeaders(app);
+  setupBodyParsing(app);
+  setupRateLimiting(app);
+  setupRequestLogging(app);
 
   configureExpoAndLanding(app);
 

@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "238884248738",
+    "project_id": "mydoctor-40043",
+    "storage_bucket": "mydoctor-40043.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:238884248738:android:e910225ef2f938a346cbfb",
+        "android_client_info": {
+          "package_name": "com.tabibi.health"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "238884248738-qp43962v0of6vreq5383nmavob924tmc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAJ38OEy_QYBsUXJuJOUz9Z-eO3R29oNuQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "238884248738-qp43962v0of6vreq5383nmavob924tmc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
