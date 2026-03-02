@@ -48,7 +48,7 @@ function RootLayoutNav() {
       }
       setCheckedOnboarding(true);
     });
-  }, [user, isLoading, segments]);
+  }, [user, isLoading]);
 
   if (isLoading) {
     return (
