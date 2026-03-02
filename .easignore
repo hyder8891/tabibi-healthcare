@@ -1,0 +1,10 @@
+node_modules/
+.git/
+.local/
+attached_assets/
+/tmp/
+*.log
+firebase-debug.log
+.cache/
+dist/
+static-build/
