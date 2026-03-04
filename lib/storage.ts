@@ -59,7 +59,11 @@ function fromBase64(b64: string): string {
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  return String.fromCharCode(...bytes);
+  let result = "";
+  for (let i = 0; i < bytes.length; i++) {
+    result += String.fromCharCode(bytes[i]);
+  }
+  return result;
 }
 
 async function encryptData(plaintext: string): Promise<string> {

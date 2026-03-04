@@ -476,7 +476,7 @@ export default function AssessmentScreen() {
           existingAssessment.emergency = parsedEmergency || existingAssessment.emergency;
           await updateAssessment(existingAssessment);
         }
-      } else if (parsedResult || parsedEmergency) {
+      } else {
         const newId = Crypto.randomUUID();
         const assessment: Assessment = {
           id: newId,
