@@ -267,7 +267,21 @@ export default function AssessmentScreen() {
       let parsedEmergency: EmergencyAlert | null = null;
 
       const normalizeResult = (raw: any): AssessmentResult => {
-        const result = { ...raw } as AssessmentResult;
+        const result: AssessmentResult = {
+          assessment: {
+            condition: raw.assessment?.condition || "",
+            confidence: raw.assessment?.confidence || "",
+            severity: raw.assessment?.severity || "moderate",
+            description: raw.assessment?.description || "",
+          },
+          pathway: raw.pathway || "A",
+          recommendations: {
+            pathwayA: raw.recommendations?.pathwayA || { active: false, medicines: [] },
+            pathwayB: raw.recommendations?.pathwayB || { active: false, tests: [] },
+          },
+          warnings: Array.isArray(raw.warnings) ? raw.warnings : [],
+          followUp: "",
+        };
         if (raw.followUp && typeof raw.followUp === "object" && raw.followUp.returnIn) {
           result.followUp = {
             returnIn: raw.followUp.returnIn,
@@ -301,7 +315,7 @@ export default function AssessmentScreen() {
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
-          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*\}/g, "")
+          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/g, "")
           .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "")
           .trim();
       };
@@ -355,19 +369,23 @@ export default function AssessmentScreen() {
                     const raw = JSON.parse(jsonMatch[1]);
                     parsedResult = normalizeResult(raw);
                     setAssessmentResult(parsedResult);
-                  } catch {}
+                  } catch (e) {
+                    console.warn("Failed to parse code-fenced JSON:", e);
+                  }
                 }
 
                 if (!parsedResult) {
                   const rawJsonMatch = fullText.match(
-                    /\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*\}/,
+                    /\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/,
                   );
                   if (rawJsonMatch) {
                     try {
                       const raw = JSON.parse(rawJsonMatch[0]);
                       parsedResult = normalizeResult(raw);
                       setAssessmentResult(parsedResult);
-                    } catch {}
+                    } catch (e) {
+                      console.warn("Failed to parse raw JSON:", e);
+                    }
                   }
                 }
 
