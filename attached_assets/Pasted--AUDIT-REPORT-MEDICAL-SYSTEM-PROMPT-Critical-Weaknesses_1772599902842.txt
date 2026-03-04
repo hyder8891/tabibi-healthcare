@@ -1,0 +1,35 @@
+🔍 AUDIT REPORT — MEDICAL_SYSTEM_PROMPT
+🔴 Critical Weaknesses
+1. Iraq-brand constraint is too absolute → causes medicine repetition
+The current rule says:
+
+"ALWAYS recommend the most popular Iraqi/locally-available brand names"
+
+This is the root cause of the repetition problem. The AI has a fixed example list (Samarra Paracetamol, Brufen, Voltaren, Buscopan, Omez…) and when it sees "ALWAYS recommend Iraqi brands", it pattern-matches to that example list every time. So a patient with a skin allergy and a patient with a UTI both end up getting Samarra Paracetamol + Brufen in the recommendations, because that's what the examples anchor on. The fix: change from "ALWAYS use Iraqi brand" to "PRIORITIZE Iraqi market availability — if a locally available option exists use it; if not, recommend the globally appropriate medicine by its generic name."
+2. Drug class selection section is incomplete → same drugs keep appearing
+The CONDITION-APPROPRIATE MEDICATION SELECTION section only covers 8 scenarios (NSAIDs for colicky pain, antispasmodics, antihistamines, PPIs, antibiotics, paracetamol, and a vague "multiple medications" note). It's missing entire categories:
+
+Antiemetics (nausea/vomiting — very common complaints; metoclopramide, domperidone are widely available in Iraq)
+Antidiarrheals (loperamide, ORS — Imodium is already listed in brands but not in drug class rules)
+Topical treatments (antifungal creams, eye drops, ear drops, topical steroids, wound antiseptics)
+Antifungals (fluconazole for oral/vaginal thrush, clotrimazole topical)
+Respiratory (salbutamol MDI for bronchospasm, intranasal steroids for rhinitis, N-acetylcysteine for productive cough)
+Antihypertensives / cardiac — guidance when patient is in BP crisis (send to ER vs advise to take their existing medication)
+Laxatives/constipation (bisacodyl, lactulose, fibre supplements)
+Vitamins & supplements (Vitamin D, Iron, B12 — very common in Iraq, often deficient)
+Rehydration (ORS for gastroenteritis — critical in Iraq's hot climate)
+Antacids (plain antacids for quick relief vs PPI for sustained treatment)
+Mucolytics/expectorants for cough
+
+3. No structured differential diagnoses in JSON output
+The assessment block only outputs a single condition. In reality, the AI is weighing multiple possibilities. When it collapses to one, it discards clinical nuance. The user sees only one answer with no context on what else it could be. Adding differentials (2nd and 3rd possibility + what feature separates them) dramatically improves the quality of the output.
+4. No triage urgency level in JSON
+"Severity" (mild/moderate/severe) describes the symptom, not the time urgency. A patient can have severe chronic back pain (not time-urgent) vs moderate chest pain (very time-urgent). There's no structured triageLevel field telling the app/user "how soon to act."
+5. The followUp field is unstructured free text
+Currently followUp is a generic text string. It's often vague ("see a doctor in 3 days"). What's actually needed is: (a) when to return, (b) what specific new symptoms should trigger immediate return (red flags). These are separate concerns that should be separate fields.
+6. Minimum questioning depth rule has no enforcement anchor
+The prompt says "count the number of user replies — if fewer than 5, keep asking." But the AI can't actually count reliably from the system prompt. What actually works is framing it as a staged flow with explicit decision gates. The current text can be overridden by a confident-sounding user presenting simple symptoms, leading to premature recommendations.
+7. The JSON format for tests lacks estimatedCost and availableAt guidance
+Tests are recommended without any guidance on where specifically to get them in Iraq (MOH lab, private lab, hospital imaging, etc.) or cost tier (free at MOH vs ~5,000 IQD at private lab). This makes the test recommendations less actionable.
+8. Pediatric mode is an afterthought
+Pediatric instructions are a short paragraph at the end instead of being integrated throughout the flow. There's no instruction to ask about immunization status, no mention of dose capping (max adult dose), and no guidance on when NOT to use certain drugs in children (e.g., aspirin contraindicated under 16).
