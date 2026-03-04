@@ -57,6 +57,19 @@ export interface TestRecommendation {
   reason: string;
   facilityType: string;
   capabilities: string[];
+  estimatedCost?: "free-MOH" | "low" | "moderate" | "high";
+  availableAt?: "MOH-lab" | "private-lab" | "hospital" | "any-pharmacy";
+}
+
+export interface DifferentialDiagnosis {
+  condition: string;
+  likelihood: string;
+  distinguishingFeature: string;
+}
+
+export interface StructuredFollowUp {
+  returnIn: string;
+  redFlags: string[];
 }
 
 export interface AssessmentResult {
@@ -66,6 +79,8 @@ export interface AssessmentResult {
     severity: string;
     description: string;
   };
+  differentials?: DifferentialDiagnosis[];
+  triageLevel?: "immediate" | "within-hours" | "within-24h" | "within-week" | "routine";
   pathway: string;
   recommendations: {
     pathwayA?: {
@@ -78,7 +93,7 @@ export interface AssessmentResult {
     };
   };
   warnings: string[];
-  followUp: string;
+  followUp: string | StructuredFollowUp;
 }
 
 export interface EmergencyAlert {

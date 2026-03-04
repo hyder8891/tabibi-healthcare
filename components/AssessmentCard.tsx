@@ -40,6 +40,16 @@ export function AssessmentCard({
         : Colors.light.success
     : Colors.light.textTertiary;
 
+  const triageLevel = assessment.result?.triageLevel;
+  const triageConfig: Record<string, { color: string; bg: string; en: string; ar: string }> = {
+    "immediate": { color: "#DC2626", bg: "#FEE2E2", en: "Immediate", ar: "فوري" },
+    "within-hours": { color: "#EA580C", bg: "#FFEDD5", en: "Within Hours", ar: "خلال ساعات" },
+    "within-24h": { color: "#D97706", bg: "#FEF3C7", en: "Within 24h", ar: "خلال ٢٤ ساعة" },
+    "within-week": { color: "#2563EB", bg: "#DBEAFE", en: "Within a Week", ar: "خلال أسبوع" },
+    "routine": { color: "#16A34A", bg: "#DCFCE7", en: "Routine", ar: "روتيني" },
+  };
+  const triage = triageLevel ? triageConfig[triageLevel] : null;
+
   return (
     <Pressable
       style={({ pressed }) => [
@@ -88,25 +98,40 @@ export function AssessmentCard({
           <Text style={styles.resultCondition} numberOfLines={1}>
             {assessment.result.assessment.condition || t("Assessment", "تقييم")}
           </Text>
-          {severity && (
-            <View
-              style={[
-                styles.severityBadge,
-                {
-                  backgroundColor:
-                    severity === "severe"
-                      ? Colors.light.emergencyLight
-                      : severity === "moderate"
-                        ? Colors.light.warningLight
-                        : Colors.light.successLight,
-                },
-              ]}
-            >
-              <Text style={[styles.severityText, { color: severityColor }]}>
-                {severity}
-              </Text>
-            </View>
-          )}
+          <View style={styles.badgeRow}>
+            {triage && (
+              <View
+                style={[
+                  styles.triageBadge,
+                  { backgroundColor: triage.bg },
+                ]}
+              >
+                <View style={[styles.triageDot, { backgroundColor: triage.color }]} />
+                <Text style={[styles.triageText, { color: triage.color }]}>
+                  {t(triage.en, triage.ar)}
+                </Text>
+              </View>
+            )}
+            {severity && (
+              <View
+                style={[
+                  styles.severityBadge,
+                  {
+                    backgroundColor:
+                      severity === "severe"
+                        ? Colors.light.emergencyLight
+                        : severity === "moderate"
+                          ? Colors.light.warningLight
+                          : Colors.light.successLight,
+                  },
+                ]}
+              >
+                <Text style={[styles.severityText, { color: severityColor }]}>
+                  {severity}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       )}
       {assessment.emergency && (
@@ -190,6 +215,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.light.textSecondary,
     flex: 1,
+  },
+  badgeRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  triageBadge: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  triageDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  triageText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
   },
   severityBadge: {
     paddingHorizontal: 10,

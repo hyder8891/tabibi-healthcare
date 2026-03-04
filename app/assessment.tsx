@@ -266,12 +266,42 @@ export default function AssessmentScreen() {
       let parsedResult: AssessmentResult | null = null;
       let parsedEmergency: EmergencyAlert | null = null;
 
+      const normalizeResult = (raw: any): AssessmentResult => {
+        const result = { ...raw } as AssessmentResult;
+        if (raw.followUp && typeof raw.followUp === "object" && raw.followUp.returnIn) {
+          result.followUp = {
+            returnIn: raw.followUp.returnIn,
+            redFlags: Array.isArray(raw.followUp.redFlags) ? raw.followUp.redFlags : [],
+          };
+        } else if (typeof raw.followUp === "string") {
+          result.followUp = raw.followUp;
+        }
+        if (Array.isArray(raw.differentials)) {
+          result.differentials = raw.differentials.map((d: any) => ({
+            condition: d.condition || "",
+            likelihood: d.likelihood || "",
+            distinguishingFeature: d.distinguishingFeature || "",
+          }));
+        }
+        if (raw.triageLevel) {
+          result.triageLevel = raw.triageLevel;
+        }
+        if (result.recommendations?.pathwayB?.tests) {
+          result.recommendations.pathwayB.tests = result.recommendations.pathwayB.tests.map((t: any) => ({
+            ...t,
+            estimatedCost: t.estimatedCost || undefined,
+            availableAt: t.availableAt || undefined,
+          }));
+        }
+        return result;
+      };
+
       const stripJson = (text: string) => {
         return text
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
-          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?\}[\s\S]*?\}[\s\S]*?\}/g, "")
+          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*\}/g, "")
           .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "")
           .trim();
       };
@@ -322,9 +352,9 @@ export default function AssessmentScreen() {
                 );
                 if (jsonMatch) {
                   try {
-                    const result = JSON.parse(jsonMatch[1]);
-                    parsedResult = result;
-                    setAssessmentResult(result);
+                    const raw = JSON.parse(jsonMatch[1]);
+                    parsedResult = normalizeResult(raw);
+                    setAssessmentResult(parsedResult);
                   } catch {}
                 }
 
@@ -334,9 +364,9 @@ export default function AssessmentScreen() {
                   );
                   if (rawJsonMatch) {
                     try {
-                      const result = JSON.parse(rawJsonMatch[0]);
-                      parsedResult = result;
-                      setAssessmentResult(result);
+                      const raw = JSON.parse(rawJsonMatch[0]);
+                      parsedResult = normalizeResult(raw);
+                      setAssessmentResult(parsedResult);
                     } catch {}
                   }
                 }
@@ -344,6 +374,9 @@ export default function AssessmentScreen() {
                 if (parsedEmergency && parsedResult) {
                   if (parsedResult.assessment) {
                     parsedResult.assessment.severity = "severe";
+                  }
+                  if (!parsedResult.triageLevel) {
+                    parsedResult.triageLevel = "immediate";
                   }
                   setAssessmentResult({ ...parsedResult });
                 } else if (parsedEmergency && !parsedResult) {
@@ -354,6 +387,7 @@ export default function AssessmentScreen() {
                       severity: "severe",
                       description: parsedEmergency.action || "Seek immediate medical attention",
                     },
+                    triageLevel: "immediate",
                     pathway: "B",
                     recommendations: {
                       pathwayA: { active: false, medicines: [] },
@@ -370,7 +404,10 @@ export default function AssessmentScreen() {
                       },
                     },
                     warnings: [parsedEmergency.action || "Seek immediate emergency care"],
-                    followUp: "Go to the nearest emergency room immediately",
+                    followUp: {
+                      returnIn: "Immediately",
+                      redFlags: [parsedEmergency.action || "Seek immediate emergency care"],
+                    },
                   };
                   setAssessmentResult(parsedResult);
                 }

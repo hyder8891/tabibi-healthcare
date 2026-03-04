@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import type { AssessmentResult, MedicineRecommendation } from "@/lib/types";
+import type { AssessmentResult, MedicineRecommendation, StructuredFollowUp } from "@/lib/types";
 import { useSettings } from "@/contexts/SettingsContext";
 
 interface RecommendationCardProps {
@@ -11,6 +11,28 @@ interface RecommendationCardProps {
   onFindLab?: () => void;
   onOrderMedicines?: (meds: { name: string; dosage: string; frequency: string }[]) => void;
 }
+
+const TRIAGE_CONFIG: Record<string, { color: string; bg: string; labelEn: string; labelAr: string }> = {
+  immediate: { color: "#EF4444", bg: "#FEF2F2", labelEn: "IMMEDIATE", labelAr: "فوري" },
+  "within-hours": { color: "#F97316", bg: "#FFF7ED", labelEn: "WITHIN HOURS", labelAr: "خلال ساعات" },
+  "within-24h": { color: "#F59E0B", bg: "#FFFBEB", labelEn: "WITHIN 24H", labelAr: "خلال 24 ساعة" },
+  "within-week": { color: "#3B82F6", bg: "#EFF6FF", labelEn: "WITHIN A WEEK", labelAr: "خلال أسبوع" },
+  routine: { color: "#10B981", bg: "#ECFDF5", labelEn: "ROUTINE", labelAr: "روتيني" },
+};
+
+const COST_LABELS: Record<string, { en: string; ar: string }> = {
+  "free-MOH": { en: "Free (MOH)", ar: "مجاني (وزارة الصحة)" },
+  low: { en: "Low Cost", ar: "تكلفة منخفضة" },
+  moderate: { en: "Moderate Cost", ar: "تكلفة متوسطة" },
+  high: { en: "High Cost", ar: "تكلفة عالية" },
+};
+
+const AVAILABLE_LABELS: Record<string, { en: string; ar: string }> = {
+  "MOH-lab": { en: "MOH Lab", ar: "مختبر وزارة الصحة" },
+  "private-lab": { en: "Private Lab", ar: "مختبر خاص" },
+  hospital: { en: "Hospital", ar: "مستشفى" },
+  "any-pharmacy": { en: "Any Pharmacy", ar: "أي صيدلية" },
+};
 
 export function RecommendationCard({
   result,
@@ -55,16 +77,32 @@ export function RecommendationCard({
         ? Colors.light.warningLight
         : Colors.light.successLight;
 
+  const triageLevel = result?.triageLevel;
+  const triageCfg = triageLevel ? TRIAGE_CONFIG[triageLevel] : null;
+
+  const followUp = result?.followUp;
+  const isStructuredFollowUp = followUp && typeof followUp === "object" && "returnIn" in followUp;
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
-        <View style={[styles.severityBadge, { backgroundColor: severityBg }]}>
-          <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
-          <Text style={[styles.severityText, { color: severityColor }]}>
-            {isRTL
-              ? (severity === "severe" || severity === "urgent" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
-              : severity.toUpperCase()}
-          </Text>
+        <View style={[styles.badgeRow, isRTL && { flexDirection: "row-reverse" }]}>
+          <View style={[styles.severityBadge, { backgroundColor: severityBg }]}>
+            <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
+            <Text style={[styles.severityText, { color: severityColor }]}>
+              {isRTL
+                ? (severity === "severe" || severity === "urgent" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
+                : severity.toUpperCase()}
+            </Text>
+          </View>
+          {triageCfg && (
+            <View style={[styles.triageBadge, { backgroundColor: triageCfg.bg }]}>
+              <Ionicons name="timer-outline" size={12} color={triageCfg.color} />
+              <Text style={[styles.triageText, { color: triageCfg.color }]}>
+                {isRTL ? triageCfg.labelAr : triageCfg.labelEn}
+              </Text>
+            </View>
+          )}
         </View>
         <Text style={styles.confidence}>
           {result?.assessment?.confidence || "—"} {t("confidence", "الثقة")}
@@ -73,6 +111,33 @@ export function RecommendationCard({
 
       <Text style={[styles.condition, isRTL && { textAlign: "right" }]}>{result?.assessment?.condition || t("Assessment", "تقييم")}</Text>
       <Text style={[styles.description, isRTL && { textAlign: "right" }]}>{result?.assessment?.description || ""}</Text>
+
+      {result?.differentials && result.differentials.length > 0 && (
+        <View style={styles.differentialsContainer}>
+          <View style={[styles.sectionHeader, isRTL && { flexDirection: "row-reverse" }]}>
+            <MaterialCommunityIcons name="format-list-checks" size={18} color={Colors.light.primary} />
+            <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>
+              {t("Differential Diagnoses", "التشخيصات التفريقية")}
+            </Text>
+          </View>
+          {result.differentials.map((diff, i) => (
+            <View key={i} style={styles.diffCard}>
+              <View style={[styles.diffHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                <Text style={[styles.diffCondition, isRTL && { textAlign: "right" }]}>{diff.condition}</Text>
+                <View style={styles.diffLikelihoodBadge}>
+                  <Text style={styles.diffLikelihoodText}>{diff.likelihood}</Text>
+                </View>
+              </View>
+              <View style={[styles.diffFeatureRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="information-circle-outline" size={14} color={Colors.light.textTertiary} />
+                <Text style={[styles.diffFeatureText, isRTL && { textAlign: "right" }]}>
+                  {diff.distinguishingFeature}
+                </Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
 
       {result?.warnings && result.warnings.length > 0 && (
         <View style={styles.warningsContainer}>
@@ -283,6 +348,31 @@ export function RecommendationCard({
                   {test.type === "lab" ? t("Laboratory Test", "فحص مخبري") : t("Medical Imaging", "تصوير طبي")}
                 </Text>
                 <Text style={[styles.testReason, isRTL && { textAlign: "right" }]}>{test.reason}</Text>
+
+                {(test.estimatedCost || test.availableAt) && (
+                  <View style={styles.testMetaRow}>
+                    {test.estimatedCost && (
+                      <View style={[styles.testMetaBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                        <MaterialCommunityIcons name="cash" size={13} color={Colors.light.textSecondary} />
+                        <Text style={styles.testMetaText}>
+                          {isRTL
+                            ? (COST_LABELS[test.estimatedCost]?.ar || test.estimatedCost)
+                            : (COST_LABELS[test.estimatedCost]?.en || test.estimatedCost)}
+                        </Text>
+                      </View>
+                    )}
+                    {test.availableAt && (
+                      <View style={[styles.testMetaBadge, isRTL && { flexDirection: "row-reverse" }]}>
+                        <MaterialCommunityIcons name="map-marker-outline" size={13} color={Colors.light.textSecondary} />
+                        <Text style={styles.testMetaText}>
+                          {isRTL
+                            ? (AVAILABLE_LABELS[test.availableAt]?.ar || test.availableAt)
+                            : (AVAILABLE_LABELS[test.availableAt]?.en || test.availableAt)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             ))}
             {onFindLab && (
@@ -304,9 +394,40 @@ export function RecommendationCard({
           </View>
         )}
 
-      <View style={[styles.followUpContainer, isRTL && { flexDirection: "row-reverse" }]}>
-        <Ionicons name="time" size={16} color={Colors.light.textSecondary} />
-        <Text style={[styles.followUpText, isRTL && { textAlign: "right" }]}>{result?.followUp || ""}</Text>
+      <View style={styles.followUpSection}>
+        {isStructuredFollowUp ? (
+          <>
+            <View style={[styles.followUpTimelineRow, isRTL && { flexDirection: "row-reverse" }]}>
+              <MaterialCommunityIcons name="calendar-clock" size={18} color={Colors.light.primary} />
+              <Text style={[styles.followUpTimelineText, isRTL && { textAlign: "right" }]}>
+                {t("Follow up", "المتابعة")}: {(followUp as StructuredFollowUp).returnIn}
+              </Text>
+            </View>
+            {(followUp as StructuredFollowUp).redFlags && (followUp as StructuredFollowUp).redFlags.length > 0 && (
+              <View style={styles.redFlagsContainer}>
+                <View style={[styles.redFlagsHeader, isRTL && { flexDirection: "row-reverse" }]}>
+                  <Ionicons name="warning" size={15} color={Colors.light.emergency} />
+                  <Text style={styles.redFlagsTitle}>
+                    {t("Return immediately if", "عد فورًا إذا")}
+                  </Text>
+                </View>
+                {(followUp as StructuredFollowUp).redFlags.map((flag, i) => (
+                  <View key={i} style={[styles.redFlagRow, isRTL && { flexDirection: "row-reverse" }]}>
+                    <View style={styles.redFlagBullet} />
+                    <Text style={[styles.redFlagText, isRTL && { textAlign: "right" }]}>{flag}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </>
+        ) : (
+          <View style={[styles.followUpContainer, isRTL && { flexDirection: "row-reverse" }]}>
+            <Ionicons name="time" size={16} color={Colors.light.textSecondary} />
+            <Text style={[styles.followUpText, isRTL && { textAlign: "right" }]}>
+              {typeof followUp === "string" ? followUp : ""}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -332,6 +453,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 12,
   },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexShrink: 1,
+  },
   severityBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -347,6 +474,18 @@ const styles = StyleSheet.create({
   },
   severityText: {
     fontSize: 12,
+    fontWeight: "700" as const,
+  },
+  triageBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  triageText: {
+    fontSize: 10,
     fontWeight: "700" as const,
   },
   confidence: {
@@ -365,6 +504,55 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     lineHeight: 22,
     marginBottom: 16,
+  },
+  differentialsContainer: {
+    backgroundColor: Colors.light.primarySurface,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  diffCard: {
+    backgroundColor: Colors.light.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  diffHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  diffCondition: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.light.text,
+    flex: 1,
+    marginRight: 8,
+  },
+  diffLikelihoodBadge: {
+    backgroundColor: Colors.light.primaryMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  diffLikelihoodText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: Colors.light.primary,
+  },
+  diffFeatureRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+  },
+  diffFeatureText: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    lineHeight: 17,
+    flex: 1,
   },
   warningsContainer: {
     backgroundColor: Colors.light.accentLight,
@@ -573,6 +761,29 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     lineHeight: 18,
   },
+  testMetaRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.borderLight,
+  },
+  testMetaBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: Colors.light.surfaceSecondary,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  testMetaText: {
+    fontSize: 11,
+    fontWeight: "500" as const,
+    color: Colors.light.textSecondary,
+  },
   actionButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -593,18 +804,66 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: "#fff",
   },
+  followUpSection: {
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.borderLight,
+  },
   followUpContainer: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.borderLight,
   },
   followUpText: {
     flex: 1,
     fontSize: 13,
     color: Colors.light.textSecondary,
     lineHeight: 18,
+  },
+  followUpTimelineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  followUpTimelineText: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    color: Colors.light.primary,
+  },
+  redFlagsContainer: {
+    backgroundColor: Colors.light.emergencyLight,
+    borderRadius: 12,
+    padding: 12,
+  },
+  redFlagsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 8,
+  },
+  redFlagsTitle: {
+    fontSize: 13,
+    fontWeight: "700" as const,
+    color: Colors.light.emergency,
+  },
+  redFlagRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 4,
+  },
+  redFlagBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.light.emergency,
+    marginTop: 5,
+  },
+  redFlagText: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.light.emergencyDark,
+    lineHeight: 17,
   },
 });
