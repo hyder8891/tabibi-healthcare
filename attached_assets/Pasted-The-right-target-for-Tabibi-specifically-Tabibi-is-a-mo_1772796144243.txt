@@ -1,0 +1,24 @@
+The right target for Tabibi specifically
+Tabibi is a mobile consumer app, not a clinical research platform. Ada's 30 questions were validated on patients who specifically opted into a thorough diagnostic session. Your users want fast, trustworthy guidance on their phone. The right model is NHS 111 adaptive — not Ada deep-clinical.
+Case TypeTarget Q CountFormatEmergency (TIER 1)0–3Immediate responseObviously simple (classic cold, minor cut)6–8Quick taps, exit earlyModerate (UTI, back pain, fever)10–14Quick taps + 1-2 typedComplex/serious (chest pain, neurological)15–20Mix of taps + follow-upsHard cap — never exceed20 QFor any presentation
+20 questions is the absolute ceiling. Beyond that, drop-off spikes regardless of app quality.
+
+The 3 UX fixes that make question depth bearable
+1. A progress bar is non-negotiable
+Show "Step 4 of ~10" or a visual progress fill at the top of the chat. Research on chatbot completion rates shows a progress indicator alone reduces abandonment by 30–40%. This goes in assessment.tsx as a simple estimated question counter.
+2. Section headers between question groups
+After Phase 0 (red flags pass), the AI sends: "Good — no emergency signs. Let me ask a few more questions to understand your symptoms better." After Phase 1 SOCRATES: "Almost there — just a couple more to check your history." These micro-reassurances break the session into digestible chunks.
+3. Quick replies on every single question — already in your fix
+This is the most impactful single change. With quick replies, 15 questions = ~45 seconds of effort. The person isn't "answering questions" — they're tapping through a fast interactive flow.
+
+Revised question budget recommendation
+Given all of this, here's what I'd suggest for the system prompt:
+
+Phase 0 (Red Flags): 2–3 Q — mandatory for all
+Phase 1 (SOCRATES Core): 5–7 Q — mandatory for all non-emergency
+Phase 2 (Systems Review): 3–5 Q — only if case is not clearly mild after Phase 1
+Phase 3 (Context/Risk): 2–3 Q — only for complex/chronic cases
+
+Total: 7–10 for simple cases. 12–16 for moderate. Hard stop at 20.
+The AI exits to assessment the moment it has enough confidence — it doesn't run through all phases mechanically. That's the Bayesian logic Ada uses: stop asking when the differential is clear, keep asking when it isn't.
+This gives you clinical depth for complex cases, fast conclusions for simple ones, and a user experience that doesn't feel like a medical exam. The quick replies your latest fix added already solve most of the boredom problem — pair them with a progress indicator and you're in good shape.
