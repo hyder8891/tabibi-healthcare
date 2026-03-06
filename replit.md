@@ -20,6 +20,8 @@ The backend features a modular route structure for authentication, AI services, 
 
 The application supports key features such as smart symptom assessment with emergency red flag detection, medication scanning with drug interaction checking, actionable care plans, hyper-local care routing, pediatric mode, and bilingual support (English/Arabic). It also includes a non-contact heart rate monitor and OTC medicine ordering with tracking.
 
+The AI assessment uses an adaptive phased clinical interview (Phase 0: red flag screening, Phase 1: SOCRATES core, Phase 2: systems review, Phase 3: context/risk) with tiered question budgets (6-8 simple, 10-14 moderate, 15-20 complex, hard cap 20). The assessment screen includes a progress bar showing step count. Local health data encryption uses ENC2: prefix with UTF-8-aware XOR cipher (TextEncoder/TextDecoder) to properly handle Arabic text.
+
 ## External Dependencies
 - **Expo SDK**: Core framework for React Native development.
 - **React Native**: Frontend UI library.

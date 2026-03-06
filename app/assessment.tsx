@@ -658,6 +658,40 @@ export default function AssessmentScreen() {
         )}
       </View>
 
+      {(() => {
+        const isComplete = !!assessmentResult;
+        const questionCount = messages.filter(
+          (m) => m.role === "assistant" && m.id !== "welcome" && m.id !== "streaming"
+        ).length;
+        const estimatedTotal = questionCount <= 3 ? 10 : questionCount <= 8 ? 12 : 16;
+        const cappedTotal = Math.min(estimatedTotal, 20);
+        const progress = isComplete ? 1 : Math.min(questionCount / cappedTotal, 0.95);
+        if (isComplete && assessmentId) return null;
+        return (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBarBg}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  { width: `${Math.round(progress * 100)}%` as any },
+                  isComplete && styles.progressBarComplete,
+                ]}
+              />
+            </View>
+            <Text style={styles.progressLabel}>
+              {isComplete
+                ? t("Complete", "\u0645\u0643\u062a\u0645\u0644")
+                : questionCount > 0
+                ? t(
+                    `Step ${questionCount} of ~${cappedTotal}`,
+                    `\u0633\u0624\u0627\u0644 ${questionCount} \u0645\u0646 ~${cappedTotal}`,
+                  )
+                : t("Starting assessment...", "\u0628\u062f\u0621 \u0627\u0644\u062a\u0642\u064a\u064a\u0645...")}
+            </Text>
+          </View>
+        );
+      })()}
+
       <KeyboardAvoidingView
         style={styles.chatArea}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -823,6 +857,38 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
+  },
+  progressContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: Colors.light.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.borderLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  progressBarBg: {
+    flex: 1,
+    height: 4,
+    backgroundColor: Colors.light.borderLight,
+    borderRadius: 2,
+    overflow: "hidden" as const,
+  },
+  progressBarFill: {
+    height: 4,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 2,
+  },
+  progressBarComplete: {
+    backgroundColor: Colors.light.success,
+  },
+  progressLabel: {
+    fontSize: 11,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textTertiary,
+    minWidth: 80,
+    textAlign: "right" as const,
   },
   headerButton: {
     width: 40,
