@@ -1,0 +1,33 @@
+Live Assessment Test — Full Results
+Scenario: ألم بطن + حمى يومين → RLQ sharp pain + fever + anorexia before pain + vomiting once
+Final diagnosis: التهاب الزائدة الدودية الحاد (Acute Appendicitis)
+Questions asked: 9 (before emergency triggered)
+Progress bar trajectory: ~10 → ~12 (at RLQ) → ~16 (classic appendicitis pattern) → مكتمل
+
+✅ What Worked Well
+Clinical reasoning is strong:
+
+Correctly diagnosed acute appendicitis with high confidence
+Differentials were included and clinically sound — UTI/kidney stone and colitis/enteritis, each with correct distinguishing reasoning
+Tests recommended are perfect: CBC, CRP, Urinalysis, Abdominal Ultrasound — exactly what an ER would order
+Warning about avoiding painkillers/antibiotics before diagnosis is clinically excellent
+Red flag "return immediately if" list is accurate (peritonitis signs, rigidity, high fever spike)
+
+Question flow was SOCRATES-compliant:
+
+Q1: Red flag screen → Q2: Site → Q3: Sub-quadrant drill-down (RUQ vs RLQ — clinically critical) → Q4: Character → Q5: Associated symptoms → Q6: Temporal sequence + vomiting → Q7: Vomiting follow-up → Q8: PMH/medications → Q9: Prior episodes
+
+Adaptive complexity worked: The ~estimate expanded from 10 → 12 → 16 as the classic appendicitis pattern solidified. The system got smarter mid-assessment.
+Emergency overlay fired correctly — full red screen, correct condition name, "go to nearest ER immediately."
+
+⚠️ Bugs Found (5 confirmed, 1 pre-existing)
+#BugSeverity1"تقريباً انتهينا" at Q6/16 — AI said "almost done" when only 37% throughMedium — breaks trust2Q5 missing quick replies despite ending with "؟"Medium — forces typing3Q8 missing quick replies despite ending with "؟"Medium — forces typing4Gender conjugation error — AI addressed patient as feminine (أنتِ/عانيتِ) when profile is maleLow-Medium — feels wrong5"immediately if worsening" not translated — shows English in Arabic UILow — localization6"Surgical Consultation" labeled as تصوير طبي (medical imaging) — should be استشارة سريريةLow — wrong label7Scroll-to-latest broken — chat doesn't auto-scroll to newest message after each replyMedium — UX friction8Emergency call button dials 911 not 122 (pre-existing, known)High for Iraq users
+
+Summary Verdict
+The clinical reasoning engine is genuinely impressive — it caught acute appendicitis at Q9, gave correct differentials, correct tests, and escalated to emergency properly. That's the core product working.
+The bugs are all presentation layer issues, not clinical logic issues. The "تقريباً انتهينا" bug is the most damaging because it appears consistently (confirmed in both headache and appendicitis tests). The quick reply gaps on free-text questions and the scroll reset are real UX friction.
+The highest-priority fix list for the system prompt alone:
+
+Remove "تقريباً انتهينا" entirely — or gate it to the final 2 questions max
+Fix quick reply generation for open-ended associated symptom questions (give checklist options)
+Fix gender detection — pull from user profile or ask early
