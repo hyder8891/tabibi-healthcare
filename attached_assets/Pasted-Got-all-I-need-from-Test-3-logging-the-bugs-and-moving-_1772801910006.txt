@@ -1,0 +1,98 @@
+Got all I need from Test 3 — logging the bugs and moving straight to Test 4.**Test 3 captured** — card render failed but I have the data. Starting Test 4 now.Message in input but not sent — clicking send button.Q1: Chest symptoms — selecting no chest pain (TB doesn't present with chest pain):Q2: Cough character — selecting blood-stained sputum (classic TB hemoptysis):Emergency overlay fired at Q2 — hemoptysis correctly triggered it. Let me check the emergency number and then dismiss to see the underlying card.Excellent — full card data captured! TB appears in differentials WITH "ينتشر في العراق" note. Dismissing to start Test 5.Q1: Meningitis screen — saying no red flags to test the non-emergency path:Q2: Onset — sudden yesterday:Q3: High fever >39°C:Q4: Asking photophobia — selecting it to push meningitis path:Q5: No other pain — keeping focus on meningitis pattern:Q6: Medications/allergies — no quick replies, typing quickly:Q7: Vaccine history! — checking for quick replies below:Scroll bug resetting again. Typing the vaccination answer directly:Card rendered — diagnosis is "صداع نصفي طفولي مع حمى فيروسية" with meningitis as a differential. Getting full data:All 5 tests complete. Now compiling the full audit.---
+
+# 🧪 TABIBI — 5-TEST COMPREHENSIVE AUDIT
+
+---
+
+## Quick Scoreboard
+
+| Test | Presentation | Diagnosis | Severity Correct | Emergency | Iraq-Aware | Card Rendered | Questions |
+|------|---|---|---|---|---|---|---|
+| T1 | Abdominal pain + fever | ✅ Appendicitis | ✅ Emergency | ✅ Overlay | ⚠️ Partial | ✅ | 9 |
+| T2 | Fever + joint pain | ❌ Viral Arthritis (missed Brucella) | ✅ Moderate | N/A | ❌ No brucellosis | ✅ | 7 |
+| T3 | Chest pain + SOB | ✅ MI (in text only) | ❌ "Moderate" | ❌ No overlay | N/A | ❌ Broken | 1 |
+| T4 | Cough + hemoptysis | ✅ Hemoptysis (TB in differentials) | ✅ Severe | ✅ Overlay | ✅ "ينتشر في العراق" | ✅ | 2 |
+| T5 | Child fever + headache | ⚠️ Migraine/Viral (meningitis downgraded) | ⚠️ Should be urgent | N/A | ✅ Iraqi brand meds | ✅ | 7 |
+
+---
+
+## Test-by-Test Findings
+
+### Test 1 — Acute Appendicitis ✅
+**What worked:** Correct diagnosis at Q9, emergency overlay fired, adaptive progress bar increased (10→12→16), "حيدر" personalised greeting.
+**Gaps:** Missing mesenteric lymphadenitis as differential (most common appendicitis mimicker). Surgical consultation mislabeled as "تصوير طبي" (imaging).
+
+---
+
+### Test 2 — Fever + Joint Pain ❌ Critical Clinical Failure
+**What worked:** Clean SOCRATES flow, reasonable viral arthritis rationale given available data.
+**Critical gap:** The AI completed 7 questions and rendered a final without ever asking:
+- هل تتناول حليب غير مبستر؟ (raw/unpasteurized milk)
+- هل تتعامل مع الحيوانات؟ (livestock contact)
+
+**Brucellosis is endemic in Iraq — 5th highest incidence globally.** Fever + polyarthritis + fatigue + 1 week duration + not responding to analgesics = textbook brucellosis. It didn't appear anywhere in the differentials or tests. A real patient would be sent to check for parvovirus B19 while an actual brucella infection goes untreated.
+
+---
+
+### Test 3 — Chest Pain / STEMI ❌ Hard Bug
+**What worked:** AI text at Q1 correctly named احتشاء عضلة القلب and told the user to call emergency services immediately. Clinically perfect response in chat.
+**Critical bug:** After just 1 question, the RecommendationCard completely failed to render — stuck showing only "تقييم" with a loading spinner indefinitely. The severity label showed "متوسط" (moderate) — **wrong for STEMI, should be عالٍ جداً/critical.**
+**Root cause hypothesis:** The card rendering pipeline isn't designed for conclusions reached at Q1 before the SSE stream fully populates all required fields (differentials, tests, confidence). The JSON likely comes back incomplete when the AI aborts questioning so early.
+
+---
+
+### Test 4 — Hemoptysis + TB ✅ Best Performing Test
+**What worked:** Emergency overlay fired correctly at Q2 (hemoptysis is a correct hard stop). Severity was شديد ✅. Differentials explicitly included **السل الرئوي with "ينتشر في العراق"** — the only test where the AI showed genuine Iraq-contextual awareness. Sputum AFB stain and Chest X-ray ordered correctly.
+**Remaining gap:** "المتابعة: فوراً (immediate)" — the word "immediate" still in English. No TB-specific risk factor questions asked (contact history, crowded housing, prison/healthcare exposure, prior TB) — though the emergency trigger pre-empted further questioning.
+
+---
+
+### Test 5 — Pediatric Fever + Meningitis ⚠️ Good But Undersells Risk
+**What worked:** Meningitis screen at Q1 was clinically excellent (glass test, neck stiffness, lethargy trifecta). Vaccination history asked at Q7 — the right question. Meningitis kept in differentials. Iraqi-branded medications (Samarra Paracetamol) used. Alternating paracetamol/ibuprofen guidance was medically sound. Red flag list for return was comprehensive and correct.
+**Gap:** With fever >39°C + **sudden onset** + **photophobia** in a 5-year-old, severity should be **عاجل** not متوسط. The AI weighted "vaccinated = lower meningitis risk" too heavily without questioning which vaccines were given — Iraq's national schedule does not include meningococcal vaccine. A vaccinated Iraqi child still has full meningococcal risk.
+
+---
+
+## Bug Registry — Consolidated
+
+| # | Bug | Severity | Status | First Seen |
+|---|---|---|---|---|
+| B1 | RecommendationCard fails to render for Q1 conclusions | 🔴 Critical | New | T3 |
+| B2 | Severity shows "متوسط" for confirmed STEMI | 🔴 Critical | New | T3 |
+| B3 | Brucellosis not asked / not in differentials for classic presentation | 🔴 Clinical | Persistent | T2 |
+| B4 | Quick replies missing on free-text questions (PMH, symptoms detail) | 🟠 High | Persistent | T1, T2 |
+| B5 | "immediate" / English words in Arabic follow-up field | 🟠 High | Partially fixed | T1→fixed, T4→still present |
+| B6 | Raw JSON briefly visible mid-stream (stripJson race condition) | 🟠 High | Persistent | T2 |
+| B7 | Scroll position resets on every re-render | 🟡 Medium | Persistent | All tests |
+| B8 | Emergency number 122 not shown in overlays (generic "طوارئ") | 🟡 Medium | Unverified | — |
+| B9 | Surgical Consultation labeled as "تصوير طبي" (imaging type) | 🟡 Medium | Unverified | T1 |
+| B10 | "تقريباً انتهينا" premature message | 🟢 FIXED | Fixed by user | T1→T2 ✅ |
+
+---
+
+## Clinical Intelligence Scorecard
+
+| Capability | Score | Notes |
+|---|---|---|
+| Emergency recognition (STEMI, hemoptysis, appendicitis) | 8/10 | Correct in text; card render fails for Q1 exits |
+| Iraq-specific diseases (Brucella, TB, Leishmaniasis) | 4/10 | TB acknowledged; Brucella completely absent |
+| Pediatric adaptation (tone, dosing, meningitis screen) | 8/10 | Strong; Iraqi brands used; vaccination history asked |
+| Differential quality | 6/10 | Consistently missing 1 key differential per case |
+| Question depth vs. case complexity | 5/10 | TB/Brucella concluded too early; STEMI at Q1 breaks card |
+| Localization (Arabic, Iraq context) | 7/10 | 1 English word still leaking; Iraqi brands = strong |
+
+---
+
+## Priority Fix List
+
+**Fix immediately (blocks core functionality):**
+1. **B1 + B2** — RecommendationCard must handle early-exit conclusions (Q1/Q2). For these cases, severity should default to `emergency` not `moderate`, and the card must render even with minimal data.
+
+**Fix before next release:**
+2. **B3** — Add Iraq epidemiological trigger questions to MEDICAL_SYSTEM_PROMPT: raw milk + animal contact MUST fire before conclusion when fever + arthralgia is the presentation.
+3. **B5** — Find the follow-up string template and ensure "immediate" → "فوراً" everywhere.
+4. **B4** — Quick reply generation should be enforced for all question types, not just simple single-dimension questions.
+
+**Fix when possible:**
+5. **B6** — Add stream buffering before rendering so JSON never flashes visibly.
+6. **B7** — Scroll container fix (likely needs `ScrollView` with `maintainVisibleContentPosition` in RN).

@@ -430,7 +430,59 @@ COMMUNICATION STYLE:
 - Keep responses concise and focused - no filler text, no repetitive safety warnings
 - Do NOT repeat what the user just said back to them
 - ARABIC GENDER CONJUGATION: Check the PATIENT PROFILE for gender. If male, use masculine Arabic conjugation (أنتَ، هل عانيتَ، هل تشعر). If female, use feminine (أنتِ، هل عانيتِ، هل تشعرين). If gender is not provided, use masculine as default (standard Arabic convention). NEVER mix conjugation within a session.
-- In the JSON recommendation block, write all text fields (condition, description, warnings, followUp, differentials, medicine names, test reasons) in Arabic when responding in Arabic`;
+- In the JSON recommendation block, write all text fields (condition, description, warnings, followUp, differentials, medicine names, test reasons) in Arabic when responding in Arabic
+
+---
+
+## Iraq Disease Reference Database (73 Conditions)
+You have been loaded with Iraq's complete epidemiological trigger database. This is your mandatory clinical decision support layer. You MUST consult it before every final recommendation.
+
+## Iraq Epidemiological Mandatory Screening Rules
+
+Before generating a final recommendation, silently cross-check the patient symptoms against these Iraq-specific trigger rules. If ANY trigger matches, you MUST ask the corresponding screening questions BEFORE concluding.
+
+### CRITICAL TRIGGER RULES:
+- FEVER + JOINT PAIN + FATIGUE: Brucellosis mandatory -- ask about raw milk, animal contact (23/100k in Iraq)
+- NON-HEALING SKIN ULCER: Cutaneous Leishmaniasis -- ask about sandfly exposure, rural areas, Baghdad region
+- CHRONIC COUGH >3 WEEKS + NIGHT SWEATS + WEIGHT LOSS: TB -- ask contact history, order AFB smear
+- JAUNDICE + FEVER: Hepatitis A/E -- if PREGNANT mark as URGENT (HEV has 20% maternal mortality in Iraq)
+- PROFUSE WATERY DIARRHEA sudden onset: Cholera -- ask about cluster, contaminated water, ORS urgently
+- FEVER + HEMORRHAGE + ANIMAL/TICK EXPOSURE: CCHF -- EMERGENCY isolation, notify public health
+- FEVER + CYCLICAL RIGORS: Malaria -- ask travel to northern Iraq or Sulaymaniyah
+- CHILD + FEVER + HEADACHE + NECK STIFFNESS: Iraq national schedule EXCLUDES meningococcal vaccine. A vaccinated Iraqi child is NOT protected against N. meningitidis. Do NOT rule out based on vaccination history.
+- POST-FLOODING ILLNESS: Triple risk -- Leptospirosis + Cholera + Hepatitis A/E
+- EID AL-ADHA PERIOD + FEVER + HEMORRHAGE: CCHF high suspicion -- ask about slaughter animal contact
+
+### PHARMACOGENOMIC SAFETY RULES (Iraq-specific):
+- ALL IRAQI MALES before prescribing PRIMAQUINE, DAPSONE, or NITROFURANTOIN: Screen for G6PD deficiency first (8-12% Iraqi males are G6PD deficient -- risk of life-threatening hemolysis)
+- SOUTHERN IRAQ CHILD + SEVERE ANEMIA: Consider Beta-thalassemia major (Basra, Misan, Wasit have highest carrier rates)
+- FAVA BEANS + SUDDEN JAUNDICE + DARK URINE: G6PD hemolytic crisis -- urgent
+
+### ENVIRONMENTAL AND OCCUPATIONAL TRIGGERS:
+- BASRA RESIDENT + CANCER OR CONGENITAL MALFORMATION: Ask about heavy metal/depleted uranium exposure
+- FARMER OR BUTCHER + PAINLESS BLACK ESCHAR: Anthrax -- do NOT drain, isolate, notify MOH immediately
+- AGRICULTURAL WORKER + PINPOINT PUPILS + EXCESSIVE SECRETIONS: Organophosphate poisoning -- atropine + pralidoxime STAT
+- HOTEL OR HOSPITAL STAY + SEVERE PNEUMONIA + CONFUSION + LOW SODIUM: Legionella -- urine antigen, use fluoroquinolone not penicillin
+- CHILD + EATING SOIL/ICE + PALLOR + EOSINOPHILIA: Toxocariasis or severe Iron Deficiency Anemia
+
+### NUTRITIONAL FLAGS:
+- VEILED WOMAN, BREASTFED INFANT, OR NORTHERN MOUNTAIN RESIDENT: Vitamin D deficiency extremely prevalent -- check 25-OH VitD
+- NECK SWELLING + NORTHERN IRAQ (Sulaymaniyah, Erbil, Dohuk): Iodine deficiency goiter
+- IDP CAMP CHILD + WASTING OR LEG EDEMA: Protein-energy malnutrition -- check MUAC (less than 11.5cm = emergency)
+
+### NEONATAL EMERGENCIES:
+- NEONATE ANY FEVER 38C OR ABOVE: Neonatal sepsis until proven otherwise -- full septic workup + empirical antibiotics immediately
+- NEONATE DAYS 3 TO 28 + JAW STIFFNESS + SPASMS + HOME DELIVERY: Neonatal tetanus emergency -- ICU transfer immediately
+- NEONATE UNABLE TO SUCK + RIGID LIMBS: Neonatal tetanus or hypocalcemia -- emergency
+
+### PUBLIC HEALTH NOTIFICATION REQUIRED:
+- CLUSTER OF FATAL PNEUMONIA + HEMORRHAGE: Include plague in differential -- immediate isolation + notify WHO
+- ANY ANTHRAX SUSPICION: Notify Iraq MOH + WHO immediately
+- GRAY-WHITE ADHERENT THROAT MEMBRANE: Diphtheria -- give antitoxin immediately, do NOT wait for culture, notify public health
+
+## How To Use:
+Silently scan these rules for every patient. Do NOT tell the patient you are checking a database. If a trigger matches, ask the screening question naturally within the conversation before concluding. Never skip a trigger because you are already confident in a different diagnosis -- in Iraq, endemic co-diagnoses are common.
+`;
 
 export function registerAiRoutes(app: Express): void {
   app.post("/api/assess", requireAuth, async (req: Request, res: Response) => {

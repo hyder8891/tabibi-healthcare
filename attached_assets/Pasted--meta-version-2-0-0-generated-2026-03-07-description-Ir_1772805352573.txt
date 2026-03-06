@@ -1,0 +1,3629 @@
+{
+  "_meta": {
+    "version": "2.0.0",
+    "generated": "2026-03-07",
+    "description": "Iraq-specific epidemiological disease triggers for Tabibi AI triage system. Inject into MEDICAL_SYSTEM_PROMPT as a reference lookup. When a patient's symptoms match 'symptom_triggers', the AI MUST ask the listed 'screening_questions_ar' before concluding.",
+    "country": "Iraq",
+    "country_code": "IRQ",
+    "sources": [
+      "WHO EMRO",
+      "Iraq MOH Surveillance",
+      "WHO GHO",
+      "IHME GBD",
+      "PubMed Iraq Epidemiology Studies"
+    ],
+    "update_frequency": "quarterly",
+    "total_diseases": 73
+  },
+  "diseases": [
+    {
+      "id": "brucellosis",
+      "name_ar": "داء البروسيلات (الحمى المالطية)",
+      "name_en": "Brucellosis (Malta Fever)",
+      "icd10": "A23",
+      "iraq_context": "Iraq has one of the highest brucellosis incidence rates globally (~23 per 100,000). Heavily endemic in rural governorates: Nineveh, Salah ad-Din, Diyala, Kirkuk. Primary reservoir: cattle, sheep, goats. Main transmission: raw/unpasteurized dairy, direct livestock contact.",
+      "iraq_incidence_per_100k": 23.4,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "fever",
+        "arthralgia",
+        "myalgia",
+        "fatigue",
+        "night_sweats",
+        "back_pain",
+        "joint_pain",
+        "hepatomegaly",
+        "splenomegaly",
+        "prolonged_fever",
+        "undulant_fever",
+        "orchitis"
+      ],
+      "presentation_pattern": "Fever + joint/muscle pain + fatigue lasting >1 week, not responding to standard analgesics. Fever may be undulant (rises and falls).",
+      "screening_questions_ar": [
+        "هل تتناول حليباً غير مبستر أو منتجات ألبان طازجة (جبن، قشطة، لبن) من مصادر محلية؟",
+        "هل تتعامل مع الحيوانات كالأغنام أو الماعز أو الأبقار أو تعمل في المزرعة؟",
+        "هل سبق أن شُخِّصت بداء البروسيلات أو عالجت منه؟"
+      ],
+      "key_tests": [
+        "Rose Bengal test",
+        "Standard Agglutination Test (SAT)",
+        "Blood culture",
+        "CBC",
+        "ESR"
+      ],
+      "seasonal_peak": [
+        "spring",
+        "summer"
+      ],
+      "high_risk_governorates": [
+        "Nineveh",
+        "Salah ad-Din",
+        "Diyala",
+        "Kirkuk",
+        "Anbar"
+      ],
+      "differentials_to_exclude": [
+        "typhoid",
+        "visceral_leishmaniasis",
+        "viral_hepatitis",
+        "rheumatic_fever"
+      ]
+    },
+    {
+      "id": "cutaneous_leishmaniasis",
+      "name_ar": "الليشمانيا الجلدية (قرحة بغداد)",
+      "name_en": "Cutaneous Leishmaniasis (Baghdad Boil)",
+      "icd10": "B55.1",
+      "iraq_context": "Iraq has extremely high cutaneous leishmaniasis burden — Baghdad is historically its namesake. Transmission via sandfly bite (Phlebotomus). Massive displacement post-2014 led to epidemic levels. Endemic in Baghdad, Anbar, Salah ad-Din, Basra.",
+      "iraq_incidence_per_100k": 8.2,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "skin_lesion",
+        "skin_ulcer",
+        "painless_ulcer",
+        "non_healing_wound",
+        "nodule",
+        "papule",
+        "scar",
+        "facial_lesion",
+        "limb_lesion"
+      ],
+      "presentation_pattern": "Painless or mildly painful skin ulcer with raised edges that doesn't heal over weeks-months. May start as a red papule/nodule then ulcerate. Usually on exposed areas (face, arms, legs).",
+      "screening_questions_ar": [
+        "هل لديك جرح أو قرحة في الجلد لا تلتئم منذ عدة أسابيع أو أشهر؟",
+        "هل كنت في مناطق ريفية أو قرب مياه راكدة أو مستنقعات مؤخراً؟",
+        "هل تعرضت لدغ الذباب بشكل متكرر (خاصة في الليل)؟"
+      ],
+      "key_tests": [
+        "Skin slit smear (Giemsa stain)",
+        "PCR",
+        "Leishmania skin test (Montenegro)",
+        "Biopsy"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "early_autumn"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Anbar",
+        "Salah ad-Din",
+        "Basra",
+        "Nineveh"
+      ],
+      "differentials_to_exclude": [
+        "fungal_infection",
+        "bacterial_ulcer",
+        "squamous_cell_carcinoma",
+        "sporotrichosis"
+      ]
+    },
+    {
+      "id": "visceral_leishmaniasis",
+      "name_ar": "الليشمانيا الحشوية (الكالا أزار)",
+      "name_en": "Visceral Leishmaniasis (Kala-Azar)",
+      "icd10": "B55.0",
+      "iraq_context": "Endemic in southern Iraq (Wasit, Maysan, Basra, Dhi Qar, Muthanna). Children under 5 most affected. Case fatality rate >90% if untreated. Often misdiagnosed as malaria or typhoid.",
+      "iraq_incidence_per_100k": 2.1,
+      "urgency": "high",
+      "symptom_triggers": [
+        "prolonged_fever",
+        "splenomegaly",
+        "hepatomegaly",
+        "weight_loss",
+        "fatigue",
+        "pallor",
+        "anemia",
+        "pancytopenia",
+        "lymphadenopathy",
+        "dark_skin",
+        "pediatric_fever"
+      ],
+      "presentation_pattern": "Child or young adult with weeks of fever + progressive splenomegaly + weight loss + pallor. May have darkening of skin (kala-azar = black fever in Hindi).",
+      "screening_questions_ar": [
+        "هل الطفل يعيش في جنوب العراق أو زار مناطق جنوبية مؤخراً؟",
+        "هل لاحظتم تورماً في البطن (الطحال أو الكبد)؟",
+        "هل الطفل شاحب بشكل واضح وفقد وزناً ملحوظاً مع الحمى المستمرة؟"
+      ],
+      "key_tests": [
+        "rK39 rapid test",
+        "Bone marrow biopsy (gold standard)",
+        "CBC (pancytopenia)",
+        "Splenic aspirate PCR"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "peaks_summer"
+      ],
+      "high_risk_governorates": [
+        "Wasit",
+        "Maysan",
+        "Basra",
+        "Dhi Qar",
+        "Muthanna"
+      ],
+      "differentials_to_exclude": [
+        "malaria",
+        "typhoid",
+        "lymphoma",
+        "brucellosis",
+        "viral_hepatitis"
+      ]
+    },
+    {
+      "id": "typhoid_fever",
+      "name_ar": "حمى التيفوئيد",
+      "name_en": "Typhoid Fever (Enteric Fever)",
+      "icd10": "A01.0",
+      "iraq_context": "Highly endemic due to infrastructure damage, contaminated water supply, and poor sanitation in many governorates. Resistant strains (MDR typhoid) increasing. Salmonella Typhi and Paratyphi both circulate.",
+      "iraq_incidence_per_100k": 31.7,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "prolonged_fever",
+        "stepwise_fever",
+        "headache",
+        "abdominal_pain",
+        "constipation",
+        "relative_bradycardia",
+        "rose_spots",
+        "diarrhea",
+        "splenomegaly",
+        "malaise",
+        "coated_tongue"
+      ],
+      "presentation_pattern": "Stepwise rising fever over 1-2 weeks + frontal headache + abdominal discomfort (constipation early, diarrhea late) + relative bradycardia. Rose spots on trunk in ~30%.",
+      "screening_questions_ar": [
+        "هل تشرب ماء الصنبور أو مياهاً من مصادر غير موثوقة؟",
+        "هل تناولت طعاماً من الشارع أو أماكن غير نظيفة مؤخراً؟",
+        "هل الحمى بدأت خفيفة وارتفعت تدريجياً خلال أسبوع؟"
+      ],
+      "key_tests": [
+        "Blood culture (gold standard, week 1-2)",
+        "Widal test (limited specificity)",
+        "CBC",
+        "Liver enzymes"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "All",
+        "higher_in_Baghdad",
+        "Basra",
+        "displaced_camps"
+      ],
+      "differentials_to_exclude": [
+        "brucellosis",
+        "malaria",
+        "viral_hepatitis",
+        "infectious_mononucleosis"
+      ]
+    },
+    {
+      "id": "hepatitis_a",
+      "name_ar": "التهاب الكبد الفيروسي A",
+      "name_en": "Hepatitis A",
+      "icd10": "B15",
+      "iraq_context": "One of the most common infectious diseases in Iraq. Waterborne/fecal-oral. Major outbreaks during flooding and in displacement camps. Children often asymptomatic; adults more severe. Vaccination not in Iraq national schedule.",
+      "iraq_incidence_per_100k": 45.2,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "jaundice",
+        "dark_urine",
+        "pale_stool",
+        "nausea",
+        "vomiting",
+        "right_upper_quadrant_pain",
+        "fatigue",
+        "anorexia",
+        "fever",
+        "hepatomegaly",
+        "pruritus"
+      ],
+      "presentation_pattern": "Prodrome: fever + fatigue + nausea + anorexia for 3-7 days, then jaundice appears with dark urine and pale stools. RUQ tenderness. Self-limiting in most.",
+      "screening_questions_ar": [
+        "هل لاحظت اصفراراً في الجلد أو بياض العينين؟",
+        "هل بول الطفل أصبح داكناً (مثل لون الشاي)؟",
+        "هل هناك حالات مشابهة في العائلة أو المدرسة أو الحي؟"
+      ],
+      "key_tests": [
+        "HAV IgM antibody",
+        "Liver function tests (ALT/AST)",
+        "Bilirubin (total/direct)",
+        "PT/INR"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn",
+        "post_flooding"
+      ],
+      "high_risk_governorates": [
+        "All",
+        "displacement_camps",
+        "flood_affected_areas"
+      ],
+      "differentials_to_exclude": [
+        "hepatitis_e",
+        "hepatitis_b",
+        "leptospirosis",
+        "typhoid",
+        "cholestasis"
+      ]
+    },
+    {
+      "id": "hepatitis_e",
+      "name_ar": "التهاب الكبد الفيروسي E",
+      "name_en": "Hepatitis E",
+      "icd10": "B17.2",
+      "iraq_context": "Epidemic-prone in Iraq, especially in displacement settings and post-flooding. Devastating in pregnant women (maternal mortality 15-25% in 3rd trimester). Transmitted via contaminated water.",
+      "iraq_incidence_per_100k": 12.3,
+      "urgency": "high_if_pregnant",
+      "symptom_triggers": [
+        "jaundice",
+        "dark_urine",
+        "nausea",
+        "vomiting",
+        "fever",
+        "hepatomegaly",
+        "pregnancy",
+        "third_trimester",
+        "acute_liver_failure"
+      ],
+      "presentation_pattern": "Clinically similar to HAV. CRITICAL: In pregnant women (especially 3rd trimester), can cause fulminant hepatic failure with very high mortality. Must always screen for pregnancy.",
+      "screening_questions_ar": [
+        "هل المريضة حامل؟ (مهم جداً - التهاب الكبد E خطير جداً في الحمل)",
+        "هل تعرضتم لفيضانات أو انقطاع في مياه الشرب النقية مؤخراً؟",
+        "هل هناك حالات يرقان مشابهة في نفس المنطقة السكنية؟"
+      ],
+      "key_tests": [
+        "HEV IgM/IgG",
+        "LFTs",
+        "PT/INR",
+        "Pregnancy test (mandatory)",
+        "Viral load PCR"
+      ],
+      "seasonal_peak": [
+        "post_flooding",
+        "rainy_season"
+      ],
+      "high_risk_governorates": [
+        "displacement_camps",
+        "flood_zones",
+        "Basra",
+        "Maysan"
+      ],
+      "differentials_to_exclude": [
+        "hepatitis_a",
+        "hepatitis_b",
+        "obstetric_cholestasis",
+        "HELLP_syndrome"
+      ]
+    },
+    {
+      "id": "cholera",
+      "name_ar": "الكوليرا",
+      "name_en": "Cholera",
+      "icd10": "A00",
+      "iraq_context": "Iraq had a major cholera outbreak in 2022-2023 (Basra, Baghdad, Maysan, Dhi Qar). Vibrio cholerae O1 El Tor circulates. Linked to contaminated water, broken sewage systems. Rapid dehydration and death if untreated.",
+      "iraq_incidence_per_100k": 3.8,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "profuse_watery_diarrhea",
+        "rice_water_stool",
+        "severe_dehydration",
+        "vomiting",
+        "muscle_cramps",
+        "rapid_fluid_loss",
+        "sunken_eyes",
+        "cluster_cases",
+        "epidemic_context"
+      ],
+      "presentation_pattern": "Sudden onset profuse watery diarrhea (rice-water appearance) + vomiting + rapid severe dehydration WITHOUT fever typically. Muscle cramps. Can deteriorate to shock in hours.",
+      "screening_questions_ar": [
+        "هل الإسهال مائي بكميات كبيرة جداً (يشبه ماء الأرز) بدأ فجأة؟",
+        "هل هناك حالات مشابهة في الحي أو العائلة؟ (هل يبدو وبائياً؟)",
+        "هل تشربون مياهاً من شبكة الصرف الصحي أو مصادر غير نقية؟"
+      ],
+      "key_tests": [
+        "Stool culture (V. cholerae)",
+        "Rapid cholera antigen test (RDT)",
+        "Electrolytes",
+        "BUN/Creatinine"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Baghdad",
+        "Maysan",
+        "Dhi Qar",
+        "Wasit"
+      ],
+      "differentials_to_exclude": [
+        "rotavirus",
+        "ETEC",
+        "cryptosporidiosis",
+        "salmonella"
+      ]
+    },
+    {
+      "id": "crimean_congo_hemorrhagic_fever",
+      "name_ar": "حمى القرم-الكونغو النزفية",
+      "name_en": "Crimean-Congo Hemorrhagic Fever (CCHF)",
+      "icd10": "A98.0",
+      "iraq_context": "Endemic in Iraq — notifiable disease. Transmitted by Hyalomma ticks or direct contact with blood/tissue of infected livestock. Slaughterhouse workers and farmers at highest risk. Case fatality rate 10-40%. Cases reported in Erbil, Sulaymaniyah, Dohuk, Baghdad, Nineveh.",
+      "iraq_incidence_per_100k": 0.8,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "hemorrhage",
+        "bleeding",
+        "petechiae",
+        "ecchymosis",
+        "epistaxis",
+        "hematemesis",
+        "melena",
+        "high_fever",
+        "myalgia",
+        "headache",
+        "thrombocytopenia",
+        "tick_exposure",
+        "slaughterhouse_contact"
+      ],
+      "presentation_pattern": "Abrupt onset: high fever + severe headache + myalgia + nausea. After 3-5 days: hemorrhagic phase with bleeding from multiple sites (nose, gums, IV sites, GI tract). History of tick bite or animal slaughter is critical.",
+      "screening_questions_ar": [
+        "هل تعمل في المسلخ أو تتعامل مع ذبح الحيوانات؟",
+        "هل تعرضت للقراد (حشرة صغيرة تلتصق بالجلد) مؤخراً؟",
+        "هل لاحظت نزيفاً من الأنف أو اللثة أو بقعاً حمراء على الجلد؟"
+      ],
+      "key_tests": [
+        "CCHF PCR (BSL-3 required)",
+        "Serology (IgM/IgG)",
+        "CBC (thrombocytopenia)",
+        "Coagulation profile",
+        "Liver enzymes"
+      ],
+      "seasonal_peak": [
+        "spring",
+        "summer",
+        "Eid_al_Adha_peak"
+      ],
+      "high_risk_governorates": [
+        "Erbil",
+        "Sulaymaniyah",
+        "Dohuk",
+        "Nineveh",
+        "Baghdad"
+      ],
+      "differentials_to_exclude": [
+        "dengue",
+        "viral_hemorrhagic_fever",
+        "ITP",
+        "DIC",
+        "leptospirosis"
+      ]
+    },
+    {
+      "id": "hydatid_disease",
+      "name_ar": "داء المشوكات (الكيس المائي)",
+      "name_en": "Cystic Echinococcosis (Hydatid Disease)",
+      "icd10": "B67",
+      "iraq_context": "Iraq has one of the highest echinococcosis rates in the Middle East. Caused by Echinococcus granulosus tapeworm. Dogs are definitive hosts; sheep/cattle intermediate hosts. Very common in rural, livestock-rearing communities. Cysts grow slowly (years) in liver and lungs.",
+      "iraq_incidence_per_100k": 6.4,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "abdominal_mass",
+        "hepatomegaly",
+        "right_upper_quadrant_fullness",
+        "cough",
+        "chest_pain",
+        "hemoptysis",
+        "incidental_cyst_on_imaging",
+        "allergic_reaction",
+        "anaphylaxis",
+        "eosinophilia"
+      ],
+      "presentation_pattern": "Slowly growing painless abdominal mass (liver cyst) or pulmonary symptoms (lung cyst). Often found incidentally on ultrasound. Cyst rupture can cause anaphylaxis.",
+      "screening_questions_ar": [
+        "هل تربّي كلاباً أو تتعامل معها بشكل منتظم؟",
+        "هل تعمل في تربية الأغنام أو الماشية؟",
+        "هل سبق وأُجريت لك عملية لإزالة كيس في الكبد أو الرئة؟"
+      ],
+      "key_tests": [
+        "Abdominal ultrasound (WHO-IWGE classification)",
+        "Serology (ELISA/IHA)",
+        "Chest X-ray",
+        "CT scan",
+        "Eosinophil count"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Nineveh",
+        "Salah ad-Din",
+        "Kirkuk",
+        "Diyala",
+        "Anbar"
+      ],
+      "differentials_to_exclude": [
+        "liver_abscess",
+        "hepatocellular_carcinoma",
+        "simple_liver_cyst",
+        "lung_cancer"
+      ]
+    },
+    {
+      "id": "malaria",
+      "name_ar": "الملاريا",
+      "name_en": "Malaria",
+      "icd10": "B50-B54",
+      "iraq_context": "Iraq was certified malaria-free in 2009 for most regions but P. vivax persists in northern Kurdistan (Dohuk, Erbil, Sulaymaniyah) and some border areas with Iran/Syria. P. falciparum rare but imported. Consider in returned travelers and Kurdish region residents.",
+      "iraq_incidence_per_100k": 0.3,
+      "urgency": "moderate_to_high",
+      "symptom_triggers": [
+        "cyclical_fever",
+        "rigors",
+        "chills",
+        "sweating",
+        "headache",
+        "myalgia",
+        "splenomegaly",
+        "anemia",
+        "thrombocytopenia",
+        "travel_history",
+        "northern_iraq",
+        "iran_border"
+      ],
+      "presentation_pattern": "Classic: cyclical fever with rigors every 48h (P. vivax) + headache + myalgia + splenomegaly. Thrombocytopenia on CBC is a key clue.",
+      "screening_questions_ar": [
+        "هل زرت مناطق كردستان الشمالية (دهوك، أربيل، السليمانية) مؤخراً؟",
+        "هل سافرت إلى دول مجاورة مثل إيران أو سوريا أو أفريقيا؟",
+        "هل الحمى تأتي على شكل نوبات دورية مع قشعريرة شديدة ثم تعرق؟"
+      ],
+      "key_tests": [
+        "Malaria RDT (rapid diagnostic test)",
+        "Thick and thin blood smear",
+        "PCR",
+        "CBC"
+      ],
+      "seasonal_peak": [
+        "spring",
+        "summer"
+      ],
+      "high_risk_governorates": [
+        "Dohuk",
+        "Erbil",
+        "Sulaymaniyah",
+        "border_areas"
+      ],
+      "differentials_to_exclude": [
+        "typhoid",
+        "brucellosis",
+        "dengue",
+        "viral_hepatitis",
+        "leptospirosis"
+      ]
+    },
+    {
+      "id": "schistosomiasis",
+      "name_ar": "داء البلهارسيا",
+      "name_en": "Schistosomiasis (Bilharzia)",
+      "icd10": "B65",
+      "iraq_context": "S. haematobium historically present in southern Iraq along Tigris/Euphrates river basins. Transmission via freshwater contact with infected snails. Less common now but persists in rural riverine communities in Basra, Maysan, Wasit.",
+      "iraq_incidence_per_100k": 1.2,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "hematuria",
+        "blood_in_urine",
+        "dysuria",
+        "urinary_frequency",
+        "abdominal_pain",
+        "hepatomegaly",
+        "splenomegaly",
+        "eosinophilia",
+        "freshwater_exposure",
+        "river_swimming"
+      ],
+      "presentation_pattern": "Terminal hematuria (blood at end of urination stream) + dysuria. Chronic: hepatosplenic disease, portal hypertension. 'Swimmer's itch' at initial skin penetration.",
+      "screening_questions_ar": [
+        "هل تسبح أو تتعامل مع مياه الأنهار أو القنوات (دجلة أو الفرات)؟",
+        "هل لاحظت دماً في البول خاصة في نهاية التبول؟",
+        "هل تعيش في منطقة قريبة من نهر أو مستنقع في جنوب العراق؟"
+      ],
+      "key_tests": [
+        "Urine microscopy (Schistosoma eggs)",
+        "Stool microscopy",
+        "Serology ELISA",
+        "Ultrasound (bladder/liver)",
+        "Eosinophil count"
+      ],
+      "seasonal_peak": [
+        "summer"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Maysan",
+        "Wasit",
+        "Dhi Qar"
+      ],
+      "differentials_to_exclude": [
+        "UTI",
+        "bladder_cancer",
+        "renal_TB",
+        "kidney_stones"
+      ]
+    },
+    {
+      "id": "leptospirosis",
+      "name_ar": "داء البريميات (الليبتوسبيريوسيس)",
+      "name_en": "Leptospirosis",
+      "icd10": "A27",
+      "iraq_context": "Underdiagnosed in Iraq. Associated with flooding events (increasingly common). Transmission via water/soil contaminated with infected animal urine (rats, livestock). Post-flooding seasons see sharp increases. Baghdad and southern flood-prone areas highest risk.",
+      "iraq_incidence_per_100k": 2.7,
+      "urgency": "high",
+      "symptom_triggers": [
+        "fever",
+        "headache",
+        "myalgia",
+        "conjunctival_suffusion",
+        "jaundice",
+        "renal_failure",
+        "hemorrhage",
+        "flooding_exposure",
+        "rat_exposure",
+        "acute_febrile_illness",
+        "muscle_tenderness",
+        "calf_pain"
+      ],
+      "presentation_pattern": "Biphasic: Phase 1 (4-7 days) — abrupt fever + severe headache + myalgia + conjunctival injection. Brief improvement then Phase 2 (Weil's disease) — jaundice + renal failure + hemorrhage. Calf muscle tenderness is a classic sign.",
+      "screening_questions_ar": [
+        "هل تعرضت لمياه الفيضانات أو عملت في أماكن مغمورة بالمياه مؤخراً؟",
+        "هل لديك تعامل مع الجرذان أو الحيوانات البرية؟",
+        "هل تشعر بألم شديد في عضلات الساق (الربلة)؟"
+      ],
+      "key_tests": [
+        "MAT (Microscopic Agglutination Test) - gold standard",
+        "Leptospira PCR (acute phase)",
+        "CBC",
+        "LFTs",
+        "Renal function",
+        "Urinalysis"
+      ],
+      "seasonal_peak": [
+        "post_flooding",
+        "rainy_season",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "Maysan",
+        "flood_affected_areas"
+      ],
+      "differentials_to_exclude": [
+        "viral_hepatitis",
+        "malaria",
+        "dengue",
+        "typhoid",
+        "CCHF"
+      ]
+    },
+    {
+      "id": "tuberculosis_pulmonary",
+      "name_ar": "السل الرئوي",
+      "name_en": "Pulmonary Tuberculosis",
+      "icd10": "A15",
+      "iraq_context": "TB incidence in Iraq is 45/100,000 — higher than regional average. Significantly elevated in displaced populations (IDP camps), prisons, and healthcare workers. MDR-TB emerging. BCG vaccine in national schedule but meningococcal and other conjugate vaccines not included.",
+      "iraq_incidence_per_100k": 45.0,
+      "urgency": "high",
+      "symptom_triggers": [
+        "cough_3_weeks",
+        "hemoptysis",
+        "night_sweats",
+        "weight_loss",
+        "low_grade_fever",
+        "fatigue",
+        "anorexia",
+        "pleuritic_chest_pain",
+        "lymphadenopathy",
+        "immunocompromised"
+      ],
+      "presentation_pattern": "Classic triad: cough >3 weeks + night sweats + unexplained weight loss. Hemoptysis is a red flag. Low-grade afternoon fever. Gradual onset over weeks-months.",
+      "screening_questions_ar": [
+        "هل سبق وتعرضت لشخص مصاب بالسل أو عاشرته؟",
+        "هل تعيش أو عشت في ظروف مكتظة (مخيمات، سجون، مستشفيات)؟",
+        "هل سبق أن خضعت لعلاج السل من قبل؟"
+      ],
+      "key_tests": [
+        "Sputum AFB smear x3",
+        "GeneXpert MTB/RIF (PCR)",
+        "Chest X-ray",
+        "Mantoux TST",
+        "IGRA",
+        "Culture (LJ medium)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "IDP_camps",
+        "Baghdad",
+        "Mosul",
+        "Basra",
+        "all_governorates"
+      ],
+      "differentials_to_exclude": [
+        "lung_cancer",
+        "pneumonia",
+        "COPD",
+        "bronchiectasis",
+        "histoplasmosis"
+      ]
+    },
+    {
+      "id": "meningococcal_disease",
+      "name_ar": "المرض المكوري السحائي (التهاب السحايا البكتيري)",
+      "name_en": "Meningococcal Disease / Bacterial Meningitis",
+      "icd10": "A39",
+      "iraq_context": "CRITICAL: Meningococcal vaccine is NOT in Iraq's national immunization schedule. Children who are 'fully vaccinated' per Iraqi schedule are NOT protected against Neisseria meningitidis. Serogroup B and W135 circulate. Also consider Streptococcus pneumoniae (pneumococcal conjugate vaccine PCV recently added but coverage gaps remain).",
+      "iraq_incidence_per_100k": 1.9,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "severe_headache",
+        "neck_stiffness",
+        "photophobia",
+        "phonophobia",
+        "fever",
+        "purpuric_rash",
+        "non_blanching_rash",
+        "altered_consciousness",
+        "kernigs_sign",
+        "brudzinskis_sign",
+        "pediatric_fever",
+        "seizures"
+      ],
+      "presentation_pattern": "Classic triad: fever + severe headache + neck stiffness. Plus: photophobia, phonophobia. DANGER SIGN: non-blanching purpuric rash = meningococcal septicemia → IMMEDIATE emergency.",
+      "screening_questions_ar": [
+        "هل يعاني من تصلب في الرقبة لا يستطيع معه إمالة الرأس للأمام؟",
+        "هل ظهرت بقع حمراء أو بنفسجية على الجسم لا تختفي عند الضغط عليها بكوب؟",
+        "تنبيه: التطعيم في العراق لا يشمل لقاح المكورات السحائية — الطفل المطعّم بالجدول العراقي ليس محمياً منها"
+      ],
+      "key_tests": [
+        "LP (CSF analysis - URGENT)",
+        "Blood culture",
+        "CBC",
+        "CRP/PCT",
+        "CT head (before LP if papilloedema)",
+        "Meningococcal PCR"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "crowded_schools",
+        "hajj_pilgrims"
+      ],
+      "differentials_to_exclude": [
+        "viral_meningitis",
+        "herpes_encephalitis",
+        "subarachnoid_hemorrhage",
+        "brain_abscess"
+      ]
+    },
+    {
+      "id": "dengue_fever",
+      "name_ar": "حمى الضنك",
+      "name_en": "Dengue Fever",
+      "icd10": "A90",
+      "iraq_context": "Dengue is rapidly expanding in Iraq due to climate change, Aedes aegypti mosquito spread, and increased flooding. Outbreaks reported in Baghdad, Basra, and southern governorates since 2019. Often misdiagnosed as flu or typhoid. No vaccine available in Iraq. Rising incidence year-on-year.",
+      "iraq_incidence_per_100k": 4.1,
+      "urgency": "moderate_to_high",
+      "symptom_triggers": [
+        "high_fever",
+        "severe_headache",
+        "retro_orbital_pain",
+        "eye_pain",
+        "myalgia",
+        "arthralgia",
+        "rash",
+        "thrombocytopenia",
+        "leukopenia",
+        "nausea",
+        "vomiting",
+        "hemorrhage",
+        "dengue_shock",
+        "bone_pain"
+      ],
+      "presentation_pattern": "Abrupt high fever (39-40°C) + severe retro-orbital headache ('pain behind the eyes') + bone/joint/muscle pain ('breakbone fever') + maculopapular rash appearing day 3-5. Platelet drop is key diagnostic clue.",
+      "screening_questions_ar": [
+        "هل تشعر بألم شديد خلف العينين أو في العظام والمفاصل؟",
+        "هل ظهر طفح جلدي (بقع حمراء) على الجسم بعد يومين أو ثلاثة من بدء الحمى؟",
+        "هل تعيش في منطقة بها مياه راكدة أو لدغ بعوض بشكل مكثف؟"
+      ],
+      "key_tests": [
+        "Dengue NS1 antigen (days 1-5)",
+        "Dengue IgM/IgG (after day 5)",
+        "CBC (thrombocytopenia + leukopenia)",
+        "Hematocrit (hemoconcentration = severe dengue)"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "post_flooding",
+        "rainy_season"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "Maysan",
+        "Dhi Qar",
+        "Wasit"
+      ],
+      "differentials_to_exclude": [
+        "malaria",
+        "typhoid",
+        "chikungunya",
+        "leptospirosis",
+        "CCHF"
+      ]
+    },
+    {
+      "id": "hepatitis_b_chronic",
+      "name_ar": "التهاب الكبد الفيروسي B (المزمن)",
+      "name_en": "Hepatitis B (Chronic)",
+      "icd10": "B18.1",
+      "iraq_context": "Iraq HBV surface antigen prevalence ~3.5-5% (hyperendemic threshold is 2%). Transmission via blood, sexual contact, vertical (mother to child). Historically high due to shared medical equipment, insufficient blood screening, and low vaccination in older generations. HBV vaccination added to national schedule in 1994 — those born before this are unvaccinated.",
+      "iraq_incidence_per_100k": 3500,
+      "urgency": "routine_to_moderate",
+      "symptom_triggers": [
+        "jaundice",
+        "fatigue",
+        "right_upper_quadrant_pain",
+        "hepatomegaly",
+        "elevated_liver_enzymes",
+        "cirrhosis_signs",
+        "ascites",
+        "varices",
+        "incidental_finding",
+        "family_history_liver",
+        "healthcare_worker"
+      ],
+      "presentation_pattern": "Often asymptomatic for years. Discovered incidentally. Chronic: fatigue + RUQ discomfort + elevated ALT. Advanced: cirrhosis features (spider angiomata, ascites, jaundice, varices).",
+      "screening_questions_ar": [
+        "هل سبق وأجريت تحليل لفحص التهاب الكبد B (HBsAg)؟",
+        "هل أحد والديك أو أشقائك مصاب بالتهاب الكبد B أو تليف الكبد؟",
+        "هل تعرضت لعمليات جراحية أو نقل دم قبل عام 1994؟"
+      ],
+      "key_tests": [
+        "HBsAg",
+        "HBeAg/Anti-HBe",
+        "HBV DNA quantitative",
+        "LFTs",
+        "AFP",
+        "Liver ultrasound",
+        "FibroScan"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "higher_pre_1994_birth_cohorts"
+      ],
+      "differentials_to_exclude": [
+        "hepatitis_c",
+        "autoimmune_hepatitis",
+        "alcoholic_liver",
+        "NAFLD"
+      ]
+    },
+    {
+      "id": "hepatitis_c",
+      "name_ar": "التهاب الكبد الفيروسي C",
+      "name_en": "Hepatitis C",
+      "icd10": "B18.2",
+      "iraq_context": "Iraq HCV prevalence ~1.5-2.5%. Major risk: shared needles, unscreened blood transfusions (pre-2000s), dental procedures, tattooing. Now curable with DAA therapy (direct-acting antivirals). Most patients asymptomatic until cirrhosis. Significant underdiagnosis.",
+      "iraq_incidence_per_100k": 2000,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "fatigue",
+        "jaundice",
+        "elevated_liver_enzymes",
+        "hepatomegaly",
+        "cirrhosis",
+        "ascites",
+        "hepatocellular_carcinoma",
+        "cryoglobulinemia",
+        "IV_drug_use",
+        "blood_transfusion_history",
+        "dialysis"
+      ],
+      "presentation_pattern": "Usually asymptomatic or mild fatigue for decades. Cirrhosis develops in ~20% over 20 years. Key risk factor: blood transfusion before 1992 or IV drug use.",
+      "screening_questions_ar": [
+        "هل تلقيت نقل دم أو عمليات قبل عام 2000؟",
+        "هل خضعت لغسيل الكلى أو إجراءات طبية متكررة؟",
+        "هل سبق وأجريت تحليل لفحص التهاب الكبد C (HCV)؟"
+      ],
+      "key_tests": [
+        "Anti-HCV antibody",
+        "HCV RNA PCR (confirmatory)",
+        "HCV genotype",
+        "LFTs",
+        "FibroScan/biopsy"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "hepatitis_b",
+        "NAFLD",
+        "autoimmune_hepatitis",
+        "hemochromatosis"
+      ]
+    },
+    {
+      "id": "acute_rheumatic_fever",
+      "name_ar": "الحمى الرثوية الحادة",
+      "name_en": "Acute Rheumatic Fever (ARF)",
+      "icd10": "I00",
+      "iraq_context": "ARF is extremely common in Iraq — one of the highest rates in the Middle East (~50-100/100,000 in children). Caused by untreated/undertreated Group A Streptococcal pharyngitis. Leads to rheumatic heart disease (RHD), a major cause of cardiac death in young Iraqis. Often missed or treated late.",
+      "iraq_incidence_per_100k": 75.0,
+      "urgency": "high",
+      "symptom_triggers": [
+        "joint_pain",
+        "migratory_arthritis",
+        "carditis",
+        "chorea",
+        "subcutaneous_nodules",
+        "erythema_marginatum",
+        "fever",
+        "sore_throat_history",
+        "preceding_pharyngitis",
+        "pediatric_joint_pain",
+        "murmur",
+        "palpitations"
+      ],
+      "presentation_pattern": "Child or adolescent with migratory large-joint arthritis (moves from joint to joint) + fever, 2-4 weeks after sore throat. May have carditis (new murmur, pericarditis). Sydenham chorea (involuntary movements) is pathognomonic.",
+      "screening_questions_ar": [
+        "هل أصيب بالتهاب الحلق أو اللوزتين قبل 2-4 أسابيع من بدء آلام المفاصل؟",
+        "هل آلام المفاصل تنتقل من مفصل لآخر (مفصل يتحسن والآخر يؤلم)؟",
+        "هل سبق أن شُخِّص بالحمى الرثوية أو عنده تاريخ أمراض قلب؟"
+      ],
+      "key_tests": [
+        "ASO titer (Anti-Streptolysin O)",
+        "Anti-DNase B",
+        "Throat culture",
+        "CRP/ESR",
+        "ECG (prolonged PR)",
+        "Echocardiogram"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "crowded_schools",
+        "IDP_camps",
+        "low_income_areas"
+      ],
+      "differentials_to_exclude": [
+        "JIA",
+        "reactive_arthritis",
+        "septic_arthritis",
+        "brucellosis",
+        "viral_arthritis"
+      ]
+    },
+    {
+      "id": "toxoplasmosis",
+      "name_ar": "داء المقوسات (التوكسوبلازما)",
+      "name_en": "Toxoplasmosis",
+      "icd10": "B58",
+      "iraq_context": "Iraq has very high Toxoplasma gondii seroprevalence (~50-65% in adults). Transmission: undercooked meat (lamb/beef common in Iraqi diet), cat feces, contaminated soil. Usually asymptomatic in immunocompetent. CRITICAL in pregnancy: can cause congenital toxoplasmosis (blindness, hydrocephalus, stillbirth). Also life-threatening in immunocompromised (reactivation → cerebral toxoplasmosis).",
+      "iraq_incidence_per_100k": 650,
+      "urgency": "high_if_pregnant_or_immunocompromised",
+      "symptom_triggers": [
+        "pregnancy",
+        "lymphadenopathy",
+        "fever",
+        "cervical_lymph_nodes",
+        "immunocompromised",
+        "HIV",
+        "headache",
+        "confusion",
+        "seizures",
+        "ring_enhancing_lesion",
+        "chorioretinitis",
+        "visual_disturbance",
+        "congenital_infection",
+        "fetal_abnormality"
+      ],
+      "presentation_pattern": "Immunocompetent: painless cervical lymphadenopathy ± mild fever (like mono). PREGNANT: risk of vertical transmission → congenital defects. IMMUNOCOMPROMISED: cerebral toxoplasmosis (ring-enhancing lesions on MRI, headache, focal neuro deficits, seizures).",
+      "screening_questions_ar": [
+        "هل المريضة حامل؟ (داء المقوسات خطير جداً على الجنين)",
+        "هل تتعامل مع القطط أو تنظفين صندوق رمل القطة؟",
+        "هل تتناولين اللحم غير المطهو جيداً (مثل الكباب النيء أو الكيمة)؟"
+      ],
+      "key_tests": [
+        "Toxoplasma IgM/IgG serology",
+        "Avidity test (in pregnancy)",
+        "Amniocentesis PCR (if fetal infection suspected)",
+        "MRI brain (if neuro symptoms)",
+        "Ophthalmology exam"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "lymphoma",
+        "EBV_mononucleosis",
+        "CMV",
+        "toxocariasis",
+        "lymph_node_TB"
+      ]
+    },
+    {
+      "id": "rabies_post_exposure",
+      "name_ar": "داء الكلب (السعار) — إدارة ما بعد التعرض",
+      "name_en": "Rabies — Post-Exposure Management",
+      "icd10": "A82",
+      "iraq_context": "Rabies is endemic in Iraq. Dog bites are very common (stray dogs prevalent in all cities). Cat and livestock bites also transmit. Post-exposure prophylaxis (PEP) is available at government hospitals but awareness is low — many patients present late or do not complete the vaccine course. 100% fatal once symptoms appear.",
+      "iraq_incidence_per_100k": 0.4,
+      "urgency": "emergency_post_exposure",
+      "symptom_triggers": [
+        "dog_bite",
+        "animal_bite",
+        "cat_bite",
+        "bat_exposure",
+        "scratch_from_animal",
+        "hydrophobia",
+        "aerophobia",
+        "hypersalivation",
+        "agitation",
+        "paralysis",
+        "wound_from_animal",
+        "animal_attack"
+      ],
+      "presentation_pattern": "POST-EXPOSURE (before symptoms): Any bite/scratch/lick on broken skin from warm-blooded animal → PEP urgently. PRE-SYMPTOMATIC RABIES: 1-3 months after bite → prodrome (pain/itching at bite site, fever, anxiety). SYMPTOMATIC: hydrophobia, aerophobia, agitation → death. PEP must start within 24-72h.",
+      "screening_questions_ar": [
+        "هل تعرضت لعضة أو خدش من كلب أو قطة أو حيوان آخر؟",
+        "هل الحيوان الذي عضك كان يتصرف بشكل غريب أو شللي؟",
+        "هل حصلت على تطعيم ضد داء الكلب بعد العضة؟ (يجب البدء فوراً)"
+      ],
+      "key_tests": [
+        "Wound assessment + cleaning (first step)",
+        "Animal capture/observation if possible",
+        "PEP initiation: RIG + vaccine series",
+        "No reliable ante-mortem test in early exposure"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "rural_areas",
+        "Baghdad_outskirts"
+      ],
+      "differentials_to_exclude": [
+        "tetanus",
+        "viral_encephalitis",
+        "psychiatric_presentation"
+      ]
+    },
+    {
+      "id": "q_fever",
+      "name_ar": "حمى Q (القيّ)",
+      "name_en": "Q Fever (Coxiella burnetii)",
+      "icd10": "A78",
+      "iraq_context": "Significantly underdiagnosed in Iraq. Coxiella burnetii is transmitted via inhalation of dust contaminated with livestock birth products (placenta, amniotic fluid), milk, or feces. Sheep and goat farmers, veterinarians, slaughterhouse workers at highest risk. Can cause atypical pneumonia, hepatitis, or endocarditis.",
+      "iraq_incidence_per_100k": 1.8,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "fever",
+        "headache",
+        "myalgia",
+        "dry_cough",
+        "atypical_pneumonia",
+        "hepatitis",
+        "endocarditis",
+        "livestock_exposure",
+        "slaughterhouse",
+        "birth_of_animals",
+        "fatigue",
+        "night_sweats"
+      ],
+      "presentation_pattern": "Acute: high fever + severe headache + myalgia + dry cough (atypical pneumonia pattern) ± hepatitis. Chronic Q fever (months-years): culture-negative endocarditis in someone with valvular disease.",
+      "screening_questions_ar": [
+        "هل تعمل في مزرعة أو مسلخ أو بيطرة؟",
+        "هل شهدت ولادة حيوانات (أغنام، ماعز) مؤخراً أو تعاملت مع المشيمة؟",
+        "هل لديك أمراض قلبية أو صمامات قلب مصنعة؟ (خطر حمى Q المزمنة)"
+      ],
+      "key_tests": [
+        "Q fever serology (Phase I/II IgG/IgM - IFA)",
+        "PCR blood/tissue",
+        "LFTs",
+        "Echo (if endocarditis suspected)",
+        "CBC"
+      ],
+      "seasonal_peak": [
+        "spring",
+        "lambing_season"
+      ],
+      "high_risk_governorates": [
+        "Nineveh",
+        "Salah ad-Din",
+        "Diyala",
+        "rural_governorates"
+      ],
+      "differentials_to_exclude": [
+        "brucellosis",
+        "typhoid",
+        "atypical_pneumonia",
+        "viral_hepatitis",
+        "infective_endocarditis"
+      ]
+    },
+    {
+      "id": "sandfly_fever",
+      "name_ar": "حمى ذبابة الرمل (حمى البابامي)",
+      "name_en": "Sandfly Fever (Phlebotomus Fever / Pappataci Fever)",
+      "icd10": "A93.1",
+      "iraq_context": "Extremely common in Iraq summers — massively underreported. Caused by Phlebovirus transmitted by Phlebotomus sandflies (same vector as leishmaniasis). Self-limiting, 3-5 days. Very high attack rate among newcomers to endemic areas. Iraqi military and displaced populations particularly affected.",
+      "iraq_incidence_per_100k": 85.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "fever_3_days",
+        "headache",
+        "eye_pain",
+        "retro_orbital_pain",
+        "myalgia",
+        "malaise",
+        "flushed_face",
+        "conjunctival_injection",
+        "no_rash",
+        "summer_fever",
+        "short_illness"
+      ],
+      "presentation_pattern": "Acute onset fever + severe headache + retro-orbital pain + intense myalgia. Flushed face, injected conjunctiva. Lasts exactly 3 days ('three-day fever'). Complete recovery. Bradycardia relative to fever. No rash typically.",
+      "screening_questions_ar": [
+        "هل تعيش في منطقة رملية أو صحراوية وتتعرض للذباب الصغير (ذبابة الرمل) في الليل؟",
+        "هل الحمى بدأت فجأة وتوقعت أنها ستنتهي في 2-3 أيام؟",
+        "هل هناك آخرون في نفس المكان أصيبوا بنفس الأعراض معك؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis (no reliable rapid test)",
+        "Serology (IgM Phlebovirus) for confirmation",
+        "CBC (leukopenia)",
+        "Exclude other causes"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "june_to_september"
+      ],
+      "high_risk_governorates": [
+        "Anbar",
+        "Nineveh",
+        "Salah ad-Din",
+        "all_desert_areas"
+      ],
+      "differentials_to_exclude": [
+        "dengue",
+        "malaria",
+        "typhoid",
+        "influenza",
+        "brucellosis"
+      ]
+    },
+    {
+      "id": "amoebic_dysentery_liver_abscess",
+      "name_ar": "الزحار الأميبي وخراج الكبد الأميبي",
+      "name_en": "Amoebic Dysentery / Amoebic Liver Abscess",
+      "icd10": "A06",
+      "iraq_context": "Entamoeba histolytica is hyperendemic in Iraq due to contaminated water and food. Intestinal amoebiasis is common. Amoebic liver abscess (ALA) is the most serious complication — occurs weeks to months after intestinal infection, often without diarrhea history. Young adult males most affected.",
+      "iraq_incidence_per_100k": 55.0,
+      "urgency": "moderate_to_high",
+      "symptom_triggers": [
+        "bloody_diarrhea",
+        "mucus_in_stool",
+        "tenesmus",
+        "abdominal_cramps",
+        "right_upper_quadrant_pain",
+        "fever",
+        "hepatomegaly",
+        "tender_liver",
+        "shoulder_tip_pain",
+        "weight_loss",
+        "night_sweats"
+      ],
+      "presentation_pattern": "Intestinal: bloody mucoid diarrhea + tenesmus + cramping. ALA: fever + RUQ/right shoulder pain + tender hepatomegaly WITHOUT diarrhea (only 30% have concurrent diarrhea). Raised right hemidiaphragm on X-ray.",
+      "screening_questions_ar": [
+        "هل تشرب ماء غير معقم أو تأكل خضروات نيئة غير مغسولة جيداً؟",
+        "هل الإسهال يحتوي على دم أو مخاط؟",
+        "هل يوجد ألم في الجانب الأيمن من البطن خاصة عند التنفس العميق؟"
+      ],
+      "key_tests": [
+        "Stool antigen test (E. histolytica)",
+        "Stool O&P microscopy",
+        "Serology (ELISA - high sensitivity for ALA)",
+        "Abdominal ultrasound (ALA: single right lobe abscess)",
+        "CBC (leukocytosis)"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "camps",
+        "rural",
+        "Baghdad"
+      ],
+      "differentials_to_exclude": [
+        "pyogenic_liver_abscess",
+        "hydatid_cyst",
+        "IBD",
+        "bacterial_dysentery",
+        "cholecystitis"
+      ]
+    },
+    {
+      "id": "g6pd_deficiency",
+      "name_ar": "نقص إنزيم G6PD",
+      "name_en": "G6PD Deficiency (Drug Safety Alert)",
+      "icd10": "D55.0",
+      "iraq_context": "G6PD deficiency affects ~8-12% of Iraqi males (X-linked). Critical for drug safety: primaquine (malaria), dapsone, nitrofurantoin, and high-dose aspirin can trigger acute hemolytic anemia. Fava beans (ful medames — very common in Iraqi diet) also trigger hemolysis. Must screen before prescribing these drugs.",
+      "iraq_incidence_per_100k": 9000,
+      "urgency": "drug_safety_screen",
+      "symptom_triggers": [
+        "hemolytic_anemia",
+        "jaundice_post_medication",
+        "dark_urine_after_medication",
+        "pallor",
+        "fatigue_after_fava_beans",
+        "neonatal_jaundice",
+        "acute_hemolysis",
+        "back_pain_drug_induced",
+        "drug_reaction"
+      ],
+      "presentation_pattern": "Usually asymptomatic until triggered. Trigger → acute: pallor + jaundice + dark urine (hemoglobinuria) + back/abdominal pain. Neonatal jaundice in affected newborns. Screen before prescribing oxidant drugs.",
+      "screening_questions_ar": [
+        "هل سبق أن أُخبرت بأن لديك نقص في إنزيم G6PD أو 'الفول يؤثر عليك'؟",
+        "هل عانيت من اصفرار الجلد أو تحول بول للون الداكن بعد تناول أدوية معينة؟",
+        "هل لديك تاريخ عائلي لهذا المرض؟ (يصيب الذكور أكثر)"
+      ],
+      "key_tests": [
+        "G6PD enzyme assay (quantitative)",
+        "Blood smear (bite cells, Heinz bodies during crisis)",
+        "CBC (hemolytic anemia)",
+        "Bilirubin"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "fava_bean_season_spring"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "higher_in_south"
+      ],
+      "drug_triggers_to_avoid": [
+        "primaquine",
+        "dapsone",
+        "nitrofurantoin",
+        "rasburicase",
+        "phenazopyridine",
+        "high_dose_aspirin",
+        "fava_beans"
+      ],
+      "differentials_to_exclude": [
+        "hereditary_spherocytosis",
+        "autoimmune_hemolytic_anemia",
+        "sickle_cell",
+        "thalassemia"
+      ]
+    },
+    {
+      "id": "heat_stroke_hyperthermia",
+      "name_ar": "ضربة الشمس والإجهاد الحراري",
+      "name_en": "Heat Stroke / Heat Exhaustion",
+      "icd10": "T67",
+      "iraq_context": "Iraq regularly records among the highest temperatures on Earth — Baghdad reaches 50°C+ in summer. Heat stroke is a major killer, especially among elderly, outdoor workers, hajj pilgrims, and those with power outages (no AC). Increasingly frequent with climate change. Often misdiagnosed or undertreated.",
+      "iraq_incidence_per_100k": 12.0,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "high_ambient_temperature",
+        "heat_exposure",
+        "confusion",
+        "altered_consciousness",
+        "hyperthermia",
+        "hot_dry_skin",
+        "no_sweating",
+        "rapid_heart_rate",
+        "dizziness",
+        "collapse",
+        "summer_outdoor_work",
+        "power_outage",
+        "elderly_fever",
+        "pilgrim_haj"
+      ],
+      "presentation_pattern": "Heat exhaustion: heavy sweating + weakness + cool/pale skin + nausea + headache + dizziness. HEAT STROKE (emergency): core temp >40°C + confusion/altered consciousness + HOT DRY SKIN (anhidrosis) → organ failure if not cooled immediately.",
+      "screening_questions_ar": [
+        "هل كان المريض تحت أشعة الشمس أو في مكان ساخن جداً قبل ظهور الأعراض؟",
+        "هل الجلد ساخن وجاف (بدون تعرق) مع ارتفاع درجة الحرارة فوق 40 درجة؟",
+        "هل يعاني من ارتباك أو فقدان وعي؟ (هذه حالة طوارئ - تبريد فوري)"
+      ],
+      "key_tests": [
+        "Core temperature (rectal)",
+        "CBC",
+        "Electrolytes",
+        "Renal function",
+        "LFTs",
+        "Coagulation (DIC risk)",
+        "CK (rhabdomyolysis)"
+      ],
+      "seasonal_peak": [
+        "june",
+        "july",
+        "august",
+        "september"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "Baghdad",
+        "Basra",
+        "Najaf",
+        "Karbala",
+        "outdoor_workers"
+      ],
+      "differentials_to_exclude": [
+        "meningitis",
+        "septic_shock",
+        "thyroid_storm",
+        "anticholinergic_toxicity",
+        "serotonin_syndrome"
+      ]
+    },
+    {
+      "id": "lead_poisoning",
+      "name_ar": "التسمم بالرصاص والمعادن الثقيلة",
+      "name_en": "Lead Poisoning / Heavy Metal Toxicity",
+      "icd10": "T56.0",
+      "iraq_context": "Unique to Iraq due to war legacy, oil industry contamination, and depleted uranium exposure. Elevated blood lead levels documented in children near Basra oil fields, Fallujah, and former conflict zones. Also: traditional remedies containing lead (surma/kohl eye powder, certain herbal preparations). Basra has documented elevated cancer rates potentially linked to heavy metal contamination.",
+      "iraq_incidence_per_100k": 8.5,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "developmental_delay",
+        "learning_difficulty",
+        "behavioral_change",
+        "abdominal_pain",
+        "constipation",
+        "anemia",
+        "headache",
+        "irritability",
+        "fatigue",
+        "peripheral_neuropathy",
+        "encephalopathy",
+        "traditional_remedy",
+        "oil_field_proximity",
+        "war_zone_residence",
+        "paint_exposure"
+      ],
+      "presentation_pattern": "Children: developmental delay, learning problems, behavioral issues, abdominal pain, pallor (microcytic anemia). Adults: headache, fatigue, peripheral neuropathy, abdominal colic. Basophilic stippling on blood smear.",
+      "screening_questions_ar": [
+        "هل يعيش الطفل قرب حقول النفط أو المناطق التي شهدت معارك (بصرة، الفلوجة)؟",
+        "هل يستخدم الطفل الكحل التقليدي (سرمة) أو منتجات طبية شعبية قد تحتوي على رصاص؟",
+        "هل لاحظتم تأخراً في الكلام أو التعلم أو السلوك عند الطفل؟"
+      ],
+      "key_tests": [
+        "Blood lead level (BLL) - gold standard",
+        "CBC (basophilic stippling)",
+        "ALA dehydratase",
+        "Abdominal X-ray (lead lines)",
+        "Cognitive assessment"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Fallujah",
+        "Baghdad",
+        "oil_field_areas"
+      ],
+      "differentials_to_exclude": [
+        "ADHD",
+        "autism_spectrum",
+        "iron_deficiency_anemia",
+        "celiac",
+        "other_heavy_metals"
+      ]
+    },
+    {
+      "id": "measles",
+      "name_ar": "الحصبة",
+      "name_en": "Measles",
+      "icd10": "B05",
+      "iraq_context": "Iraq experienced measles outbreaks in 2018-2019 and ongoing in IDP camps with low vaccination coverage. MMR vaccine is in Iraq national schedule but cold chain failures and access issues in conflict areas lead to immunity gaps. Highly contagious. Complications (pneumonia, encephalitis) more severe in malnourished children.",
+      "iraq_incidence_per_100k": 3.2,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "maculopapular_rash",
+        "fever",
+        "cough",
+        "coryza",
+        "conjunctivitis",
+        "koplik_spots",
+        "rash_behind_ears",
+        "unvaccinated",
+        "camp_residence",
+        "exposure_to_measles_case",
+        "pediatric_rash_fever"
+      ],
+      "presentation_pattern": "Prodrome (3-4 days): high fever + cough + runny nose + red eyes + Koplik spots (white spots inside cheeks — pathognomonic). Then: maculopapular rash starts behind ears → spreads downward. Fever may spike to 40°C when rash appears.",
+      "screening_questions_ar": [
+        "هل الطفل مطعّم ضد الحصبة (لقاح MMR)؟",
+        "هل ظهر طفح جلدي بدأ من الوجه أو خلف الأذنين وانتشر للجسم؟",
+        "هل كان الطفل في تماس مع شخص مصاب بالحصبة أو في مخيم يعاني من تفشٍّ؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis (Koplik spots + rash)",
+        "Measles IgM serology",
+        "PCR (throat/urine)",
+        "Notify public health immediately"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "IDP_camps",
+        "Nineveh",
+        "Anbar",
+        "low_coverage_areas"
+      ],
+      "differentials_to_exclude": [
+        "rubella",
+        "roseola",
+        "scarlet_fever",
+        "drug_rash",
+        "parvovirus_B19"
+      ]
+    },
+    {
+      "id": "pertussis",
+      "name_ar": "السعال الديكي (الشاهوق)",
+      "name_en": "Pertussis (Whooping Cough)",
+      "icd10": "A37",
+      "iraq_context": "Pertussis remains endemic in Iraq with periodic outbreaks. DTP vaccine coverage varies — cold chain issues in remote areas. Waning immunity in adolescents/adults (booster not given). Classic 'whoop' may be absent in infants and vaccinated individuals. High infant mortality if untreated in first months of life.",
+      "iraq_incidence_per_100k": 5.1,
+      "urgency": "moderate_to_high",
+      "symptom_triggers": [
+        "paroxysmal_cough",
+        "whooping_cough",
+        "post_tussive_vomiting",
+        "inspiratory_whoop",
+        "cyanosis_with_cough",
+        "prolonged_cough",
+        "infant_cough",
+        "apnea_infant",
+        "cough_3_weeks",
+        "night_cough"
+      ],
+      "presentation_pattern": "3 stages: Catarrhal (1-2 weeks, like a cold) → Paroxysmal (2-6 weeks, severe coughing fits ending in inspiratory 'whoop' + vomiting + cyanosis) → Convalescent. Infants: apnea instead of whoop. Most dangerous in <6 months.",
+      "screening_questions_ar": [
+        "هل السعال يأتي على شكل نوبات متكررة وشديدة ثم يأخذ نفساً بصوت صفير؟",
+        "هل يتقيأ الطفل بعد نوبة السعال؟",
+        "هل الطفل أقل من 6 أشهر أو لم يكمل تطعيمات DTP؟"
+      ],
+      "key_tests": [
+        "Nasopharyngeal PCR (gold standard)",
+        "Nasopharyngeal culture (Bordet-Gengou medium)",
+        "CBC (lymphocytosis — classic)",
+        "Notify public health"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "low_DTP_coverage_areas"
+      ],
+      "differentials_to_exclude": [
+        "croup",
+        "bronchiolitis",
+        "asthma",
+        "foreign_body",
+        "TB",
+        "adenovirus"
+      ]
+    },
+    {
+      "id": "giardiasis",
+      "name_ar": "داء الجيارديات (الإسهال المائي المزمن)",
+      "name_en": "Giardiasis",
+      "icd10": "A07.1",
+      "iraq_context": "Highly prevalent throughout Iraq, especially in children under 5 and areas with contaminated water supplies. Feco-oral transmission. Often presents as persistent/chronic diarrhea misdiagnosed as IBS. Responsible for significant childhood malnutrition.",
+      "iraq_incidence_per_100k": 120.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "chronic_diarrhea",
+        "watery_diarrhea",
+        "greasy_stool",
+        "bloating",
+        "flatulence",
+        "abdominal_cramps",
+        "weight_loss",
+        "fatigue",
+        "pediatric_diarrhea",
+        "malabsorption",
+        "failure_to_thrive"
+      ],
+      "presentation_pattern": "Intermittent greasy/frothy foul-smelling diarrhea + bloating + flatulence for >2 weeks. No blood/mucus (distinguishes from amoeba). Malabsorption pattern. Child with failure to thrive + recurrent loose stools.",
+      "screening_questions_ar": [
+        "هل الإسهال مستمر أكثر من أسبوعين؟",
+        "هل البراز دهني أو رغوي أو يطفو على الماء؟",
+        "هل مصدر المياه نظيف ومعالج؟"
+      ],
+      "key_tests": [
+        "Stool antigen (ELISA/RDT - gold standard)",
+        "Stool O&P x3",
+        "Duodenal aspirate (if negative stool)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "rural",
+        "displacement_camps",
+        "areas_with_poor_water"
+      ],
+      "differentials_to_exclude": [
+        "amoebic_colitis",
+        "IBS",
+        "lactose_intolerance",
+        "celiac",
+        "cryptosporidiosis"
+      ]
+    },
+    {
+      "id": "cryptosporidiosis",
+      "name_ar": "داء الكريبتوسبوريديا",
+      "name_en": "Cryptosporidiosis",
+      "icd10": "A07.2",
+      "iraq_context": "Increasingly recognized in Iraq, especially in immunocompromised patients (HIV, malnutrition, steroid use) and infants. Waterborne outbreaks possible after flooding. Chlorine-resistant oocysts survive standard water treatment.",
+      "iraq_incidence_per_100k": 15.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "profuse_watery_diarrhea",
+        "pediatric_diarrhea",
+        "immunocompromised_diarrhea",
+        "diarrhea_after_flood",
+        "chronic_diarrhea_HIV",
+        "abdominal_cramps",
+        "nausea",
+        "vomiting",
+        "low_grade_fever"
+      ],
+      "presentation_pattern": "Profuse watery diarrhea (up to 20x/day) in immunocompromised patient OR self-limited 2-week diarrhea in healthy person. Post-flooding or contaminated water exposure. In HIV/malnourished: chronic and life-threatening.",
+      "screening_questions_ar": [
+        "هل الشخص يعاني من ضعف مناعة أو يتناول أدوية تضعف المناعة؟",
+        "هل تعرض لمياه فيضانات أو حمامات سباحة مؤخراً؟",
+        "هل الإسهال مائي وغزير جداً بدون دم؟"
+      ],
+      "key_tests": [
+        "Modified Acid-Fast stain (stool)",
+        "Stool antigen ELISA",
+        "PCR (reference labs)",
+        "Check CD4 if HIV suspected"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "post_flooding"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Misan",
+        "southern_Iraq_flooding_areas"
+      ],
+      "differentials_to_exclude": [
+        "giardiasis",
+        "cholera",
+        "rotavirus",
+        "ETEC",
+        "cyclospora"
+      ]
+    },
+    {
+      "id": "strongyloidiasis",
+      "name_ar": "داء الاسترونجيلويد (دودة الخيط)",
+      "name_en": "Strongyloidiasis",
+      "icd10": "B78",
+      "iraq_context": "Endemic in rural Iraq with soil-transmitted transmission. Unique danger: autoinfection allows lifelong persistence. Immunosuppression (steroids, transplant, HIV) triggers hyperinfection syndrome — potentially fatal. Often undiagnosed for years.",
+      "iraq_incidence_per_100k": 8.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "recurrent_urticaria",
+        "eosinophilia",
+        "larva_currens",
+        "epigastric_pain",
+        "diarrhea",
+        "skin_rash_migratory",
+        "cough_with_eosinophilia",
+        "immunosuppressed_GI_symptoms",
+        "sepsis_gram_negative",
+        "respiratory_failure_immunosuppressed"
+      ],
+      "presentation_pattern": "Asymptomatic eosinophilia OR recurrent urticaria + larva currens (fast-moving linear skin rash) + epigastric pain. HIGH ALERT: Patient starting steroids with unknown Strongyloides status → risk of hyperinfection (disseminated larvae carrying gut bacteria → gram-negative sepsis, meningitis, death).",
+      "screening_questions_ar": [
+        "هل ظهر طفح جلدي خطي أو خزّاز جلدي يتحرك بسرعة؟",
+        "هل يتناول المريض كورتيزون أو أدوية تضعف المناعة؟",
+        "هل المريض من المناطق الريفية ويمشي حافياً؟"
+      ],
+      "key_tests": [
+        "Stool O&P (needs serial samples)",
+        "Strongyloides IgG serology (best sensitivity)",
+        "Eosinophilia on CBC",
+        "Screen BEFORE starting steroids"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "rural_south",
+        "Diyala",
+        "Wasit"
+      ],
+      "differentials_to_exclude": [
+        "cutaneous_larva_migrans",
+        "scabies",
+        "urticaria_allergic",
+        "IBD"
+      ]
+    },
+    {
+      "id": "toxocariasis",
+      "name_ar": "داء التوكساكارا (يرقة الديدان الخفية)",
+      "name_en": "Toxocariasis (Visceral/Ocular Larva Migrans)",
+      "icd10": "B83.0",
+      "iraq_context": "Common in Iraqi children due to close contact with dogs/cats. Visceral larva migrans (liver, lungs, CNS) or ocular (strabismus, white reflex in children). Frequently misdiagnosed. Hypereosinophilia is a key clue.",
+      "iraq_incidence_per_100k": 12.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "eosinophilia",
+        "hepatomegaly",
+        "cough",
+        "wheezing",
+        "fever_unexplained",
+        "strabismus_child",
+        "leukocoria",
+        "visual_loss_child",
+        "seizures_eosinophilia",
+        "dog_cat_contact"
+      ],
+      "presentation_pattern": "Child with: unexplained persistent eosinophilia + hepatomegaly + recurrent cough/wheeze. OR child with strabismus/white pupil/visual loss (ocular larva migrans). History of pica (eating soil) or contact with puppies/kittens.",
+      "screening_questions_ar": [
+        "هل الطفل يلعب مع الكلاب أو القطط، خاصة الصغيرة منها؟",
+        "هل كانت هناك مشكلة في عين الطفل أو حول في النظر؟",
+        "هل تحليل الدم أظهر ارتفاعاً في خلايا الحمضات (Eosinophils)؟"
+      ],
+      "key_tests": [
+        "Toxocara IgG ELISA (serology)",
+        "CBC (eosinophilia)",
+        "Liver ultrasound",
+        "Ophthalmology referral (ocular form)",
+        "Chest X-ray"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "rural",
+        "areas_with_stray_dogs"
+      ],
+      "differentials_to_exclude": [
+        "visceral_leishmaniasis",
+        "asthma",
+        "retinoblastoma",
+        "leukemia",
+        "other_helminthiasis"
+      ]
+    },
+    {
+      "id": "fasciolosis",
+      "name_ar": "داء المثقبة الكبدية (ديدان الكبد)",
+      "name_en": "Fasciolosis (Liver Fluke)",
+      "icd10": "B66.3",
+      "iraq_context": "Present in Iraq, especially Basra, Misan, Wasit — Shatt al-Arab and Tigris river valley areas. Fasciola hepatica. Transmission via watercress and other aquatic plants. Masquerades as biliary disease or unexplained right upper quadrant pain.",
+      "iraq_incidence_per_100k": 3.5,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "right_upper_quadrant_pain",
+        "hepatomegaly",
+        "eosinophilia",
+        "fever",
+        "jaundice",
+        "bile_duct_obstruction",
+        "liver_abscess_like",
+        "watercress_consumption",
+        "river_water_contact"
+      ],
+      "presentation_pattern": "Acute phase: Fever + RUQ pain + eosinophilia + hepatomegaly (6-12 weeks post-ingestion). Chronic phase: biliary colic, cholangitis, bile duct obstruction. Often confused with cholecystitis or liver abscess.",
+      "screening_questions_ar": [
+        "هل تأكل نباتات مائية طازجة كالجرجير أو البقدونس المروي بمياه الأنهار؟",
+        "هل تشرب مياه الأنهار أو تسبح فيها؟",
+        "هل تحليل الدم أظهر ارتفاعاً في خلايا الحمضات؟"
+      ],
+      "key_tests": [
+        "Fasciola IgG serology (ELISA)",
+        "Stool O&P (eggs in chronic phase)",
+        "Liver ultrasound/CT",
+        "CBC (eosinophilia)",
+        "LFTs"
+      ],
+      "seasonal_peak": [
+        "spring",
+        "summer"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Misan",
+        "Wasit",
+        "Dhi_Qar"
+      ],
+      "differentials_to_exclude": [
+        "cholecystitis",
+        "hydatid_cyst",
+        "amoebic_liver_abscess",
+        "cholangiocarcinoma"
+      ]
+    },
+    {
+      "id": "influenza",
+      "name_ar": "الإنفلونزا الموسمية وH5N1",
+      "name_en": "Influenza (Seasonal + Avian surveillance)",
+      "icd10": "J10-J11",
+      "iraq_context": "Seasonal influenza peaks in Iraq November-March. H1N1 (2009 pandemic strain) now circulates as seasonal. Iraq has limited surveillance. Avian influenza H5N1 risk from poultry contact. Vaccination coverage extremely low (<5%).",
+      "iraq_incidence_per_100k": 850.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "fever_sudden_onset",
+        "myalgia",
+        "headache",
+        "dry_cough",
+        "sore_throat",
+        "rhinorrhea",
+        "fatigue_severe",
+        "chills",
+        "poultry_contact_fever",
+        "cluster_respiratory_illness"
+      ],
+      "presentation_pattern": "Sudden-onset high fever (>38.5°C) + severe myalgia + headache + dry cough. 'Knocked down' — patient typically cannot get out of bed. Seasonal clustering. RED FLAG for H5N1: severe respiratory illness + recent poultry contact (especially dead birds).",
+      "screening_questions_ar": [
+        "هل الحمى جاءت فجأة مع ألم شديد في العضلات والمفاصل؟",
+        "هل تلامس الطيور مؤخراً، خاصة الدجاج المريض أو الميت؟",
+        "هل هناك أشخاص آخرون في نفس البيت أو المدرسة مصابون بنفس الأعراض؟"
+      ],
+      "key_tests": [
+        "Rapid Influenza Diagnostic Test (RIDT)",
+        "Nasopharyngeal PCR (subtyping)",
+        "CBC (leukopenia typical)",
+        "CXR (pneumonia complication)"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "COVID-19",
+        "dengue",
+        "brucellosis",
+        "malaria",
+        "meningococcal",
+        "typhoid"
+      ]
+    },
+    {
+      "id": "west_nile_virus",
+      "name_ar": "حمى غرب النيل",
+      "name_en": "West Nile Virus",
+      "icd10": "A92.3",
+      "iraq_context": "Iraq lies within the West Nile Virus endemic zone. Outbreaks documented in Basra, Dhi Qar, Diyala. Culex mosquito vector. Most cases (80%) asymptomatic. Neuroinvasive disease (encephalitis, meningitis, flaccid paralysis) in elderly and immunocompromised. Often misdiagnosed as viral meningitis.",
+      "iraq_incidence_per_100k": 2.1,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "fever",
+        "headache",
+        "neck_stiffness",
+        "encephalitis",
+        "flaccid_paralysis",
+        "altered_consciousness",
+        "mosquito_exposure",
+        "rash_maculopapular",
+        "elderly_neurological",
+        "meningitis_summer"
+      ],
+      "presentation_pattern": "Febrile illness in summer/autumn after mosquito exposure. 20% develop West Nile fever (fever + headache + rash). <1% neuroinvasive: encephalitis + altered consciousness + flaccid paralysis (mimics Guillain-Barré). Elderly >> risk of severe disease.",
+      "screening_questions_ar": [
+        "هل هناك تعرض لدغات البعوض في المناطق الريفية أو قرب المياه الراكدة؟",
+        "هل ظهرت أعراض عصبية كالتشوش أو ضعف في الأطراف؟",
+        "هل العمر فوق 60 سنة أو يعاني من ضعف مناعي؟"
+      ],
+      "key_tests": [
+        "WNV IgM serology (serum + CSF)",
+        "PCR (early viremia)",
+        "CSF analysis (lymphocytic pleocytosis)",
+        "MRI brain (encephalitis)"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Dhi_Qar",
+        "Diyala",
+        "Misan"
+      ],
+      "differentials_to_exclude": [
+        "herpes_encephalitis",
+        "bacterial_meningitis",
+        "rabies",
+        "enteroviral_meningitis",
+        "GBS"
+      ]
+    },
+    {
+      "id": "mumps",
+      "name_ar": "النكاف",
+      "name_en": "Mumps",
+      "icd10": "B26",
+      "iraq_context": "Mumps outbreaks occur in Iraq despite MMR availability, as vaccination coverage is incomplete, especially in conflict-affected areas. Orchitis in post-pubertal males (20-30%) → risk of infertility. Meningitis/encephalitis possible. Schools and military barracks are high-risk settings.",
+      "iraq_incidence_per_100k": 18.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "parotid_swelling",
+        "jaw_swelling",
+        "facial_swelling",
+        "fever",
+        "orchitis",
+        "testicular_pain",
+        "headache_stiff_neck",
+        "hearing_loss",
+        "school_outbreak",
+        "young_adult_fever_swelling"
+      ],
+      "presentation_pattern": "Painful swelling of parotid gland (one or both sides) + fever + malaise. 1-3 days pre-swelling: myalgia, headache, low fever. Post-pubertal male: orchitis (painful testicular swelling) — bilateral in 15-30% → infertility risk. Meningitis in 10%.",
+      "screening_questions_ar": [
+        "هل يوجد تورم وألم في منطقة الفك أو أمام الأذنين؟",
+        "هل يعاني الشاب من ألم في الخصية مع تورم؟",
+        "هل تم تلقي لقاح MMR؟ وكم جرعة؟"
+      ],
+      "key_tests": [
+        "Mumps IgM serology",
+        "Buccal swab PCR (most sensitive early)",
+        "Urine PCR",
+        "CBC (leukopenia, lymphocytosis)",
+        "Amylase (elevated)"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "low_MMR_coverage_areas"
+      ],
+      "differentials_to_exclude": [
+        "bacterial_parotitis",
+        "lymphoma",
+        "salivary_gland_stone",
+        "HIV_parotitis",
+        "epididymo_orchitis"
+      ]
+    },
+    {
+      "id": "rubella_crs",
+      "name_ar": "الحصبة الألمانية ومتلازمة الحصبة الألمانية الخلقية",
+      "name_en": "Rubella & Congenital Rubella Syndrome (CRS)",
+      "icd10": "B06 / P35.0",
+      "iraq_context": "Rubella remains a risk in Iraq. CRS is a major concern — deaf-blind-heart defect triad in newborns. MMR vaccination coverage gaps leave young women susceptible. Rubella in first trimester → 90% CRS risk. Iraq has had rubella outbreaks post-conflict.",
+      "iraq_incidence_per_100k": 12.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "maculopapular_rash",
+        "lymphadenopathy_posterior_auricular",
+        "arthralgia_young_woman",
+        "fever_low_grade",
+        "pregnancy_rash",
+        "newborn_cataracts",
+        "newborn_heart_defect",
+        "newborn_hearing_loss",
+        "newborn_petechiae",
+        "intrauterine_growth_restriction"
+      ],
+      "presentation_pattern": "Maternal: Mild rash + posterior auricular lymphadenopathy + low fever + arthralgia. HIGH ALERT if in first trimester of pregnancy. CRS triad: Cataracts + Sensorineural deafness + Congenital heart defect (PDA, pulmonary artery stenosis). Petechiae ('blueberry muffin' rash) in newborn.",
+      "screening_questions_ar": [
+        "هل الأم في الحمل الأول أو تخطط للحمل؟ ما هو تاريخ التطعيم بلقاح MMR؟",
+        "هل ظهر طفح جلدي خلال فترة الحمل؟",
+        "للمولود: هل يوجد إعتام في العين أو مشكلة في القلب أو ضعف في السمع؟"
+      ],
+      "key_tests": [
+        "Rubella IgM/IgG (serology)",
+        "PCR throat/nasal swab",
+        "Prenatal: amniocentesis PCR if suspected",
+        "Newborn CRS: rubella IgM + ophthalmology + cardiology + audiology"
+      ],
+      "seasonal_peak": [
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "low_MMR_coverage_areas"
+      ],
+      "differentials_to_exclude": [
+        "measles",
+        "roseola",
+        "scarlet_fever",
+        "parvovirus_B19",
+        "drug_rash"
+      ]
+    },
+    {
+      "id": "varicella",
+      "name_ar": "جدري الماء (الحماق)",
+      "name_en": "Varicella (Chickenpox)",
+      "icd10": "B01",
+      "iraq_context": "Varicella vaccine not in Iraq national schedule. Nearly universal childhood infection. Adults (especially immunocompromised, pregnant women) at risk of severe varicella pneumonia. Secondary bacterial skin infections very common. Herpes zoster (shingles) reactivation prevalent in adults.",
+      "iraq_incidence_per_100k": 320.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "vesicular_rash",
+        "pruritic_rash",
+        "rash_different_stages",
+        "fever",
+        "malaise",
+        "headache",
+        "pregnancy_rash",
+        "dermatomal_rash",
+        "vesicular_pain",
+        "immunocompromised_vesicular"
+      ],
+      "presentation_pattern": "Crops of vesicles (dew drops on rose petal) at different stages simultaneously. Pruritic. Trunk → face → limbs. Fever + malaise preceding by 1-2 days. SEVERE in: adults, pregnant women (pneumonia), immunocompromised (disseminated), neonates. Herpes Zoster: unilateral dermatomal painful vesicular rash.",
+      "screening_questions_ar": [
+        "هل هناك طفح على شكل حبوب بها سائل تظهر على مراحل مختلفة في نفس الوقت؟",
+        "هل الشخص حامل أو يعاني من ضعف مناعة؟",
+        "هل الطفح يؤلم ويلتزم جانباً واحداً من الجسم (لدى الكبار)؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis (typical rash)",
+        "Tzanck smear (multinucleated giant cells)",
+        "VZV PCR (vesicle fluid)",
+        "Serology (IgM/IgG)"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "smallpox_surveillance",
+        "hand_foot_mouth",
+        "impetigo",
+        "monkeypox_surveillance",
+        "rickettsialpox"
+      ]
+    },
+    {
+      "id": "hand_foot_mouth_disease",
+      "name_ar": "متلازمة اليد والقدم والفم",
+      "name_en": "Hand, Foot and Mouth Disease (HFMD)",
+      "icd10": "B08.4",
+      "iraq_context": "Common childhood illness in Iraq, caused by Enterovirus 71 (EV71) and Coxsackievirus A16. EV71 strains can cause severe neurological complications (encephalitis, acute flaccid paralysis) in children. Outbreaks in nurseries and schools.",
+      "iraq_incidence_per_100k": 45.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "oral_ulcers",
+        "vesicular_oral",
+        "rash_palms_soles",
+        "fever_child",
+        "drooling",
+        "refusal_to_eat",
+        "vesicles_hands_feet",
+        "neurological_after_HFMD",
+        "child_rash_nursery"
+      ],
+      "presentation_pattern": "Child with: fever + painful oral ulcers (inside mouth) + vesicular rash on palms and soles. Drooling (pain prevents swallowing). 3-7 days duration. WARNING SIGNS for EV71 neurological complications: persistent high fever after day 3, myoclonus (limb jerking), ataxia, altered consciousness.",
+      "screening_questions_ar": [
+        "هل يوجد قروح داخل الفم مع حبوب بها سائل على اليدين والقدمين؟",
+        "هل الطفل في روضة أو يلعب مع أطفال لديهم نفس الأعراض؟",
+        "هل ظهرت أعراض عصبية كالرجفة أو صعوبة في المشي؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis",
+        "Throat/rectal swab PCR (enterovirus typing)",
+        "CSF if neurological symptoms",
+        "CBC (leukocytosis with EV71)"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "herpangina",
+        "herpes_gingivostomatitis",
+        "aphthous_ulcers",
+        "varicella",
+        "impetigo"
+      ]
+    },
+    {
+      "id": "infectious_mononucleosis",
+      "name_ar": "داء كثرة الوحيدات المعدية (إبشتاين-بار)",
+      "name_en": "Infectious Mononucleosis (EBV)",
+      "icd10": "B27.0",
+      "iraq_context": "EBV ubiquitous in Iraq; primary infection usually occurs in childhood (often subclinical). Classic IM presentation more common in adolescents/young adults from higher socioeconomic background who escaped early childhood exposure. Splenic rupture risk — avoid contact sports.",
+      "iraq_incidence_per_100k": 25.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "sore_throat_severe",
+        "lymphadenopathy_posterior",
+        "splenomegaly",
+        "fever",
+        "fatigue_extreme",
+        "tonsillitis_exudate",
+        "rash_after_amoxicillin",
+        "periorbital_edema",
+        "hepatitis_young_adult"
+      ],
+      "presentation_pattern": "Young adult with: severe sore throat + massive lymphadenopathy (especially posterior cervical) + extreme fatigue + splenomegaly. KEY CLUE: Gave amoxicillin/ampicillin for suspected bacterial tonsillitis → generalized maculopapular rash (90%). Risk: splenic rupture with trauma.",
+      "screening_questions_ar": [
+        "هل أُخذت مضادات حيوية للحنجرة وظهر طفح جلدي بعدها؟",
+        "هل الشخص شاب أو مراهق يعاني من إرهاق شديد مع التهاب حلق وتضخم غدد؟",
+        "هل يمارس رياضات تلامسية مؤخراً (خطر تمزق الطحال)؟"
+      ],
+      "key_tests": [
+        "Monospot test (heterophile antibodies)",
+        "EBV IgM/IgG serology (if monospot negative)",
+        "CBC (atypical lymphocytes >10%)",
+        "LFTs (mild hepatitis)",
+        "Abdominal ultrasound (splenomegaly)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "urban",
+        "Baghdad",
+        "Erbil"
+      ],
+      "differentials_to_exclude": [
+        "bacterial_tonsillitis",
+        "CMV_mononucleosis",
+        "toxoplasmosis",
+        "HIV_acute",
+        "lymphoma"
+      ]
+    },
+    {
+      "id": "rotavirus_gastroenteritis",
+      "name_ar": "إسهال فيروس الروتا (الإسهال الوبائي عند الأطفال)",
+      "name_en": "Rotavirus Gastroenteritis",
+      "icd10": "A08.0",
+      "iraq_context": "Leading cause of severe diarrhea in Iraqi children under 5. Peak in winter (October-February). Causes up to 40% of childhood diarrhea hospitalizations. Rotavirus vaccine (Rotarix/RotaTeq) added to Iraq schedule but coverage incomplete. Highly contagious — nursery/family clusters.",
+      "iraq_incidence_per_100k": 950.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "profuse_watery_diarrhea_child",
+        "vomiting_child",
+        "fever_child",
+        "dehydration_child",
+        "winter_diarrhea",
+        "child_under_5_gastroenteritis",
+        "nursery_cluster_diarrhea",
+        "pale_watery_stool"
+      ],
+      "presentation_pattern": "Child 6 months - 5 years: sudden onset vomiting (1-2 days) followed by profuse watery diarrhea (pale/whitish, no blood) + fever. Winter peak. Rapid dehydration (sunken eyes, dry mouth, reduced urine). Cluster of cases in daycare/family common.",
+      "screening_questions_ar": [
+        "كم عمر الطفل؟ وهل الإسهال مائي وغزير بدون دم؟",
+        "هل بدأ الأمر بالقيء أولاً ثم جاء الإسهال؟",
+        "هل يوجد أطفال آخرون في نفس الروضة أو البيت لديهم نفس الأعراض؟"
+      ],
+      "key_tests": [
+        "Rapid Rotavirus antigen test (stool)",
+        "Stool PCR (reference)",
+        "Assess dehydration clinically (Gorelick score)",
+        "Electrolytes if moderate-severe"
+      ],
+      "seasonal_peak": [
+        "winter"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "cholera",
+        "ETEC",
+        "cryptosporidiosis",
+        "giardiasis",
+        "salmonellosis",
+        "intussusception"
+      ]
+    },
+    {
+      "id": "murine_typhus_rickettsiosis",
+      "name_ar": "حمى التيفوس الفأري والريكيتسيا",
+      "name_en": "Murine Typhus & Rickettsiosis",
+      "icd10": "A75.2",
+      "iraq_context": "Rickettsia typhi (murine typhus) and R. conorii (Mediterranean spotted fever) present in Iraq. Transmitted by rat fleas and ticks respectively. Under-recognized and often misdiagnosed as viral fever or typhoid. Doxycycline dramatically effective — must not miss this diagnosis.",
+      "iraq_incidence_per_100k": 4.2,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "fever_rat_exposure",
+        "rash_eschar",
+        "fever_tick_bite",
+        "fever_no_source",
+        "relative_bradycardia",
+        "headache_fever",
+        "maculopapular_rash_trunk",
+        "eschar_painless",
+        "rat_flea_exposure"
+      ],
+      "presentation_pattern": "Sustained fever + severe headache + rash (maculopapular, sparing face and palms — opposite of RMSF). Possible eschar (painless black scab) at bite site. Relative bradycardia. History of rat exposure (warehouses, food stores) or tick bite. Responds dramatically to doxycycline within 24-48 hours.",
+      "screening_questions_ar": [
+        "هل تعرض للجرذان أو الفئران في المنزل أو العمل؟",
+        "هل تعرض للقراد مؤخراً؟ وهل يوجد جرح أسود صغير في الجسم؟",
+        "هل الحمى مستمرة لأكثر من 5 أيام مع صداع شديد وطفح جلدي؟"
+      ],
+      "key_tests": [
+        "Weil-Felix test (OX-19/OX-2)",
+        "Rickettsia IgM/IgG serology (IFA — gold standard)",
+        "PCR (eschar biopsy if present)",
+        "CBC (thrombocytopenia, leukopenia)"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Baghdad",
+        "rural_areas",
+        "grain_stores"
+      ],
+      "differentials_to_exclude": [
+        "typhoid",
+        "brucellosis",
+        "dengue",
+        "viral_fever",
+        "leptospirosis"
+      ]
+    },
+    {
+      "id": "anthrax",
+      "name_ar": "الجمرة الخبيثة (أنثراكس)",
+      "name_en": "Anthrax (Bacillus anthracis)",
+      "icd10": "A22",
+      "iraq_context": "Agricultural Iraq. Anthrax spores persist in soil for decades. Cattle, sheep, goats are reservoir. Cutaneous anthrax (95% of human cases) from handling infected livestock/hides. Inhalation and GI anthrax rare but fatal. Iraq has had outbreaks in Diyala, Salah ad-Din.",
+      "iraq_incidence_per_100k": 0.8,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "painless_skin_ulcer_eschar",
+        "black_eschar_livestock_exposure",
+        "neck_edema_massive",
+        "mediastinal_widening",
+        "hemorrhagic_meningitis",
+        "livestock_handler_skin_lesion",
+        "butcher_skin_lesion",
+        "severe_chest_pain_livestock_worker"
+      ],
+      "presentation_pattern": "Cutaneous: painless papule → vesicle → black eschar + surrounding massive edema. Farmer/butcher/hide worker. Inhalation: initial flu-like → rapid deterioration → mediastinal widening → hemorrhagic meningitis → septic shock (95% fatal if untreated).",
+      "screening_questions_ar": [
+        "هل يعمل الشخص مع الحيوانات أو يتعامل مع جلود الحيوانات أو صوفها؟",
+        "هل مات حيوان في القطيع مؤخراً؟",
+        "هل الجرح أو الحبة غير مؤلمة مع تورم شديد حول المنطقة؟"
+      ],
+      "key_tests": [
+        "Blood culture (B. anthracis)",
+        "Wound/lesion swab culture + gram stain",
+        "PCR (reference lab)",
+        "CXR (mediastinal widening — inhalation)",
+        "Notify public health IMMEDIATELY"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Diyala",
+        "Salah_ad_Din",
+        "Nineveh",
+        "agricultural_areas"
+      ],
+      "differentials_to_exclude": [
+        "cutaneous_leishmaniasis",
+        "ecthyma",
+        "staph_skin_infection",
+        "spider_bite"
+      ]
+    },
+    {
+      "id": "diphtheria",
+      "name_ar": "الدفتيريا (الخناق)",
+      "name_en": "Diphtheria",
+      "icd10": "A36",
+      "iraq_context": "Diphtheria resurged in Iraq post-2014 due to vaccination disruptions in conflict zones. Particularly in Nineveh, Anbar. DTP/DTaP coverage fell below 50% in some areas. Pseudomembrane and airway obstruction are the hallmarks. Myocarditis and neuropathy are late complications.",
+      "iraq_incidence_per_100k": 1.5,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "throat_pseudomembrane",
+        "grayish_throat_coating",
+        "stridor",
+        "neck_swelling_bullneck",
+        "hoarse_voice",
+        "barking_cough",
+        "low_grade_fever_throat",
+        "cardiac_arrhythmia_sore_throat",
+        "palatal_palsy",
+        "incomplete_vaccination"
+      ],
+      "presentation_pattern": "Insidious onset sore throat + LOW-GRADE fever (not high — unlike bacterial tonsillitis) + thick grayish-white ADHERENT pseudomembrane on tonsils/pharynx that BLEEDS when removed + 'bull neck' edema. Stridor if laryngeal involvement. LATE: myocarditis (ECG changes), cranial neuropathies.",
+      "screening_questions_ar": [
+        "هل يوجد طبقة رمادية بيضاء لاصقة على اللوزتين أو الحلق تنزف عند محاولة إزالتها؟",
+        "هل تطعيمات DTP مكتملة؟ وهل عاش الطفل في منطقة تأثرت بالنزاعات المسلحة؟",
+        "هل يوجد تورم في الرقبة مع صوت أبح أو صعوبة في التنفس؟"
+      ],
+      "key_tests": [
+        "Throat/nose swab culture (Corynebacterium diphtheriae)",
+        "PCR (toxin gene)",
+        "ECG (myocarditis screening)",
+        "NOTIFY PUBLIC HEALTH IMMEDIATELY",
+        "Antitoxin (clinical emergency — do not wait for culture)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Nineveh",
+        "Anbar",
+        "Salah_ad_Din",
+        "conflict_affected_areas"
+      ],
+      "differentials_to_exclude": [
+        "bacterial_tonsillitis",
+        "peritonsillar_abscess",
+        "epiglottitis",
+        "croup",
+        "viral_pharyngitis"
+      ]
+    },
+    {
+      "id": "neonatal_tetanus",
+      "name_ar": "الكزاز الوليدي",
+      "name_en": "Neonatal Tetanus",
+      "icd10": "A33",
+      "iraq_context": "Iraq target for neonatal tetanus elimination. Cases still occur in rural areas from unclean cord cutting. Unvaccinated mothers (TT/Td) = no passive immunity transfer. Case fatality rate 70-100% without ICU. Jaw stiffness + spasms in first 3-28 days of life.",
+      "iraq_incidence_per_100k": 0.9,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "neonatal_jaw_stiffness",
+        "trismus_newborn",
+        "inability_to_suck_newborn",
+        "neonatal_spasms",
+        "opisthotonos_newborn",
+        "home_delivery_unclean",
+        "umbilical_stump_infection",
+        "neonatal_rigidity"
+      ],
+      "presentation_pattern": "Neonate 3-28 days old. History of home delivery or unclean cord cutting. Progressive: trismus (jaw lock) → inability to suck/feed → generalized rigidity → opisthotonus → spasms triggered by any stimulus (light, sound, touch). Mother unvaccinated with TT.",
+      "screening_questions_ar": [
+        "أين تمت الولادة؟ وهل كانت في المنزل؟",
+        "هل الأم حصلت على تطعيمات الكزاز (TT) خلال الحمل؟",
+        "هل الرضيع لا يستطيع الرضاعة ويوجد شد في فكه أو تشنجات؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis (no lab test confirms)",
+        "Wound culture (umbilicus)",
+        "Notify public health",
+        "ICU transfer IMMEDIATELY"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "rural_areas",
+        "displacement_camps",
+        "Nineveh",
+        "Anbar",
+        "areas_with_low_TT_coverage"
+      ],
+      "differentials_to_exclude": [
+        "hypocalcemia_neonatal",
+        "hypoglycemia",
+        "meningitis_neonatal",
+        "sepsis",
+        "drug_withdrawal"
+      ]
+    },
+    {
+      "id": "group_a_streptococcal_pharyngitis",
+      "name_ar": "التهاب الحلق العقدي (العقدية الحالة للدم)",
+      "name_en": "Group A Streptococcal (GAS) Pharyngitis",
+      "icd10": "J02.0",
+      "iraq_context": "Extremely common in Iraqi children. Critical to treat promptly — untreated GAS pharyngitis leads to Acute Rheumatic Fever (high incidence in Iraq) and Post-streptococcal glomerulonephritis. Many cases under-treated or treated with incorrect antibiotics. School-age children are the primary reservoir.",
+      "iraq_incidence_per_100k": 1200.0,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "sore_throat",
+        "odynophagia",
+        "tonsillar_exudate",
+        "fever_sudden",
+        "cervical_lymphadenopathy_anterior",
+        "school_age_child_fever",
+        "no_cough",
+        "strawberry_tongue",
+        "scarlatiniform_rash",
+        "strep_contact"
+      ],
+      "presentation_pattern": "School-age child: sudden fever + severe sore throat (odynophagia) + tonsillar exudate + tender anterior cervical lymphadenopathy + NO COUGH (cough suggests viral). Strawberry tongue + sandpaper rash = Scarlet Fever. CENTOR score ≥3 → treat empirically (or rapid strep test).",
+      "screening_questions_ar": [
+        "هل الألم في الحلق شديد مع صعوبة في البلع وحمى وبدون سعال؟",
+        "هل يوجد بياض على اللوزتين أو تضخم في الغدد في الرقبة الأمامية؟",
+        "هل هناك أطفال آخرون في نفس المدرسة أو البيت لديهم نفس الأعراض؟"
+      ],
+      "key_tests": [
+        "Rapid Strep Antigen Test (RSAT)",
+        "Throat culture (gold standard)",
+        "ASOT (post-infection, for ARF/PSGN)",
+        "Treat with penicillin/amoxicillin x 10 days"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "viral_pharyngitis",
+        "EBV_mononucleosis",
+        "diphtheria",
+        "peritonsillar_abscess",
+        "herpangina"
+      ]
+    },
+    {
+      "id": "community_acquired_pneumonia",
+      "name_ar": "الالتهاب الرئوي المكتسب من المجتمع",
+      "name_en": "Community-Acquired Pneumonia (CAP)",
+      "icd10": "J18",
+      "iraq_context": "Leading cause of child mortality in Iraq. S. pneumoniae most common bacterial pathogen. Mycobacterium tuberculosis must be excluded in adults with sub-acute pneumonia. Klebsiella pneumoniae causes severe necrotizing pneumonia in diabetics/alcoholics. Atypical organisms (Mycoplasma, Chlamydia) in young adults.",
+      "iraq_incidence_per_100k": 1100.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "fever",
+        "productive_cough",
+        "dyspnea",
+        "pleuritic_chest_pain",
+        "crackles",
+        "bronchial_breath_sounds",
+        "hypoxia",
+        "lobar_consolidation",
+        "tachypnea_child",
+        "hemoptysis"
+      ],
+      "presentation_pattern": "Fever + productive cough + dyspnea + chest pain + crackles on auscultation. Child: tachypnea is key (>60/min <2mo, >50/min 2-12mo, >40/min 1-5yr) + nasal flaring + chest indrawing. Use CRB-65 for severity in adults. Must EXCLUDE TB in sub-acute presentation.",
+      "screening_questions_ar": [
+        "هل الحمى مع السعال وصعوبة التنفس بدأت فجأة؟",
+        "هل الطفل يتنفس بسرعة أكبر من المعتاد أو يسحب صدره للداخل؟",
+        "هل السعال مستمر أكثر من 3 أسابيع؟ (استبعاد السل)"
+      ],
+      "key_tests": [
+        "CXR (PA + lateral)",
+        "CBC + CRP + Procalcitonin",
+        "Blood culture (before antibiotics)",
+        "Sputum C&S + AFB smear if sub-acute",
+        "SpO2",
+        "S. pneumoniae urine antigen"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "tuberculosis",
+        "COVID-19",
+        "influenza_pneumonia",
+        "pulmonary_embolism",
+        "heart_failure"
+      ]
+    },
+    {
+      "id": "listeriosis",
+      "name_ar": "داء الليستيريا",
+      "name_en": "Listeriosis",
+      "icd10": "A32",
+      "iraq_context": "Under-recognized in Iraq. Listeria monocytogenes in unpasteurized dairy, deli meats, soft cheeses. Critical risk groups: pregnant women (stillbirth, neonatal meningitis), elderly, immunocompromised. Pregnant Iraqi women consuming homemade dairy products at high risk.",
+      "iraq_incidence_per_100k": 0.5,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "fever_pregnancy",
+        "flu_like_pregnancy",
+        "neonatal_meningitis",
+        "neonatal_sepsis",
+        "meningitis_elderly",
+        "meningitis_immunocompromised",
+        "gastroenteritis_soft_cheese",
+        "bacteremia_no_source_elderly"
+      ],
+      "presentation_pattern": "Pregnant woman: flu-like illness → fetal loss/stillbirth/preterm labor OR neonatal sepsis/meningitis. Elderly/immunocompromised: bacteremia + meningitis (CSF: monocytic pleocytosis, gram-positive rods on Gram stain). History of soft cheese, cold deli foods, unpasteurized dairy.",
+      "screening_questions_ar": [
+        "هل الحامل تناولت جبناً طرياً أو منتجات ألبان غير مبسترة مؤخراً؟",
+        "هل هناك مولود جديد مريض مع حمى أو تيبس الرقبة؟",
+        "هل المريض كبير في السن أو يعاني من ضعف مناعي ولديه حمى مجهولة السبب؟"
+      ],
+      "key_tests": [
+        "Blood culture (aerobic)",
+        "CSF culture + gram stain",
+        "Neonatal: blood + CSF + surface cultures",
+        "Avoid cephalosporins (naturally resistant) — use ampicillin"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "GBS_neonatal",
+        "E_coli_meningitis",
+        "enterococcal_bacteremia",
+        "crypto_meningitis"
+      ]
+    },
+    {
+      "id": "beta_thalassemia",
+      "name_ar": "بيتا ثلاسيميا (فقر الدم البحر متوسطي)",
+      "name_en": "Beta-Thalassemia",
+      "icd10": "D56.1",
+      "iraq_context": "Iraq has one of the highest beta-thalassemia carrier rates in the Arab world (5-8% carrier rate). Common in southern Iraq (Basra, Misan, Dhi Qar). Major cause of transfusion-dependent anemia in children. Iron overload from transfusions is a major complication. Premarital screening mandated but compliance inconsistent.",
+      "iraq_incidence_per_100k": 8.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "pallor_child",
+        "severe_anemia_child",
+        "splenomegaly_child",
+        "jaundice_chronic",
+        "failure_to_thrive",
+        "frontal_bossing",
+        "maxillary_overgrowth",
+        "transfusion_dependent",
+        "family_history_thalassemia",
+        "consanguineous_parents"
+      ],
+      "presentation_pattern": "Child (6-24 months): pallor + hepatosplenomegaly + failure to thrive + jaundice. Thalassemic facies (frontal bossing, maxillary prominence from bone marrow expansion). Severe microcytic hypochromic anemia (Hb <7). Consanguinity often present in Iraqi families.",
+      "screening_questions_ar": [
+        "هل هناك تاريخ عائلي لفقر الدم المزمن أو الثلاسيميا أو الأطفال الذين يحتاجون نقل دم منتظم؟",
+        "هل الوالدان أقارب (زواج أقارب)؟",
+        "هل الطفل شاحب جداً ويعاني من تضخم في الطحال والكبد؟"
+      ],
+      "key_tests": [
+        "CBC (severe microcytic anemia, low MCV/MCH)",
+        "Peripheral blood smear (target cells, nucleated RBCs)",
+        "Hemoglobin electrophoresis (absent/reduced HbA, elevated HbF, HbA2 >3.5% in trait)",
+        "Serum ferritin",
+        "Genetic testing"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Misan",
+        "Dhi_Qar",
+        "Wasit",
+        "southern_Iraq"
+      ],
+      "differentials_to_exclude": [
+        "iron_deficiency_anemia",
+        "sickle_cell_disease",
+        "G6PD_hemolysis",
+        "hemolytic_anemia_other"
+      ]
+    },
+    {
+      "id": "sickle_cell_disease",
+      "name_ar": "فقر الدم المنجلي",
+      "name_en": "Sickle Cell Disease",
+      "icd10": "D57",
+      "iraq_context": "Present in Iraq, especially in southern governorates and populations with African ancestry (Basra port history). Painful vaso-occlusive crises are the hallmark. Acute chest syndrome is the leading cause of death. Splenic sequestration crises in young children. Requires specialized management with hydroxyurea.",
+      "iraq_incidence_per_100k": 2.5,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "severe_bone_pain",
+        "chest_pain_anemia",
+        "stroke_young",
+        "priapism",
+        "splenomegaly_rapid",
+        "fever_sickle_cell",
+        "dactylitis_infant",
+        "pallor_episodic",
+        "jaundice_episodic",
+        "avascular_necrosis_hip"
+      ],
+      "presentation_pattern": "Known/suspected SCD: episodic severe bone pain (back, chest, extremities). Acute Chest Syndrome: chest pain + fever + new CXR infiltrate (emergency). Splenic sequestration: sudden splenomegaly + pallor + shock. Stroke in a child. Dactylitis (painful hand/foot swelling) in infants.",
+      "screening_questions_ar": [
+        "هل الشخص مصاب بفقر دم منجلي أو هل هناك تاريخ عائلي له؟",
+        "هل الألم شديد ومفاجئ في العظام أو الصدر؟",
+        "هل يوجد شحوب مفاجئ أو تضخم سريع في الطحال؟"
+      ],
+      "key_tests": [
+        "Hemoglobin electrophoresis",
+        "CBC + reticulocytes",
+        "Peripheral smear (sickle cells)",
+        "CXR (acute chest)",
+        "Blood culture + broad-spectrum antibiotics if febrile (functional asplenia)"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "cold_weather_triggers_crisis"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "southern_Iraq",
+        "African_descent_communities"
+      ],
+      "differentials_to_exclude": [
+        "osteomyelitis",
+        "septic_arthritis",
+        "pulmonary_embolism",
+        "acute_abdomen"
+      ]
+    },
+    {
+      "id": "iron_deficiency_anemia",
+      "name_ar": "فقر الدم بنقص الحديد",
+      "name_en": "Iron Deficiency Anemia (IDA)",
+      "icd10": "D50",
+      "iraq_context": "The most common nutritional deficiency in Iraq. Affects up to 30-40% of children under 5 and 25-35% of pregnant women. Contributing factors: poverty, food insecurity, conflict-related malnutrition, early cow's milk introduction, parasitic infections, heavy menstruation. Often missed and undertreated.",
+      "iraq_incidence_per_100k": 2800.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "pallor",
+        "fatigue",
+        "weakness",
+        "pica",
+        "pagophagia",
+        "koilonychia",
+        "angular_stomatitis",
+        "glossitis",
+        "tachycardia_anemia",
+        "poor_school_performance",
+        "heavy_menstruation",
+        "pregnancy_anemia"
+      ],
+      "presentation_pattern": "Gradual pallor + fatigue + weakness. Pica (eating ice/soil/dirt = pagophagia/geophagia) is pathognomonic. Koilonychia (spoon nails). Angular stomatitis. Poor school performance in children. Heavy menstrual bleeding or recent pregnancy. Parasitic infections as co-cause.",
+      "screening_questions_ar": [
+        "هل تشعر بالتعب والشحوب وتريد أكل أشياء غريبة كالثلج أو الطين؟",
+        "هل الدورة الشهرية غزيرة؟ أو هل أنتِ حامل أو أرضعتِ مؤخراً؟",
+        "هل الطفل يشرب كميات كبيرة من الحليب البقري ولا يأكل لحوماً؟"
+      ],
+      "key_tests": [
+        "CBC (low Hb, low MCV, low MCH)",
+        "Serum ferritin (most sensitive, <12 μg/L)",
+        "Serum iron + TIBC (iron low, TIBC high)",
+        "Peripheral smear (microcytic hypochromic)",
+        "Stool O&P (exclude parasites)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "rural",
+        "displacement_camps"
+      ],
+      "differentials_to_exclude": [
+        "thalassemia_trait",
+        "anemia_of_chronic_disease",
+        "sideroblastic_anemia",
+        "lead_poisoning"
+      ]
+    },
+    {
+      "id": "glucose6phosphate_dehydrogenase_hemolytic_crisis",
+      "name_ar": "أزمة انحلال الدم في نقص G6PD",
+      "name_en": "G6PD Hemolytic Crisis",
+      "icd10": "D55.0",
+      "iraq_context": "G6PD deficiency affects ~8-12% of Iraqi males (X-linked). Triggers: fava beans (fool), primaquine, dapsone, nitrofurantoin, rasburicase, high-dose aspirin, infection, mothballs. Critical: giving primaquine for malaria treatment to unscreened Iraqi patient can cause life-threatening hemolysis. MUST screen before prescribing.",
+      "iraq_incidence_per_100k": 60.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "acute_hemolysis",
+        "jaundice_sudden",
+        "dark_urine_sudden",
+        "pallor_sudden",
+        "back_pain_hemolysis",
+        "jaundice_after_fava_beans",
+        "jaundice_after_medication",
+        "neonatal_jaundice_severe",
+        "hemoglobinuria"
+      ],
+      "presentation_pattern": "Acute onset: jaundice + dark/cola-colored urine + pallor + back/abdominal pain within 24-72 hours of trigger (fava beans, infection, oxidant drug). Can be severe enough to require transfusion. Neonates: severe prolonged jaundice. KEY ALERT: screen ALL Iraqi males for G6PD BEFORE prescribing primaquine, dapsone, nitrofurantoin.",
+      "screening_questions_ar": [
+        "هل تناول الشخص فولاً أو دواءً جديداً قبل ظهور الأعراض بيوم أو يومين؟",
+        "هل البول أصبح داكن اللون (مثل الشاي أو الكولا)؟",
+        "هل هناك تاريخ عائلي لنقص G6PD أو ظهور يرقان بعد أكل الفول؟"
+      ],
+      "key_tests": [
+        "G6PD enzyme assay (fluorescent spot test — note: do during recovery, not crisis)",
+        "CBC + reticulocytes (Hb drop + reticulocytosis)",
+        "Peripheral smear (bite cells, Heinz bodies)",
+        "Urinalysis (hemoglobinuria)",
+        "Bilirubin (unconjugated elevated)"
+      ],
+      "seasonal_peak": [
+        "spring_fava_bean_season"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "Mediterranean_descent"
+      ],
+      "differentials_to_exclude": [
+        "autoimmune_hemolytic_anemia",
+        "hereditary_spherocytosis",
+        "sickle_crisis",
+        "thalassemia_major",
+        "transfusion_reaction"
+      ]
+    },
+    {
+      "id": "vitamin_d_deficiency",
+      "name_ar": "نقص فيتامين د (الكساح والتشنجات الكلسية)",
+      "name_en": "Vitamin D Deficiency & Rickets",
+      "icd10": "E55",
+      "iraq_context": "Paradoxically extremely common in sun-rich Iraq. Cultural dress (full covering), indoor lifestyle, skin pigmentation, low dietary intake, extended breastfeeding without supplementation, and air quality all contribute. Up to 70-80% of women and children in some Iraqi studies are vitamin D deficient. Rickets is still reported in Iraqi children.",
+      "iraq_incidence_per_100k": 3200.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "bone_pain",
+        "myalgia",
+        "fatigue",
+        "bow_legs_child",
+        "delayed_walking",
+        "delayed_tooth_eruption",
+        "hypocalcemic_seizures_infant",
+        "carpopedal_spasm",
+        "depression",
+        "muscle_weakness",
+        "falls_elderly"
+      ],
+      "presentation_pattern": "Child: bow legs/knock knees + delayed walking + frontal bossing + rachitic rosary (costochondral beading) + delayed fontanelle closure. Infant: hypocalcemic seizures. Adult/adolescent (especially veiled women): bone pain + myalgia + fatigue + depression. Muscle weakness + falls in elderly.",
+      "screening_questions_ar": [
+        "هل الطفل يمشي أو يحبو بشكل طبيعي؟ وهل ساقيه معوجتان؟",
+        "هل المرأة ترتدي الغطاء الكامل وقليلاً ما تتعرض للشمس؟",
+        "هل يتناول الطفل مكملات فيتامين د أثناء الرضاعة الطبيعية؟"
+      ],
+      "key_tests": [
+        "Serum 25-OH Vitamin D (deficient <20 ng/mL, insufficient 20-30)",
+        "Calcium, Phosphorus, ALP",
+        "PTH (elevated in deficiency)",
+        "X-ray wrists/knees (rickets: cupping, fraying of metaphyses)"
+      ],
+      "seasonal_peak": [
+        "winter_peak_deficiency"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "hypocalcemia_other_causes",
+        "celiac_malabsorption",
+        "renal_osteodystrophy",
+        "hyperparathyroidism"
+      ]
+    },
+    {
+      "id": "iodine_deficiency_goiter",
+      "name_ar": "نقص اليود وتضخم الغدة الدرقية (الدراق)",
+      "name_en": "Iodine Deficiency & Endemic Goiter",
+      "icd10": "E01",
+      "iraq_context": "Northern and northeastern Iraq (Kurdish mountainous regions, Sulaymaniyah, Erbil, Dohuk) lie in the classical 'goiter belt.' Soil/water iodine depletion. Affects thyroid development in fetuses and newborns — cretinism risk. Iraq iodized salt programs exist but distribution inconsistent.",
+      "iraq_incidence_per_100k": 180.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "neck_swelling",
+        "goiter",
+        "hypothyroidism_symptoms",
+        "fatigue",
+        "weight_gain",
+        "cold_intolerance",
+        "constipation",
+        "dry_skin",
+        "cognitive_impairment",
+        "neonatal_hypothyroidism",
+        "pregnancy_hypothyroidism"
+      ],
+      "presentation_pattern": "Visible/palpable neck swelling (goiter) in person from northern Iraq. Hypothyroid symptoms: fatigue, weight gain, cold intolerance, constipation, dry skin, hair loss. In pregnancy: risk of fetal cretinism. Neonatal screening positive TSH.",
+      "screening_questions_ar": [
+        "هل هناك تضخم في الغدة الدرقية أو الرقبة؟",
+        "هل الشخص من المناطق الجبلية الشمالية (كردستان)؟",
+        "هل تستخدم ملحاً مضافاً إليه اليود؟"
+      ],
+      "key_tests": [
+        "TSH + Free T4 (primary screening)",
+        "Thyroid ultrasound",
+        "Urinary iodine (population screening)",
+        "Thyroid antibodies (exclude Hashimoto's)",
+        "Neonatal TSH screening"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Sulaymaniyah",
+        "Erbil",
+        "Dohuk",
+        "mountainous_areas"
+      ],
+      "differentials_to_exclude": [
+        "hashimotos_thyroiditis",
+        "multinodular_goiter",
+        "thyroid_cancer",
+        "autoimmune_hypothyroidism"
+      ]
+    },
+    {
+      "id": "protein_energy_malnutrition",
+      "name_ar": "سوء التغذية البروتيني الطاقوي (الكواشيوركور والمارسموس)",
+      "name_en": "Protein-Energy Malnutrition (Kwashiorkor / Marasmus)",
+      "icd10": "E40-E46",
+      "iraq_context": "Recurrent conflict and food insecurity cycles in Iraq maintain malnutrition rates above regional average. UNICEF data: ~7% of Iraqi children under 5 stunted, ~3% wasted. IDP camps in Nineveh, Anbar, Salah ad-Din have seen acute malnutrition. Kwashiorkor (protein-deficient) and Marasmus (total caloric deficit) both present.",
+      "iraq_incidence_per_100k": 350.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "failure_to_thrive",
+        "edema_child",
+        "hair_depigmentation",
+        "muscle_wasting",
+        "distended_abdomen",
+        "kwashiorkor_edema",
+        "extreme_thinness_child",
+        "IDP_camp_child",
+        "food_insecurity_child",
+        "skin_peeling_patches"
+      ],
+      "presentation_pattern": "Marasmus: severe wasting + 'skin and bones' + preserved consciousness + no edema. Kwashiorkor: edema (pitting, especially feet/legs) + distended abdomen + depigmented hair + skin peeling ('flaky paint' dermatosis) + irritability. Both: immunocompromised (infections are the usual presentation trigger). Mid-upper arm circumference (MUAC) < 11.5cm in children = severe acute malnutrition.",
+      "screening_questions_ar": [
+        "هل الطفل في مخيم نزوح أو منطقة تعاني من انعدام الغذاء؟",
+        "هل يوجد تورم في قدمي الطفل أو بطن منتفخ مع شحوب في الشعر؟",
+        "هل الطفل يرفض الأكل ولا يكتسب وزناً؟"
+      ],
+      "key_tests": [
+        "Anthropometry (weight-for-height, MUAC)",
+        "CBC (anemia)",
+        "Electrolytes (hypokalemia, hyponatremia)",
+        "Blood glucose (hypoglycemia risk)",
+        "Blood culture (sepsis screening)"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "post_conflict_displacement"
+      ],
+      "high_risk_governorates": [
+        "Nineveh",
+        "Anbar",
+        "Salah_ad_Din",
+        "displacement_camps"
+      ],
+      "differentials_to_exclude": [
+        "celiac_disease",
+        "cystic_fibrosis",
+        "chronic_infection",
+        "metabolic_disorder"
+      ]
+    },
+    {
+      "id": "organophosphate_chemical_exposure",
+      "name_ar": "التعرض للمواد الكيميائية والفوسفات العضوي (هجمات هلبجة وإرث الحرب)",
+      "name_en": "Organophosphate / Chemical Warfare Exposure",
+      "icd10": "T60.0",
+      "iraq_context": "Iraq has unique chemical warfare legacy: Halabja 1988 (mustard gas + nerve agents), Gulf War oil fires, Fallujah environmental contamination, agrochemical pesticide poisoning (widespread in agriculture). Delayed neurological and oncological sequelae are still presenting. Also acute pesticide poisoning common in farming areas.",
+      "iraq_incidence_per_100k": 5.5,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "miosis_pinpoint_pupils",
+        "excessive_secretions",
+        "bronchospasm_sudden",
+        "bradycardia_toxicological",
+        "seizures_acute",
+        "muscle_fasciculations",
+        "tear_gas_like_symptoms",
+        "pesticide_exposure_farmer",
+        "cluster_birth_defects",
+        "long_term_neurological_Fallujah"
+      ],
+      "presentation_pattern": "Acute OP poisoning: SLUDGE (Salivation, Lacrimation, Urination, Defecation, GI distress, Emesis) + miosis + bradycardia + bronchospasm + muscle fasciculations → paralysis. Chronic: neuropsychiatric symptoms in Gulf War veterans/survivors. Cancer clusters: leukemia, lymphoma in Fallujah children.",
+      "screening_questions_ar": [
+        "هل تعرض لمبيدات زراعية أو مواد كيميائية بشكل مهني؟",
+        "هل يعاني من تصغر في حدقة العين مع إفراز غير طبيعي؟",
+        "هل المريض من الفلوجة أو الأنبار ولديه إصابة بالسرطان أو عيوب خلقية في الأسرة؟"
+      ],
+      "key_tests": [
+        "RBC acetylcholinesterase (acute OP)",
+        "Plasma cholinesterase",
+        "Atropine challenge test",
+        "ECG (QTc, arrhythmia)",
+        "Blood/urine toxicology screen"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "agricultural_season"
+      ],
+      "high_risk_governorates": [
+        "Fallujah_Anbar",
+        "agricultural_areas",
+        "Halabja_area"
+      ],
+      "differentials_to_exclude": [
+        "carbamate_poisoning",
+        "botulism",
+        "myasthenia_gravis",
+        "SIADH",
+        "seizure_disorder"
+      ]
+    },
+    {
+      "id": "heavy_metal_toxicity_basra",
+      "name_ar": "التسمم بالمعادن الثقيلة (الرصاص والزئبق واليورانيوم المنضب - البصرة)",
+      "name_en": "Heavy Metal Toxicity (Lead, Mercury, Depleted Uranium)",
+      "icd10": "T56",
+      "iraq_context": "Basra: documented elevated soil/water uranium, lead, mercury from Gulf War military materials. Epidemiological studies show elevated leukemia, neural tube defects, congenital malformations. Not limited to Basra — former conflict zones across Iraq. Lead paint in older homes. Industrial mercury exposure in south. Already have lead_poisoning entry but this covers uranium/war-specific.",
+      "iraq_incidence_per_100k": 8.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "cluster_malformations_basra",
+        "pediatric_leukemia_war_zone",
+        "renal_failure_heavy_metal",
+        "peripheral_neuropathy_industrial",
+        "cognitive_decline_industrial",
+        "alopecia_chemical",
+        "GI_symptoms_industrial",
+        "neural_tube_defect_birth"
+      ],
+      "presentation_pattern": "Child from Basra/war-affected area with: unexplained leukemia/lymphoma, neural tube defect, or multiple congenital malformations. Adult from industrial/mining area with: peripheral neuropathy + renal impairment. Consider depleted uranium urine testing in Gulf War-exposed populations.",
+      "screening_questions_ar": [
+        "هل المريض أو عائلته من البصرة أو المناطق التي شهدت عمليات عسكرية؟",
+        "هل هناك تاريخ للعمل في مناطق صناعية أو ملوثة؟",
+        "هل وُلد أطفال آخرون في نفس الأسرة بتشوهات خلقية؟"
+      ],
+      "key_tests": [
+        "Whole blood lead level",
+        "24h urine uranium + lead + mercury",
+        "Heavy metals panel (urine/blood)",
+        "CBC (hemolytic anemia with lead)",
+        "Urinalysis + renal function",
+        "Chelation therapy if levels elevated"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Basra",
+        "Fallujah_Anbar",
+        "former_conflict_zones"
+      ],
+      "differentials_to_exclude": [
+        "leukemia_other_cause",
+        "renal_disease_primary",
+        "neuropathy_diabetic",
+        "congenital_malformation_genetic"
+      ]
+    },
+    {
+      "id": "scabies",
+      "name_ar": "الجرب",
+      "name_en": "Scabies",
+      "icd10": "B86",
+      "iraq_context": "Extremely common in Iraq, especially in displacement camps, prisons, overcrowded households. Sarcoptes scabiei mite. Post-scabies secondary bacterial infection (impetigo) leads to PSGN (post-streptococcal glomerulonephritis). Norwegian/crusted scabies in immunocompromised — highly contagious.",
+      "iraq_incidence_per_100k": 280.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "intense_pruritus_night",
+        "itching_between_fingers",
+        "papular_rash_trunk",
+        "linear_burrows",
+        "household_cluster_itching",
+        "IDP_camp_rash",
+        "wrist_pruritus",
+        "genital_pruritus_male",
+        "immunocompromised_hyperkeratotic_rash"
+      ],
+      "presentation_pattern": "Intense nocturnal itching + linear burrows (between fingers, wrists, belt line, genitals, breasts). Multiple household members affected simultaneously. Secondary impetiginization common. Norwegian (crusted) scabies: immunocompromised patient, minimal itch but massively hyperkeratotic skin — extremely contagious.",
+      "screening_questions_ar": [
+        "هل الحكة شديدة خاصة في الليل، وتتأثر مناطق بين الأصابع والرسغ؟",
+        "هل أفراد آخرون في البيت يعانون من نفس الحكة؟",
+        "هل يعيش الشخص في مخيم أو منطقة مكتظة؟"
+      ],
+      "key_tests": [
+        "Clinical diagnosis (burrows pathognomonic)",
+        "Dermoscopy ('delta-wing jet' sign)",
+        "Skin scraping + microscopy (mite/eggs/feces)",
+        "Treat ALL household contacts simultaneously"
+      ],
+      "seasonal_peak": [
+        "year_round",
+        "winter_overcrowding"
+      ],
+      "high_risk_governorates": [
+        "displacement_camps",
+        "Nineveh",
+        "Anbar",
+        "all_overcrowded"
+      ],
+      "differentials_to_exclude": [
+        "atopic_eczema",
+        "contact_dermatitis",
+        "urticaria",
+        "drug_rash",
+        "tinea_corporis"
+      ]
+    },
+    {
+      "id": "trachoma",
+      "name_ar": "التراخوما (الرمد الحبيبي)",
+      "name_en": "Trachoma",
+      "icd10": "A71",
+      "iraq_context": "Trachoma historically endemic in rural Iraq, particularly in areas with limited water and sanitation. Chlamydia trachomatis (serotypes A-C). Still present in some rural governorates. Repeated infection → scarring → trichiasis → corneal opacity → blindness. Flies are vectors in Iraq's environment.",
+      "iraq_incidence_per_100k": 12.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "chronic_eye_discharge",
+        "conjunctival_scarring",
+        "eyelid_inturning",
+        "corneal_opacity",
+        "follicular_conjunctivitis",
+        "trichiasis",
+        "photophobia_chronic",
+        "rural_poor_sanitation_eye"
+      ],
+      "presentation_pattern": "Chronic follicular conjunctivitis (cobblestone follicles on upper tarsal conjunctiva) in child from rural/poor sanitation area. Repeated Chlamydia infection. Trichiasis (inturned lashes scratching cornea) → corneal scarring → blindness. Flies carrying discharge between children.",
+      "screening_questions_ar": [
+        "هل يوجد إفراز مزمن من العينين مع احمرار منذ وقت طويل؟",
+        "هل يعاني الشخص من الرموش التي تلمس العين من الداخل؟",
+        "هل الشخص من منطقة ريفية ذات ظروف صحية صعبة؟"
+      ],
+      "key_tests": [
+        "Slit-lamp examination (WHO grading: TF, TI, TS, TT, CO)",
+        "Conjunctival swab PCR (C. trachomatis)",
+        "Visual acuity",
+        "Azithromycin single dose (SAFE strategy)"
+      ],
+      "seasonal_peak": [
+        "summer_fly_season"
+      ],
+      "high_risk_governorates": [
+        "rural_south",
+        "Muthanna",
+        "Dhi_Qar",
+        "Wasit"
+      ],
+      "differentials_to_exclude": [
+        "bacterial_conjunctivitis",
+        "viral_conjunctivitis",
+        "allergic_conjunctivitis",
+        "dry_eye"
+      ]
+    },
+    {
+      "id": "tinea_capitis",
+      "name_ar": "قوباء الرأس الفطرية (سعفة الرأس)",
+      "name_en": "Tinea Capitis (Scalp Ringworm)",
+      "icd10": "B35.0",
+      "iraq_context": "Very common in Iraqi school-age children. Trichophyton violaceum predominant species in Iraq and Middle East. Causes school absenteeism. Kerion (inflammatory mass) can be misdiagnosed as abscess and inappropriately drained. Oral antifungal required — topical alone is insufficient.",
+      "iraq_incidence_per_100k": 85.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "patchy_hair_loss",
+        "scaly_scalp",
+        "broken_hair_stubs",
+        "black_dots_scalp",
+        "cervical_lymphadenopathy_scalp",
+        "inflammatory_scalp_mass",
+        "school_child_hairloss",
+        "itchy_scalp"
+      ],
+      "presentation_pattern": "School child: patchy hair loss + scaly scalp + black dot pattern (broken hair shafts). Posterior cervical lymphadenopathy. Kerion: painful inflammatory mass on scalp (can mimic abscess — DO NOT DRAIN). Fluoresces under Wood's lamp with some species (T. violaceum does NOT fluoresce — common mistake).",
+      "screening_questions_ar": [
+        "هل الطفل لديه تساقط موضعي للشعر مع قشور أو نقاط سوداء على فروة الرأس؟",
+        "هل هناك أطفال آخرون في المدرسة أو الأسرة لديهم نفس المشكلة؟",
+        "هل استخدمت شامبو أو دواء خارجي فقط؟ (لا يكفي — يحتاج دواء فموي)"
+      ],
+      "key_tests": [
+        "Wood's lamp (limited use for T. violaceum)",
+        "Scalp scraping/hair fragment KOH prep + culture",
+        "Skin biopsy (kerion)",
+        "Oral griseofulvin or terbinafine x 6-8 weeks"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "school_children"
+      ],
+      "differentials_to_exclude": [
+        "alopecia_areata",
+        "seborrheic_dermatitis",
+        "psoriasis_scalp",
+        "bacterial_scalp_abscess",
+        "trichotillomania"
+      ]
+    },
+    {
+      "id": "neonatal_sepsis",
+      "name_ar": "تعفن الدم الوليدي",
+      "name_en": "Neonatal Sepsis",
+      "icd10": "P36",
+      "iraq_context": "Neonatal sepsis is a leading cause of neonatal mortality in Iraq. Early-onset (EOS, <72h): GBS, E. coli. Late-onset (LOS, >72h): Klebsiella, Staphylococcus epidermidis (NICU-acquired), Candida. Neonatal mortality in Iraq remains high (15-20 per 1000 live births). Group B Streptococcus antenatal screening not routinely done.",
+      "iraq_incidence_per_100k": 450.0,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "neonatal_temperature_instability",
+        "poor_feeding_neonate",
+        "neonatal_jaundice_severe",
+        "neonatal_irritability",
+        "neonatal_lethargy",
+        "neonatal_tachycardia",
+        "neonatal_respiratory_distress",
+        "prolonged_rupture_membranes",
+        "maternal_fever_labor",
+        "neonatal_apnea",
+        "neonatal_seizures"
+      ],
+      "presentation_pattern": "Neonate: any combination of temperature instability (hypo OR hyperthermia) + poor feeding + lethargy OR irritability + respiratory distress + jaundice. Rule of neonates: ANY fever ≥38°C in first month = sepsis until proven otherwise → FULL SEPTIC WORKUP.",
+      "screening_questions_ar": [
+        "ما هو عمر المولود؟ هل درجة حرارته 38 أو أكثر؟",
+        "هل الرضيع يأكل بشكل طبيعي؟ أو أصبح خاملاً وهادئاً بشكل غير طبيعي؟",
+        "هل حدث تمزق في أغشية المياه قبل الولادة بأكثر من 18 ساعة؟ أو كانت الأم مصابة بحمى أثناء الولادة؟"
+      ],
+      "key_tests": [
+        "Blood culture (before antibiotics)",
+        "CBC + differential + CRP",
+        "CSF culture/cytology (if stable)",
+        "Urine culture (LOS)",
+        "CXR",
+        "Glucose + electrolytes",
+        "Start empirical antibiotics IMMEDIATELY after cultures"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "low_resource_hospitals"
+      ],
+      "differentials_to_exclude": [
+        "congenital_heart_disease",
+        "metabolic_disorder",
+        "neonatal_tetanus",
+        "NEC",
+        "viral_meningitis"
+      ]
+    },
+    {
+      "id": "post_streptococcal_glomerulonephritis",
+      "name_ar": "التهاب الكلى ما بعد العقديات",
+      "name_en": "Post-Streptococcal Glomerulonephritis (PSGN)",
+      "icd10": "N05.0",
+      "iraq_context": "Significant burden in Iraq due to high GAS pharyngitis + impetigo rates from scabies. Typically affects school-age children 2-3 weeks after throat infection or 3-6 weeks after skin infection. Nephritic syndrome presentation. Can progress to acute hypertensive emergency or pulmonary edema.",
+      "iraq_incidence_per_100k": 9.5,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "hematuria_tea_colored",
+        "oliguria",
+        "edema_periorbital",
+        "hypertension_child",
+        "recent_sore_throat",
+        "recent_skin_infection_impetigo",
+        "proteinuria_child",
+        "headache_hypertension_child"
+      ],
+      "presentation_pattern": "School child: tea/cola-colored urine + periorbital puffiness (especially morning) + hypertension + oliguria. 2-3 weeks after pharyngitis OR 3-6 weeks after skin infection (impetigo/scabies-related). Complications: hypertensive encephalopathy, pulmonary edema.",
+      "screening_questions_ar": [
+        "هل تغير لون البول إلى الداكن أو اللون الشبيه بالشاي؟",
+        "هل هناك انتفاخ حول العينين خاصة في الصباح؟",
+        "هل كان لدى الطفل التهاب حلق أو قروح في الجلد قبل 2-6 أسابيع؟"
+      ],
+      "key_tests": [
+        "Urinalysis (RBC casts, proteinuria, hematuria)",
+        "ASOT + Anti-DNase B (elevated)",
+        "Complement C3 (low — key finding)",
+        "Serum creatinine + BUN",
+        "Blood pressure monitoring",
+        "Throat culture"
+      ],
+      "seasonal_peak": [
+        "winter_spring_pharyngitis_season"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "IgA_nephropathy",
+        "lupus_nephritis",
+        "HUS",
+        "Alport_syndrome",
+        "membranoproliferative_GN"
+      ]
+    },
+    {
+      "id": "rheumatic_heart_disease",
+      "name_ar": "مرض القلب الروماتيزمي (مضاعفات الحمى الروماتيزمية)",
+      "name_en": "Rheumatic Heart Disease",
+      "icd10": "I05-I09",
+      "iraq_context": "Iraq has significant rheumatic heart disease burden as a sequela of untreated/undertreated GAS pharyngitis and recurrent ARF. Mitral stenosis is the predominant valvular lesion. Young adults presenting with dyspnea, AF, or embolic events. Penicillin prophylaxis poorly implemented.",
+      "iraq_incidence_per_100k": 15.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "dyspnea_exertional",
+        "mitral_stenosis_murmur",
+        "atrial_fibrillation_young",
+        "stroke_young_valvular",
+        "childhood_ARF_history",
+        "opening_snap_murmur",
+        "heart_failure_young_adult",
+        "embolic_event_young"
+      ],
+      "presentation_pattern": "Young adult (20-40): progressive dyspnea on exertion + palpitations (AF) + mitral stenosis murmur (low-pitched rumbling diastolic murmur at apex + opening snap). History of ARF in childhood. Complications: AF → systemic emboli → stroke. Heart failure. Can present acutely during pregnancy.",
+      "screening_questions_ar": [
+        "هل أُصيب بالحمى الروماتيزمية أو التهاب المفاصل المع ٍالمرتبط بالتهاب الحلق في الطفولة؟",
+        "هل لديك ضيق في التنفس عند المجهود أو اضطراب في نبض القلب؟",
+        "هل أخبرك الطبيب أن لديك صوتاً غير طبيعي في القلب؟"
+      ],
+      "key_tests": [
+        "Echocardiography (gold standard)",
+        "ECG (AF, mitral P waves)",
+        "CXR (enlarged LA, pulmonary congestion)",
+        "BNP/NT-proBNP",
+        "ASOT (document past strep)",
+        "INR if on anticoagulation"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "congenital_heart_disease",
+        "cardiomyopathy",
+        "lupus_pericarditis",
+        "infective_endocarditis"
+      ]
+    },
+    {
+      "id": "legionellosis",
+      "name_ar": "داء الفيلقيات (حمى الفيلق)",
+      "name_en": "Legionellosis (Legionnaire's Disease)",
+      "icd10": "A48.1",
+      "iraq_context": "Under-recognized in Iraq. Legionella pneumophila in water cooling systems (AC towers), hospital water, irrigation systems. Occupational risk in hotels, hospitals, large buildings. Elderly, smokers, immunocompromised at highest risk. Pontiac fever (milder form). Multi-drug resistant — requires fluoroquinolone or azithromycin, not beta-lactam.",
+      "iraq_incidence_per_100k": 1.2,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "severe_pneumonia_hotel_stay",
+        "pneumonia_AC_exposure",
+        "high_fever_confusion_hyponatremia",
+        "pneumonia_not_responding_beta_lactam",
+        "pneumonia_elderly_smoker",
+        "diarrhea_with_pneumonia",
+        "leg_myalgia_pneumonia"
+      ],
+      "presentation_pattern": "Severe pneumonia with: high fever + confusion + hyponatremia (key clue) + relative bradycardia + diarrhea + myalgia. Epidemiological link: hotel stay, hospital, or cooling tower exposure. Does NOT respond to beta-lactam antibiotics. Urine antigen test positive early.",
+      "screening_questions_ar": [
+        "هل المريض كان في فندق أو مستشفى قبل المرض بـ 2-14 يوم؟",
+        "هل الالتهاب الرئوي مصحوب بتشوش ذهني وانخفاض الصوديوم في الدم؟",
+        "هل لا يتحسن الالتهاب الرئوي بالمضادات الحيوية المعتادة (البنسلين أو السيفالوسبورين)؟"
+      ],
+      "key_tests": [
+        "Urine Legionella antigen (serotype 1 — 80% of cases)",
+        "Sputum/BAL culture (BCYE agar)",
+        "Legionella PCR",
+        "CBC (leukocytosis, lymphopenia)",
+        "Sodium (hyponatremia), Liver enzymes (elevated)",
+        "Creatinine (renal failure complication)"
+      ],
+      "seasonal_peak": [
+        "summer_autumn_AC_season"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "large_hotels_hospitals"
+      ],
+      "differentials_to_exclude": [
+        "pneumococcal_pneumonia",
+        "Klebsiella_pneumonia",
+        "Q_fever",
+        "psittacosis",
+        "mycoplasma_pneumonia"
+      ]
+    },
+    {
+      "id": "covid19_surveillance",
+      "name_ar": "كوفيد-19 (مراقبة مستمرة)",
+      "name_en": "COVID-19 (Ongoing Surveillance)",
+      "icd10": "U07.1",
+      "iraq_context": "COVID-19 remains under surveillance in Iraq. Iraq experienced significant waves with high mortality partly due to limited ICU capacity. Long COVID neurological and pulmonary sequelae emerging. New variants require ongoing surveillance. Iraq vaccination coverage improved but booster gaps exist.",
+      "iraq_incidence_per_100k": 250.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "fever",
+        "cough",
+        "dyspnea",
+        "anosmia",
+        "ageusia",
+        "fatigue",
+        "cluster_respiratory_illness",
+        "hypoxia_without_dyspnea",
+        "bilateral_pneumonia",
+        "post_covid_fatigue",
+        "post_covid_neurological"
+      ],
+      "presentation_pattern": "Fever + cough + dyspnea. Key clues: anosmia/ageusia (loss of smell/taste — highly specific). 'Happy hypoxia' (SpO2 drop without dyspnea — dangerous). Bilateral ground-glass infiltrates on CT. High D-dimer, IL-6. Long COVID: fatigue + brain fog + dyspnea >12 weeks.",
+      "screening_questions_ar": [
+        "هل فقد القدرة على الشم أو التذوق؟",
+        "هل هناك تجمع في العائلة أو العمل لأشخاص مصابين بأعراض مشابهة؟",
+        "هل تحليل الأكسجين في الدم (SpO2) انخفض عن 94%؟"
+      ],
+      "key_tests": [
+        "SARS-CoV-2 Rapid Antigen Test (RAT)",
+        "RT-PCR (gold standard)",
+        "CBC (lymphopenia)",
+        "D-dimer, Ferritin, CRP, LDH",
+        "CXR/CT chest",
+        "SpO2 continuous monitoring"
+      ],
+      "seasonal_peak": [
+        "winter",
+        "spring"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "influenza",
+        "RSV",
+        "bacterial_pneumonia",
+        "pulmonary_embolism",
+        "heart_failure"
+      ]
+    },
+    {
+      "id": "hiv_aids",
+      "name_ar": "فيروس نقص المناعة البشري / الإيدز",
+      "name_en": "HIV/AIDS",
+      "icd10": "B20-B24",
+      "iraq_context": "Iraq has historically low HIV prevalence (~0.1% general population) but increasing cases since 2000s. Key risk groups: IDU (intravenous drug users — increasing), MSM (underreported), transfusion recipients (especially thalassemia patients before screening). HIV testing highly stigmatized — late presentations common. Opportunistic infections dominate in untreated patients.",
+      "iraq_incidence_per_100k": 0.8,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "unexplained_weight_loss_10percent",
+        "chronic_diarrhea_immunocompromised",
+        "recurrent_oral_candidiasis",
+        "PCP_pneumonia",
+        "CMV_retinitis",
+        "toxoplasmosis_brain",
+        "cryptococcal_meningitis",
+        "recurrent_infections_adult",
+        "prolonged_fever_lymphadenopathy",
+        "zoster_young_adult"
+      ],
+      "presentation_pattern": "Acute: mononucleosis-like illness 2-6 weeks post-exposure. Chronic: recurrent infections, oral candidiasis, zoster in young adult. AIDS: PCP pneumonia (dry cough + hypoxia), toxoplasma brain abscess, CMV retinitis, cryptococcal meningitis, Kaposi sarcoma. Unexplained weight loss >10% + chronic diarrhea + fever.",
+      "screening_questions_ar": [
+        "هل يوجد فقدان وزن غير مبرر مع إسهال مزمن وحمى؟",
+        "هل تعرض لعمليات نقل دم قبل عام 2003؟ أو لعلاج بالحقن؟",
+        "هل ظهر قلاع (فطريات) متكرر في الفم عند شخص بالغ صحي؟"
+      ],
+      "key_tests": [
+        "4th generation HIV Ag/Ab combo test",
+        "CD4 count + HIV viral load (if positive)",
+        "CBC (lymphopenia)",
+        "Screen for OIs (TB, toxoplasma serology, CMV)",
+        "Liver function + HBsAg + HCV Ab (co-infections)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "urban_centers"
+      ],
+      "differentials_to_exclude": [
+        "lymphoma",
+        "TB",
+        "EBV",
+        "CMV",
+        "other_immunodeficiency"
+      ]
+    },
+    {
+      "id": "syphilis",
+      "name_ar": "مرض الزهري (السفلس)",
+      "name_en": "Syphilis",
+      "icd10": "A50-A53",
+      "iraq_context": "Syphilis under-reported in Iraq due to stigma. Both congenital (due to lack of antenatal screening) and acquired forms present. Primary syphilis: painless genital ulcer often missed. Secondary: rash involving palms and soles. Congenital syphilis in newborns is a marker of failed antenatal care.",
+      "iraq_incidence_per_100k": 1.5,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "painless_genital_ulcer",
+        "rash_palms_soles",
+        "alopecia_patchy",
+        "condyloma_lata",
+        "meningitis_syphilitic",
+        "aortitis_young",
+        "newborn_skin_lesions",
+        "newborn_hepatosplenomegaly",
+        "VDRL_positive",
+        "RPR_positive"
+      ],
+      "presentation_pattern": "Primary: painless indurated genital/oral ulcer (chancre) + non-tender lymphadenopathy. Secondary (4-8 weeks later): diffuse maculopapular rash INVOLVING palms and soles (key) + condyloma lata + alopecia. Congenital: newborn with hepatosplenomegaly + skin lesions + 'snuffles' (bloody nasal discharge) + bone abnormalities.",
+      "screening_questions_ar": [
+        "هل ظهر قرحة غير مؤلمة في المنطقة التناسلية أو الفم مؤخراً؟",
+        "هل هناك طفح جلدي يشمل راحتي اليدين وباطن القدمين؟",
+        "هل المولود يعاني من تضخم كبد وطحال أو نزيف أنفي دموي؟"
+      ],
+      "key_tests": [
+        "RPR or VDRL (screening)",
+        "TPPA/FTA-Abs (confirmatory)",
+        "CSF VDRL (neurosyphilis)",
+        "Congenital: maternal RPR, neonatal IgM",
+        "HIV co-test always"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "urban_areas"
+      ],
+      "differentials_to_exclude": [
+        "herpes_genitalis",
+        "chancroid",
+        "lymphogranuloma_venereum",
+        "secondary_rash_other",
+        "drug_rash"
+      ]
+    },
+    {
+      "id": "onchocerciasis_border",
+      "name_ar": "داء الأنكوسيركا (عمى النهر) - مناطق حدودية",
+      "name_en": "Onchocerciasis (River Blindness) — Border Surveillance",
+      "icd10": "B73",
+      "iraq_context": "Not endemic within Iraq proper but border surveillance required for populations moving from endemic areas (parts of sub-Saharan Africa via refugee routes, some Yemen border areas). Iraqi healthcare workers may encounter imported cases in international workers/refugees. Simulium blackfly vector near fast-flowing rivers.",
+      "iraq_incidence_per_100k": 0.1,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "chronic_pruritus_skin",
+        "subcutaneous_nodules",
+        "visual_loss_progressive",
+        "sclerosing_keratitis",
+        "leopard_skin_depigmentation",
+        "hanging_groin",
+        "river_endemic_area_exposure",
+        "african_origin_traveler"
+      ],
+      "presentation_pattern": "Chronic intense pruritus + subcutaneous nodules (over bony prominences) + 'leopard skin' depigmentation + progressive visual loss (sclerosing keratitis → blindness). Person from sub-Saharan Africa or other endemic area. Black flies near fast-flowing rivers.",
+      "screening_questions_ar": [
+        "هل قدم المريض من منطقة موبوءة بهذا المرض في أفريقيا؟",
+        "هل يعاني من حكة جلدية شديدة مزمنة مع فقدان تدريجي في البصر؟",
+        "هل يوجد عقيدات تحت الجلد فوق العظام؟"
+      ],
+      "key_tests": [
+        "Skin snip biopsy (microfilariae)",
+        "Mazzotti test (ivermectin reaction)",
+        "Slit-lamp (corneal microfilariae)",
+        "PCR",
+        "Eosinophilia"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "border_areas",
+        "refugee_populations"
+      ],
+      "differentials_to_exclude": [
+        "scabies",
+        "atopic_eczema",
+        "oncho_vs_loiasis",
+        "river_blindness_trachoma_DDx"
+      ]
+    },
+    {
+      "id": "plague_surveillance",
+      "name_ar": "الطاعون (مراقبة وبائية حدودية)",
+      "name_en": "Plague — Border/Surveillance",
+      "icd10": "A20",
+      "iraq_context": "Iraq itself is not a plague-endemic country, but the surveillance context is important given bordering countries (Iran, Turkey — near historically endemic areas) and Iraq's rodent populations. Bubonic plague from flea bite; pneumonic plague is highly contagious person-to-person. Any cluster of fatal pneumonia + hemorrhage must have plague in differential for biosecurity reporting.",
+      "iraq_incidence_per_100k": 0.01,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "sudden_painful_lymphadenopathy_groin_axilla",
+        "hemorrhagic_pneumonia_cluster",
+        "rodent_die_off_area",
+        "fever_hemorrhage_sepsis",
+        "black_skin_gangrene",
+        "bacteremic_shock_rapid"
+      ],
+      "presentation_pattern": "Bubonic: sudden fever + exquisitely tender swollen lymph node (bubo) in groin/axilla/neck + dark hemorrhagic necrosis. Septicemic: shock + DIC + 'Black Death' gangrenous extremities. Pneumonic: HIGHLY CONTAGIOUS fever + bloody cough + respiratory failure. Any suspected case = IMMEDIATE isolation + notification.",
+      "screening_questions_ar": [
+        "هل تعرض الشخص للجرذان أو البراغيث في منطقة بعيدة؟",
+        "هل يوجد انتفاخ مؤلم جداً في الإربية أو الإبط أو الرقبة مع حمى شديدة؟",
+        "هل هناك أشخاص آخرون في نفس المنطقة لديهم حمى وسعال دموي؟"
+      ],
+      "key_tests": [
+        "ISOLATE IMMEDIATELY",
+        "Blood culture + lymph node aspirate culture",
+        "Yersinia pestis PCR",
+        "NOTIFY MOH + WHO IMMEDIATELY",
+        "Streptomycin/gentamicin STAT"
+      ],
+      "seasonal_peak": [
+        "summer"
+      ],
+      "high_risk_governorates": [
+        "border_areas_Iran_Turkey"
+      ],
+      "differentials_to_exclude": [
+        "tularemia",
+        "anthrax",
+        "CCHF",
+        "meningococcal_septicemia",
+        "staphylococcal_sepsis"
+      ]
+    },
+    {
+      "id": "acute_viral_hepatitis_b",
+      "name_ar": "التهاب الكبد الفيروسي الحاد (بي)",
+      "name_en": "Acute Hepatitis B",
+      "icd10": "B16",
+      "iraq_context": "Iraq has intermediate HBV endemicity (HBsAg prevalence ~3-5%). Transmission: mother-to-child (vertical — most common in Iraq), unsafe injections, transfusions pre-screening. HBV vaccination is in Iraq schedule but coverage gaps exist. Acute HBV can present as fulminant hepatitis. Co-infection with HDV (delta) increases severity.",
+      "iraq_incidence_per_100k": 12.0,
+      "urgency": "urgent",
+      "symptom_triggers": [
+        "jaundice_acute",
+        "right_upper_quadrant_pain",
+        "dark_urine_pale_stool",
+        "fever_prodrome",
+        "nausea_vomiting",
+        "joint_pain_pre_jaundice",
+        "serum_sickness_like",
+        "fulminant_hepatic_failure"
+      ],
+      "presentation_pattern": "Prodrome: fever + malaise + arthralgia + nausea (1-3 weeks before jaundice). Then: jaundice + dark urine + pale stools + RUQ pain + hepatomegaly. ALT/AST very high (1000-5000 U/L). Acute liver failure: encephalopathy + coagulopathy + jaundice = EMERGENCY.",
+      "screening_questions_ar": [
+        "هل هناك اصفرار في الجلد أو العينين مع بول داكن وبراز فاتح؟",
+        "هل تلقى حقناً غير معقمة أو نقل دم في الماضي؟",
+        "هل أم المريض تحمل فيروس الكبد بي؟"
+      ],
+      "key_tests": [
+        "HBsAg, HBeAg, Anti-HBc IgM",
+        "LFTs (high ALT/AST)",
+        "PT/INR (severity)",
+        "Hepatitis delta (HDV) co-test",
+        "HBV DNA viral load",
+        "Abdominal ultrasound"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all"
+      ],
+      "differentials_to_exclude": [
+        "hepatitis_A",
+        "hepatitis_E",
+        "hepatitis_C",
+        "EBV_hepatitis",
+        "drug_induced_hepatitis",
+        "autoimmune_hepatitis"
+      ]
+    },
+    {
+      "id": "dengue_hemorrhagic_fever",
+      "name_ar": "حمى الضنك النزفية",
+      "name_en": "Dengue Hemorrhagic Fever (DHF) / Severe Dengue",
+      "icd10": "A91",
+      "iraq_context": "Extension of the dengue entry for severe forms. DHF/DSS (Dengue Shock Syndrome) can develop in second DENV infection (immune enhancement). Plasma leakage + thrombocytopenia + hemorrhage. Iraq's Aedes albopictus (Asian tiger mosquito) enables dengue transmission in urban areas. Recognizing warning signs is critical.",
+      "iraq_incidence_per_100k": 3.5,
+      "urgency": "emergency",
+      "symptom_triggers": [
+        "dengue_warning_signs",
+        "abdominal_pain_dengue",
+        "persistent_vomiting",
+        "rapid_breathing_dengue",
+        "bleeding_dengue",
+        "lethargy_restlessness_dengue",
+        "liver_enlargement_dengue",
+        "pleural_effusion_dengue",
+        "platelet_below_100k",
+        "hematocrit_rise_20percent"
+      ],
+      "presentation_pattern": "WARNING SIGNS (critical to recognize in dengue patient): persistent vomiting, abdominal pain/tenderness, rapid breathing, bleeding (gum bleed, petechiae, menorrhagia), lethargy, liver enlargement >2cm, rising hematocrit with rapid decline in platelets. Any warning sign → HOSPITALIZE IMMEDIATELY.",
+      "screening_questions_ar": [
+        "هل يوجد قيء متكرر لا يتوقف أو ألم شديد في البطن؟",
+        "هل حدث نزيف من اللثة أو الأنف أو ظهرت بقع دموية في الجلد؟",
+        "هل الشخص يشعر بتعب شديد أو يبدو قلقاً ومتوتراً غير طبيعي؟"
+      ],
+      "key_tests": [
+        "Serial CBC (platelet + hematocrit monitoring)",
+        "NS1 antigen + Dengue IgM/IgG",
+        "Liver enzymes (AST>ALT in dengue)",
+        "CXR/ultrasound (pleural effusion/ascites)",
+        "Blood group + crossmatch"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "urban_areas"
+      ],
+      "differentials_to_exclude": [
+        "malaria",
+        "leptospirosis",
+        "CCHF",
+        "meningococcal_sepsis",
+        "ITP"
+      ]
+    },
+    {
+      "id": "chikungunya",
+      "name_ar": "حمى الشيكونغونيا",
+      "name_en": "Chikungunya",
+      "icd10": "A92.0",
+      "iraq_context": "Chikungunya expanding its range toward the Middle East via Aedes albopictus. Cases documented in neighboring Iran and Kuwait. Iraq is at risk. Distinguishing feature: EXTREMELY severe arthralgia (name means 'that which bends up') that can persist for months-years (chronic chikungunya arthritis).",
+      "iraq_incidence_per_100k": 0.5,
+      "urgency": "moderate",
+      "symptom_triggers": [
+        "fever_severe_arthralgia",
+        "symmetric_arthralgia_sudden",
+        "arthralgia_disabling_mosquito_area",
+        "rash_fever_arthralgia",
+        "chronic_arthritis_post_fever",
+        "mosquito_exposure_joint_pain"
+      ],
+      "presentation_pattern": "Sudden high fever + INCAPACITATING symmetric polyarthralgia (wrists, ankles, MCP joints — patient literally cannot walk). Maculopapular rash (trunk). Distinguished from dengue by: severe arthralgia >> headache/retro-orbital pain, no significant hemorrhage, no NS1 antigen. Chronic arthritis in ~30% lasting months.",
+      "screening_questions_ar": [
+        "هل الألم في المفاصل شديد جداً لدرجة صعوبة المشي أو تحريك اليدين؟",
+        "هل بدأ الألم فجأة مع حمى بعد لدغات بعوض؟",
+        "هل الأعراض مشابهة لآخرين في نفس المنطقة؟"
+      ],
+      "key_tests": [
+        "Chikungunya RT-PCR (first 5 days)",
+        "Chikungunya IgM/IgG serology",
+        "CBC (leukopenia, lymphopenia)",
+        "ESR/CRP (elevated in arthritis phase)",
+        "Exclude malaria and dengue"
+      ],
+      "seasonal_peak": [
+        "summer",
+        "autumn"
+      ],
+      "high_risk_governorates": [
+        "Baghdad",
+        "Basra",
+        "urban_mosquito_areas"
+      ],
+      "differentials_to_exclude": [
+        "dengue",
+        "Zika",
+        "Ross_River",
+        "reactive_arthritis",
+        "rheumatoid_arthritis",
+        "brucellosis"
+      ]
+    },
+    {
+      "id": "ascariasis_intestinal_worms",
+      "name_ar": "داء الأسكاريس والطفيليات المعوية",
+      "name_en": "Ascariasis / Intestinal Parasites",
+      "icd10": "B77",
+      "iraq_context": "Extremely common in Iraq, particularly in children. Ascaris lumbricoides, Giardia, Entamoeba histolytica, Trichuris trichiura all prevalent. Contaminated water/food, poor sanitation. Often missed or untreated for years.",
+      "iraq_incidence_per_100k": 180.0,
+      "urgency": "routine",
+      "symptom_triggers": [
+        "abdominal_pain",
+        "bloating",
+        "diarrhea",
+        "constipation",
+        "anal_itching",
+        "poor_appetite",
+        "failure_to_thrive",
+        "weight_loss",
+        "eosinophilia",
+        "passing_worms",
+        "pediatric_abdominal_pain",
+        "rectal_prolapse"
+      ],
+      "presentation_pattern": "Recurrent crampy abdominal pain + bloating + altered bowel habit in a child. Perianal itching (Enterobius). Failure to thrive. May pass visible worms. Eosinophilia on CBC is a strong clue.",
+      "screening_questions_ar": [
+        "هل لاحظت دوداً في براز الطفل أو منطقة الشرج؟",
+        "هل الطفل يشكو من حكة في منطقة الشرج خاصة في الليل؟",
+        "هل يشرب الطفل ماءً نظيفاً ويغسل يديه قبل الأكل؟"
+      ],
+      "key_tests": [
+        "Stool O&P x3 (Ova and Parasites)",
+        "Scotch tape test (Enterobius)",
+        "CBC (eosinophilia)",
+        "Stool antigen (Giardia/E. histolytica)"
+      ],
+      "seasonal_peak": [
+        "year_round"
+      ],
+      "high_risk_governorates": [
+        "all",
+        "rural",
+        "displacement_camps"
+      ],
+      "differentials_to_exclude": [
+        "IBD",
+        "appendicitis",
+        "functional_abdominal_pain",
+        "celiac"
+      ]
+    }
+  ],
+  "prompt_injection_block": {
+    "description": "Copy-paste this block directly into MEDICAL_SYSTEM_PROMPT after the existing instructions",
+    "text": "## Iraq Epidemiological Mandatory Screening Rules\n\nBefore generating a final recommendation, cross-check the patient's symptoms against the Iraq Disease Trigger Table. If symptoms match any trigger pattern, you MUST ask the listed screening questions for that disease BEFORE concluding.\n\n### CRITICAL TRIGGER RULES (Always Check):\n- FEVER + JOINT PAIN + FATIGUE → Brucellosis (raw milk? animal contact?) — 23/100k in Iraq\n- NON-HEALING SKIN ULCER → Cutaneous Leishmaniasis (sandfly, rural, Baghdad region)\n- CHRONIC COUGH >3 WEEKS + NIGHT SWEATS + WEIGHT LOSS → TB (contact history, AFB smear)\n- JAUNDICE + FEVER → Hepatitis A/E; if PREGNANT → URGENT (HEV 20% maternal mortality)\n- PROFUSE WATERY DIARRHEA (sudden) → Cholera cluster questions + ORS\n- FEVER + HEMORRHAGE/BLEEDING + ANIMAL/TICK EXPOSURE → CCHF EMERGENCY isolation\n- FEVER + CYCLICAL RIGORS → Malaria (northern Iraq, Sulaymaniyah)\n- CHILD: FEVER + HEADACHE + MENINGISM → Iraq national schedule EXCLUDES meningococcal vaccine — vaccinated child IS NOT protected against N. meningitidis — DO NOT dismiss\n- POST-FLOODING ILLNESS → Leptospirosis + Cholera + Hepatitis A/E (triple risk)\n- EID AL-ADHA + FEVER + HEMORRHAGE → CCHF (slaughter exposure)\n\n### GENETIC/PHARMACOGENOMIC SAFETY:\n- ALL IRAQI MALES before prescribing PRIMAQUINE / DAPSONE / NITROFURANTOIN → Screen G6PD first (8-12% deficiency rate)\n- SOUTHERN IRAQ CHILD + SEVERE ANEMIA → Beta-thalassemia major (high carrier rate in Basra/Misan/Wasit)\n- DRUG PRESCRIPTION IRAQ GENERAL → Check G6PD, Thalassemia trait if relevant drug class\n\n### ENVIRONMENTAL/OCCUPATIONAL TRIGGERS:\n- BASRA RESIDENT + CANCER / MALFORMATION → Heavy metal / depleted uranium exposure history\n- FARMER + PAINLESS BLACK ESCHAR → Anthrax (do NOT drain, notify public health)\n- PESTICIDE/AGRICULTURAL WORKER + MIOSIS + SECRETIONS → Organophosphate poisoning (atropine + pralidoxime)\n- HOTEL/HOSPITAL STAY + SEVERE PNEUMONIA + HYPONATREMIA + CONFUSION → Legionella (urine antigen, fluoroquinolone)\n- CHILD + PICA (eating ice/soil) + PALLOR + EOSINOPHILIA → Toxocariasis OR Iron Deficiency Anemia\n\n### NUTRITIONAL SCREENING:\n- VEILED WOMAN / BREASTFED INFANT / NORTHERN MOUNTAIN RESIDENT → Vitamin D deficiency (extremely prevalent)\n- NORTHERN IRAQ GOITER → Iodine deficiency (Sulaymaniyah, Erbil, Dohuk goiter belt)\n- IDP CAMP CHILD + WASTING/EDEMA → Protein-Energy Malnutrition (MUAC <11.5cm = emergency)\n\n### NEONATAL ALERTS:\n- NEONATE FEVER ≥38°C → Full septic workup + empirical antibiotics IMMEDIATELY (neonatal sepsis)\n- NEONATE DAY 3-28 + TRISMUS + SPASMS → Neonatal Tetanus (home delivery, unvaccinated mother)\n- NEONATE + JAW LOCK + INABILITY TO SUCK → Emergency: neonatal tetanus or hypocalcemia\n\n### SURVEILLANCE/BIOTERRORISM (Notify Public Health):\n- CLUSTER FATAL PNEUMONIA + HEMORRHAGE → Plague differential (isolation + notification)\n- ANY ANTHRAX SUSPICION → Notify MOH + WHO immediately\n- DIPHTHERIA PSEUDOMEMBRANE → Antitoxin immediately + notify public health"
+  }
+}
