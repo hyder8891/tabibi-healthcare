@@ -19,7 +19,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
   const callEmergency = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     if (Platform.OS !== "web") {
-      Linking.openURL("tel:911");
+      Linking.openURL("tel:115");
     }
   };
 
@@ -42,7 +42,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
           onPress={callEmergency}
         >
           <Ionicons name="call" size={24} color="#fff" />
-          <Text style={styles.emergencyButtonText}>{t("Call Emergency Services", "اتصل بخدمات الطوارئ")}</Text>
+          <Text style={styles.emergencyButtonText}>{t("Call 115 - Emergency", "اتصل 115 - الطوارئ")}</Text>
         </Pressable>
 
         <Pressable

@@ -345,7 +345,7 @@ export function RecommendationCard({
                   </View>
                 </View>
                 <Text style={styles.testType}>
-                  {test.type === "lab" ? t("Laboratory Test", "فحص مخبري") : t("Medical Imaging", "تصوير طبي")}
+                  {test.type === "lab" ? t("Laboratory Test", "فحص مخبري") : test.type === "referral" ? t("Specialist Referral", "تحويل لاختصاصي") : t("Medical Imaging", "تصوير طبي")}
                 </Text>
                 <Text style={[styles.testReason, isRTL && { textAlign: "right" }]}>{test.reason}</Text>
 

@@ -310,14 +310,37 @@ export default function AssessmentScreen() {
         return result;
       };
 
-      const stripJson = (text: string) => {
-        return text
+      const stripJson = (text: string, isStreaming = false) => {
+        let cleaned = text
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
           .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/g, "")
-          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "")
-          .trim();
+          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "");
+        if (isStreaming) {
+          const jsonStart = cleaned.search(/\{["\s]*(emergency|assessment|quickReplies)/);
+          if (jsonStart !== -1) {
+            cleaned = cleaned.substring(0, jsonStart);
+          }
+          const codeBlockStart = cleaned.indexOf("```");
+          if (codeBlockStart !== -1) {
+            cleaned = cleaned.substring(0, codeBlockStart);
+          }
+          const trailingJsonStart = cleaned.search(/\{["\s]*$/);
+          if (trailingJsonStart !== -1) {
+            cleaned = cleaned.substring(0, trailingJsonStart);
+          }
+          const lastOpenBrace = cleaned.lastIndexOf("{");
+          if (lastOpenBrace !== -1) {
+            const afterBrace = cleaned.substring(lastOpenBrace);
+            const opens = (afterBrace.match(/\{/g) || []).length;
+            const closes = (afterBrace.match(/\}/g) || []).length;
+            if (opens > closes) {
+              cleaned = cleaned.substring(0, lastOpenBrace);
+            }
+          }
+        }
+        return cleaned.trim();
       };
 
       const extractQuickReplies = (text: string): string[] => {
@@ -343,7 +366,7 @@ export default function AssessmentScreen() {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 fullText += data.content;
-                const cleanStreaming = stripJson(fullText);
+                const cleanStreaming = stripJson(fullText, true);
                 setStreamingMessage(cleanStreaming);
               }
               if (data.done) {
@@ -393,17 +416,16 @@ export default function AssessmentScreen() {
                   if (parsedResult.assessment) {
                     parsedResult.assessment.severity = "severe";
                   }
-                  if (!parsedResult.triageLevel) {
-                    parsedResult.triageLevel = "immediate";
-                  }
+                  parsedResult.triageLevel = "immediate";
                   setAssessmentResult({ ...parsedResult });
                 } else if (parsedEmergency && !parsedResult) {
+                  const isAr = settings.language === "ar";
                   parsedResult = {
                     assessment: {
-                      condition: parsedEmergency.condition || "Emergency",
+                      condition: parsedEmergency.condition || (isAr ? "حالة طوارئ" : "Emergency"),
                       confidence: "high",
                       severity: "severe",
-                      description: parsedEmergency.action || "Seek immediate medical attention",
+                      description: parsedEmergency.action || (isAr ? "توجه لأقرب طوارئ فوراً" : "Seek immediate medical attention"),
                     },
                     triageLevel: "immediate",
                     pathway: "B",
@@ -412,19 +434,19 @@ export default function AssessmentScreen() {
                       pathwayB: {
                         active: true,
                         tests: [{
-                          name: "Emergency evaluation",
-                          type: "lab",
-                          urgency: "emergency",
-                          reason: parsedEmergency.condition,
+                          name: isAr ? "تقييم طوارئ" : "Emergency evaluation",
+                          type: "lab" as const,
+                          urgency: "emergency" as const,
+                          reason: parsedEmergency.condition || (isAr ? "حالة طارئة تتطلب تقييم فوري" : "Emergency condition requiring immediate evaluation"),
                           facilityType: "hospital",
                           capabilities: ["emergency"],
                         }],
                       },
                     },
-                    warnings: [parsedEmergency.action || "Seek immediate emergency care"],
+                    warnings: [parsedEmergency.action || (isAr ? "توجه لأقرب طوارئ فوراً" : "Seek immediate emergency care")],
                     followUp: {
-                      returnIn: "Immediately",
-                      redFlags: [parsedEmergency.action || "Seek immediate emergency care"],
+                      returnIn: isAr ? "فوراً" : "Immediately",
+                      redFlags: [parsedEmergency.action || (isAr ? "توجه لأقرب طوارئ فوراً" : "Seek immediate emergency care")],
                     },
                   };
                   setAssessmentResult(parsedResult);

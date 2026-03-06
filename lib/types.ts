@@ -52,7 +52,7 @@ export interface MedicineRecommendation {
 
 export interface TestRecommendation {
   name: string;
-  type: "lab" | "imaging";
+  type: "lab" | "imaging" | "referral";
   urgency: "routine" | "urgent" | "emergency";
   reason: string;
   facilityType: string;
