@@ -32,20 +32,15 @@ async function getOrCreateEncryptionKey(): Promise<string> {
   return key;
 }
 
-function xorCipher(data: string, key: string): string {
-  const result: string[] = [];
+function xorBytes(data: Uint8Array, keyBytes: Uint8Array): Uint8Array {
+  const result = new Uint8Array(data.length);
   for (let i = 0; i < data.length; i++) {
-    const charCode = data.charCodeAt(i) ^ key.charCodeAt(i % key.length);
-    result.push(String.fromCharCode(charCode));
+    result[i] = data[i] ^ keyBytes[i % keyBytes.length];
   }
-  return result.join("");
+  return result;
 }
 
-function toBase64(str: string): string {
-  const bytes = new Uint8Array(str.length);
-  for (let i = 0; i < str.length; i++) {
-    bytes[i] = str.charCodeAt(i) & 0xff;
-  }
+function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let i = 0; i < bytes.length; i++) {
     binary += String.fromCharCode(bytes[i]);
@@ -53,36 +48,42 @@ function toBase64(str: string): string {
   return btoa(binary);
 }
 
-function fromBase64(b64: string): string {
+function base64ToBytes(b64: string): Uint8Array {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) {
     bytes[i] = binary.charCodeAt(i);
   }
-  let result = "";
-  for (let i = 0; i < bytes.length; i++) {
-    result += String.fromCharCode(bytes[i]);
-  }
-  return result;
+  return bytes;
 }
+
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 async function encryptData(plaintext: string): Promise<string> {
   const key = await getOrCreateEncryptionKey();
-  const ciphered = xorCipher(plaintext, key);
-  return "ENC:" + toBase64(ciphered);
+  const dataBytes = encoder.encode(plaintext);
+  const keyBytes = encoder.encode(key);
+  const encrypted = xorBytes(dataBytes, keyBytes);
+  return "ENC2:" + bytesToBase64(encrypted);
 }
 
 async function decryptData(stored: string): Promise<string> {
-  if (!stored.startsWith("ENC:")) {
+  if (stored.startsWith("ENC2:")) {
+    try {
+      const key = await getOrCreateEncryptionKey();
+      const encrypted = base64ToBytes(stored.slice(5));
+      const keyBytes = encoder.encode(key);
+      const decrypted = xorBytes(encrypted, keyBytes);
+      return decoder.decode(decrypted);
+    } catch {
+      return stored;
+    }
+  }
+  if (stored.startsWith("ENC:")) {
     return stored;
   }
-  try {
-    const key = await getOrCreateEncryptionKey();
-    const ciphered = fromBase64(stored.slice(4));
-    return xorCipher(ciphered, key);
-  } catch {
-    return stored;
-  }
+  return stored;
 }
 
 async function setEncryptedItem(key: string, json: string): Promise<void> {
@@ -93,6 +94,10 @@ async function setEncryptedItem(key: string, json: string): Promise<void> {
 async function getDecryptedItem(key: string): Promise<string | null> {
   const raw = await AsyncStorage.getItem(key);
   if (raw === null) return null;
+  if (raw.startsWith("ENC:")) {
+    await AsyncStorage.removeItem(key);
+    return null;
+  }
   try {
     const decrypted = await decryptData(raw);
     JSON.parse(decrypted);
