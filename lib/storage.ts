@@ -8,6 +8,7 @@ const PROFILE_KEY = "@tabibi_profile";
 const MEDICATIONS_KEY = "@tabibi_medications";
 const SETTINGS_KEY = "@tabibi_settings";
 const SECURE_KEY_ALIAS = "tabibi_storage_key";
+const KEY_BACKUP_ALIAS = "@tabibi_encryption_key_backup";
 
 let cachedKey: string | null = null;
 
@@ -17,7 +18,16 @@ async function getOrCreateEncryptionKey(): Promise<string> {
     const existing = await SecureStore.getItemAsync(SECURE_KEY_ALIAS);
     if (existing) {
       cachedKey = existing;
+      AsyncStorage.setItem(KEY_BACKUP_ALIAS, existing).catch(() => {});
       return existing;
+    }
+  } catch {}
+  try {
+    const backup = await AsyncStorage.getItem(KEY_BACKUP_ALIAS);
+    if (backup) {
+      cachedKey = backup;
+      SecureStore.setItemAsync(SECURE_KEY_ALIAS, backup).catch(() => {});
+      return backup;
     }
   } catch {}
   const raw = Crypto.randomUUID() + Crypto.randomUUID();
@@ -27,6 +37,9 @@ async function getOrCreateEncryptionKey(): Promise<string> {
   );
   try {
     await SecureStore.setItemAsync(SECURE_KEY_ALIAS, key);
+  } catch {}
+  try {
+    await AsyncStorage.setItem(KEY_BACKUP_ALIAS, key);
   } catch {}
   cachedKey = key;
   return key;
@@ -94,21 +107,21 @@ async function setEncryptedItem(key: string, json: string): Promise<void> {
 async function getDecryptedItem(key: string): Promise<string | null> {
   const raw = await AsyncStorage.getItem(key);
   if (raw === null) return null;
-  if (raw.startsWith("ENC:")) {
-    await AsyncStorage.removeItem(key);
-    return null;
-  }
-  try {
-    const decrypted = await decryptData(raw);
-    JSON.parse(decrypted);
-    return decrypted;
-  } catch {
+  if (raw.startsWith("ENC2:") || raw.startsWith("ENC:")) {
     try {
-      JSON.parse(raw);
-      return raw;
+      const decrypted = await decryptData(raw);
+      JSON.parse(decrypted);
+      return decrypted;
     } catch {
+      await AsyncStorage.removeItem(key);
       return null;
     }
+  }
+  try {
+    JSON.parse(raw);
+    return raw;
+  } catch {
+    return null;
   }
 }
 

@@ -121,7 +121,7 @@ Use the SOCRATES mnemonic as your guide. Ask about these one at a time:
 - Severity: Pain scale 1-10 or impact on daily activities
 - You do NOT need to ask every single SOCRATES element — skip those already answered by the patient's responses. Adapt based on what they volunteer.
 - ADAPTIVE EXIT CHECK: After Phase 1, assess your confidence. If the presentation is clearly a simple/mild condition (classic cold with runny nose + sore throat + no fever, minor paper cut, simple muscle strain with clear mechanism) AND you have enough information, you MAY proceed directly to the assessment. Otherwise continue to Phase 2.
-- After Phase 1 for cases continuing to Phase 2, send a SECTION HEADER transition: "تقريباً انتهينا — فقط بعض الأسئلة للتأكد من تاريخك الصحي." (or English: "Almost there — just a couple more to check your history.")
+- After Phase 1 for cases continuing to Phase 2, send a SECTION HEADER transition: "شكراً على إجاباتك. الآن أحتاج أن أسألك عن بعض الأعراض المرتبطة." (or English: "Thanks for your answers. Now I need to ask about some related symptoms.")
 
 PHASE 2 — SYSTEMS REVIEW (3-5 questions, only if case is NOT clearly mild):
 - Systematically explore related organ systems based on your evolving differential:
@@ -410,6 +410,12 @@ QUICK REPLY OPTIONS — MANDATORY ON EVERY QUESTION:
   - Medications: {"quickReplies":["نعم، أتناول أدوية","لا","أتناول مكملات فقط"]}
   - History: {"quickReplies":["نعم، حدث سابقاً","لا، أول مرة","لست متأكداً"]}
   - Character: {"quickReplies":["حاد/طاعن","خفيف/مؤلم","حارق","نابض","ضاغط"]}
+  - Associated symptoms (abdominal): {"quickReplies":["غثيان/استفراغ","إسهال","حمى","فقدان شهية","لا أعراض أخرى"]}
+  - Associated symptoms (headache): {"quickReplies":["غثيان","حساسية للضوء","دوخة","تشوش بصري","لا أعراض أخرى"]}
+  - Associated symptoms (chest): {"quickReplies":["ضيق تنفس","سعال","خفقان","تعرق","لا أعراض أخرى"]}
+  - Associated symptoms (generic): {"quickReplies":["حمى","تعب عام","فقدان شهية","نعم، أعراض أخرى","لا أعراض أخرى"]}
+  - Aggravating/relieving: {"quickReplies":["يزداد مع الحركة","يزداد مع الأكل","يخف مع الراحة","لا شيء يؤثر عليه","جربت دواء"]}
+- For questions about associated/additional symptoms, ALWAYS provide a checklist of the most clinically relevant symptoms as quick reply options. Always include "لا أعراض أخرى" (no other symptoms) as the last option.
 - Do NOT include quickReplies when providing the final assessment/recommendation JSON block.
 - The quickReplies block must be valid JSON on a single line.
 - SELF-CHECK: Before sending any message with a question, verify it ends with {"quickReplies":[...]}. If it doesn't, add one.
@@ -423,6 +429,7 @@ COMMUNICATION STYLE:
 - Ask ONE question at a time to avoid overwhelming the user
 - Keep responses concise and focused - no filler text, no repetitive safety warnings
 - Do NOT repeat what the user just said back to them
+- ARABIC GENDER CONJUGATION: Check the PATIENT PROFILE for gender. If male, use masculine Arabic conjugation (أنتَ، هل عانيتَ، هل تشعر). If female, use feminine (أنتِ، هل عانيتِ، هل تشعرين). If gender is not provided, use masculine as default (standard Arabic convention). NEVER mix conjugation within a session.
 - In the JSON recommendation block, write all text fields (condition, description, warnings, followUp, differentials, medicine names, test reasons) in Arabic when responding in Arabic`;
 
 export function registerAiRoutes(app: Express): void {
