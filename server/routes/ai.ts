@@ -38,7 +38,7 @@ function sanitizeInput(text: string): string {
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().max(5000),
-  imageData: z.string().optional(),
+  imageData: z.string().max(10_000_000).optional(),
   mimeType: z.string().optional(),
 });
 
@@ -570,9 +570,9 @@ Be thorough and specific. Provide your analysis in the same language the user is
             }],
             config: { maxOutputTokens: 2048 },
           });
-          imageAnalysis = imageResponse.text || "";
+          imageAnalysis = sanitizeInput(imageResponse.text || "");
 
-          console.log("Image analysis completed:", imageAnalysis.substring(0, 200));
+          console.log("Image analysis completed, length:", imageAnalysis.length);
         } catch (imgErr) {
           console.error("Image analysis error:", imgErr);
           imageAnalysis = "Image was attached but could not be analyzed due to a processing error.";
@@ -605,24 +605,67 @@ Be thorough and specific. Provide your analysis in the same language the user is
         };
       });
 
-      const stream = await ai.models.generateContentStream({
-        model: MODEL_FLASH,
-        contents: chatMessages,
-        config: {
-          systemInstruction: systemContext,
-          maxOutputTokens: 4096,
-          thinkingConfig: { thinkingBudget: 0 },
-        },
-      });
+      let streamTimedOut = false;
 
-      for await (const chunk of stream) {
-        if (clientDisconnected) break;
-        if (chunk.candidates?.[0]?.content?.parts) {
-          for (const part of chunk.candidates[0].content.parts) {
-            if (part.thought || !part.text) continue;
-            fullResponse += part.text;
-            res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
+      try {
+        const stream = await ai.models.generateContentStream({
+          model: MODEL_FLASH,
+          contents: chatMessages,
+          config: {
+            systemInstruction: systemContext,
+            maxOutputTokens: 4096,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+
+        const iterator = stream[Symbol.asyncIterator]();
+        const streamStartTime = Date.now();
+        const STREAM_TIMEOUT_MS = 60_000;
+        const CHUNK_TIMEOUT_MS = 15_000;
+
+        while (true) {
+          if (clientDisconnected) break;
+
+          const chunkPromise = iterator.next();
+          const timeoutPromise = new Promise<{ done: true; value: undefined }>((_, reject) => {
+            setTimeout(() => reject(new Error("STREAM_TIMEOUT")), CHUNK_TIMEOUT_MS);
+          });
+
+          let iterResult: IteratorResult<any>;
+          try {
+            iterResult = await Promise.race([chunkPromise, timeoutPromise]);
+          } catch (raceErr: any) {
+            if (raceErr?.message === "STREAM_TIMEOUT") {
+              streamTimedOut = true;
+              console.error("Streaming chunk timed out after 15 seconds of no data");
+              break;
+            }
+            throw raceErr;
           }
+
+          if (iterResult.done) break;
+
+          const chunk = iterResult.value;
+          if (chunk.candidates?.[0]?.content?.parts) {
+            for (const part of chunk.candidates[0].content.parts) {
+              if (part.thought || !part.text) continue;
+              fullResponse += part.text;
+              res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
+            }
+          }
+
+          if (Date.now() - streamStartTime > STREAM_TIMEOUT_MS) {
+            streamTimedOut = true;
+            console.error("Streaming exceeded 60-second total timeout");
+            break;
+          }
+        }
+      } catch (streamErr: any) {
+        if (streamErr?.message === "STREAM_TIMEOUT") {
+          streamTimedOut = true;
+          console.error("Streaming timed out");
+        } else {
+          throw streamErr;
         }
       }
 
@@ -681,7 +724,7 @@ Support both Arabic and English text on medication packaging.`;
         config: { maxOutputTokens: 2048 },
       });
       let text = response.text || "";
-      console.log("[MedScan] Raw response:", text.substring(0, 500));
+      console.log("[MedScan] Response received, length:", text.length);
 
       text = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
 
@@ -766,7 +809,7 @@ Respond ONLY with JSON:
         config: { maxOutputTokens: 4096 },
       });
       let text = interactionResponse.text || "";
-      console.log("[Interactions] Raw response:", text.substring(0, 500));
+      console.log("[Interactions] Response received, length:", text.length);
 
       text = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
 
@@ -786,7 +829,6 @@ Respond ONLY with JSON:
       console.log("[Interactions] Parsed result keys:", Object.keys(result));
       console.log("[Interactions] Interactions count:", result.interactions?.length);
       console.log("[Interactions] Overall risk:", result.overallRisk);
-      console.log("[Interactions] Summary:", result.summary?.substring(0, 200));
 
       res.json(result);
     } catch (error) {

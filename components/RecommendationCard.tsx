@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -47,6 +47,10 @@ export function RecommendationCard({
     () => Object.fromEntries(medicines.map((_, i) => [i, true]))
   );
 
+  useEffect(() => {
+    setSelectedMeds(Object.fromEntries(medicines.map((_, i) => [i, true])));
+  }, [medicines.length]);
+
   const toggleMed = (index: number) => {
     setSelectedMeds((prev) => ({ ...prev, [index]: !prev[index] }));
   };
@@ -61,7 +65,16 @@ export function RecommendationCard({
     if (selected.length > 0) onOrderMedicines(selected);
   };
 
-  const severity = result?.assessment?.severity || "moderate";
+  const triageLevel = result?.triageLevel;
+
+  const rawSeverity = result?.assessment?.severity || "moderate";
+  const severity: string = (() => {
+    if (rawSeverity === "critical") return "severe";
+    if (triageLevel === "immediate") return "severe";
+    const known = ["severe", "urgent", "moderate", "mild"];
+    if (!known.includes(rawSeverity)) return "moderate";
+    return rawSeverity;
+  })();
 
   const severityColor =
     severity === "severe" || severity === "urgent"
@@ -76,8 +89,6 @@ export function RecommendationCard({
       : severity === "moderate"
         ? Colors.light.warningLight
         : Colors.light.successLight;
-
-  const triageLevel = result?.triageLevel;
   const triageCfg = triageLevel ? TRIAGE_CONFIG[triageLevel] : null;
 
   const followUp = result?.followUp;
@@ -91,8 +102,8 @@ export function RecommendationCard({
             <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
             <Text style={[styles.severityText, { color: severityColor }]}>
               {isRTL
-                ? (severity === "severe" || severity === "urgent" ? "شديد" : severity === "moderate" ? "متوسط" : "خفيف")
-                : severity.toUpperCase()}
+                ? (severity === "severe" || severity === "urgent" ? (rawSeverity === "critical" ? "حرج" : "شديد") : severity === "moderate" ? "متوسط" : "خفيف")
+                : (rawSeverity === "critical" ? "CRITICAL" : severity.toUpperCase())}
             </Text>
           </View>
           {triageCfg && (
@@ -391,6 +402,43 @@ export function RecommendationCard({
                 </Text>
               </Pressable>
             )}
+          </View>
+        )}
+
+      {!(result?.recommendations?.pathwayA?.active && medicines.length > 0) &&
+        !(result?.recommendations?.pathwayB?.active && result?.recommendations?.pathwayB?.tests?.length > 0) && (
+          <View style={styles.selfCareSection}>
+            <View style={[styles.selfCareBanner, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={styles.selfCareIconCircle}>
+                <Ionicons name="checkmark-circle" size={22} color={Colors.light.success} />
+              </View>
+              <Text style={[styles.selfCareBannerText, isRTL && { textAlign: "right" }]}>
+                {t("Self-Care Guidance", "إرشادات الرعاية الذاتية")}
+              </Text>
+            </View>
+            <Text style={[styles.selfCareDescription, isRTL && { textAlign: "right" }]}>
+              {result?.assessment?.description || t("Based on your assessment, self-care measures should be sufficient. Monitor your symptoms and seek medical attention if they worsen.", "بناءً على تقييمك، يجب أن تكون تدابير الرعاية الذاتية كافية. راقب أعراضك واطلب الرعاية الطبية إذا تفاقمت.")}
+            </Text>
+            <View style={styles.selfCareTips}>
+              <View style={[styles.selfCareTipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="water-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.selfCareTipText, isRTL && { textAlign: "right" }]}>
+                  {t("Stay well hydrated", "حافظ على ترطيب جسمك")}
+                </Text>
+              </View>
+              <View style={[styles.selfCareTipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="bed-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.selfCareTipText, isRTL && { textAlign: "right" }]}>
+                  {t("Get adequate rest", "احصل على قسط كافٍ من الراحة")}
+                </Text>
+              </View>
+              <View style={[styles.selfCareTipRow, isRTL && { flexDirection: "row-reverse" }]}>
+                <Ionicons name="eye-outline" size={16} color={Colors.light.primary} />
+                <Text style={[styles.selfCareTipText, isRTL && { textAlign: "right" }]}>
+                  {t("Monitor your symptoms closely", "راقب أعراضك عن كثب")}
+                </Text>
+              </View>
+            </View>
           </View>
         )}
 
@@ -865,5 +913,54 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.light.emergencyDark,
     lineHeight: 17,
+  },
+  selfCareSection: {
+    marginBottom: 16,
+  },
+  selfCareBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.light.successLight,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  selfCareIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.light.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selfCareBannerText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    color: "#065F46",
+    flex: 1,
+  },
+  selfCareDescription: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    lineHeight: 21,
+    marginBottom: 14,
+  },
+  selfCareTips: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    padding: 14,
+    gap: 12,
+  },
+  selfCareTipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  selfCareTipText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    flex: 1,
   },
 });

@@ -158,7 +158,9 @@ export default function AssessmentScreen() {
         }
 
         if (base64Data) {
-          const mimeType = asset.uri.toLowerCase().includes(".png") ? "image/png" : "image/jpeg";
+          const mimeType = (asset as any).type === "image" && asset.uri.toLowerCase().includes(".png")
+            ? "image/png"
+            : (asset as any).mimeType || (asset.uri.toLowerCase().includes(".png") ? "image/png" : "image/jpeg");
           setPendingImage({ uri: asset.uri, base64: base64Data, mimeType });
         }
       }
@@ -218,6 +220,7 @@ export default function AssessmentScreen() {
 
     try {
       const profile = await getProfile();
+      const cachedProfile = profile;
       const apiUrl = getApiUrl();
       const url = new URL("/api/assess", apiUrl);
 
@@ -266,6 +269,73 @@ export default function AssessmentScreen() {
       let parsedResult: AssessmentResult | null = null;
       let parsedEmergency: EmergencyAlert | null = null;
 
+      const normalizeArabicValues = (result: AssessmentResult): AssessmentResult => {
+        if (settings.language !== "ar") return result;
+
+        const confidenceMap: Record<string, string> = {
+          "low": "منخفض",
+          "medium": "متوسط",
+          "moderate": "متوسط",
+          "high": "مرتفع",
+        };
+        const likelihoodMap: Record<string, string> = {
+          "low": "منخفض",
+          "moderate": "متوسط",
+          "high": "مرتفع",
+          "very high": "مرتفع جداً",
+        };
+        const timeframeMap: Record<string, string> = {
+          "immediately": "فوراً",
+          "within hours": "خلال ساعات",
+          "within 24 hours": "خلال 24 ساعة",
+          "within a week": "خلال أسبوع",
+          "1-2 days": "1-2 أيام",
+          "2-3 days": "2-3 أيام",
+          "3-5 days": "3-5 أيام",
+          "1 week": "أسبوع واحد",
+          "2 weeks": "أسبوعين",
+          "1 month": "شهر واحد",
+        };
+        const costMap: Record<string, string> = {
+          "free-MOH": "مجاني-وزارة الصحة",
+          "low": "منخفض",
+          "moderate": "متوسط",
+          "high": "مرتفع",
+        };
+
+        const mapValue = (val: string | undefined, map: Record<string, string>): string | undefined => {
+          if (!val) return val;
+          const lower = val.toLowerCase().trim();
+          return map[lower] || val;
+        };
+
+        if (result.assessment) {
+          result.assessment.confidence = mapValue(result.assessment.confidence, confidenceMap) || result.assessment.confidence;
+        }
+
+        if (result.recommendations?.pathwayB?.tests) {
+          result.recommendations.pathwayB.tests = result.recommendations.pathwayB.tests.map((test) => ({
+            ...test,
+            estimatedCost: test.estimatedCost ? (mapValue(test.estimatedCost, costMap) || test.estimatedCost) as any : undefined,
+          }));
+        }
+
+        if (result.differentials) {
+          result.differentials = result.differentials.map((d) => ({
+            ...d,
+            likelihood: mapValue(d.likelihood, likelihoodMap) || d.likelihood,
+          }));
+        }
+
+        if (result.followUp && typeof result.followUp === "object" && result.followUp.returnIn) {
+          result.followUp.returnIn = mapValue(result.followUp.returnIn, timeframeMap) || result.followUp.returnIn;
+        } else if (typeof result.followUp === "string") {
+          result.followUp = mapValue(result.followUp, timeframeMap) || result.followUp;
+        }
+
+        return result;
+      };
+
       const normalizeResult = (raw: any): AssessmentResult => {
         const result: AssessmentResult = {
           assessment: {
@@ -307,7 +377,7 @@ export default function AssessmentScreen() {
             availableAt: t.availableAt || undefined,
           }));
         }
-        return result;
+        return normalizeArabicValues(result);
       };
 
       const stripJson = (text: string, isStreaming = false) => {
@@ -316,7 +386,7 @@ export default function AssessmentScreen() {
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
           .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/g, "")
-          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/g, "");
+          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/gs, "");
         if (isStreaming) {
           const jsonStart = cleaned.search(/\{["\s]*(emergency|assessment|quickReplies)/);
           if (jsonStart !== -1) {
@@ -344,7 +414,7 @@ export default function AssessmentScreen() {
       };
 
       const extractQuickReplies = (text: string): string[] => {
-        const match = text.match(/\{"quickReplies"\s*:\s*(\[.*?\])\}/);
+        const match = text.match(/\{"quickReplies"\s*:\s*(\[.*?\])\}/s);
         if (match) {
           try {
             return JSON.parse(match[1]);
@@ -487,7 +557,6 @@ export default function AssessmentScreen() {
       setMessages((prev) => [...prev, aiMessage]);
       setStreamingMessage("");
 
-      const profile2 = await getProfile();
       const allMsgs = [...updatedMessages, aiMessage];
       
       if (existingAssessmentId) {
@@ -509,7 +578,7 @@ export default function AssessmentScreen() {
           emergency: parsedEmergency || undefined,
           medications: [],
           patientProfile: {
-            ...profile2,
+            ...cachedProfile,
             isPediatric: settings.pediatricMode,
           },
         };

@@ -207,9 +207,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
       confirmationResultRef.current = confirmation;
     } else {
-      if (__DEV__) {
-        (auth as any).settings.appVerificationDisabledForTesting = true;
-      }
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
       confirmationResultRef.current = confirmation;
     }
