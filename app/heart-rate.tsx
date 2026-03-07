@@ -210,7 +210,7 @@ async function extractRGBNative(uri: string): Promise<{ r: number; g: number; b:
   try {
     const result = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: 8, height: 8 } }],
+      [{ resize: { width: 32, height: 32 } }, { crop: { originX: 6, originY: 6, width: 20, height: 20 } }],
       { base64: true, format: ImageManipulator.SaveFormat.PNG }
     );
     if (result.base64) {
@@ -237,18 +237,12 @@ function isFingerCovering(r: number, g: number, b: number, duringMeasurement = f
   if (brightness < 10 || brightness > 245) return false;
 
   if (duringMeasurement) {
-    if (brightness >= 15 && brightness <= 240 && r >= g * 0.8) return true;
+    if (brightness >= 15 && brightness <= 240 && r >= g * 0.88 && r >= b * 0.9) return true;
     return false;
   }
 
   if (r > 160 && r > g * 1.2 && r > b * 1.2) return true;
   if (brightness > 20 && brightness < 200 && r > g && r > b && (r - g) > 3 && (r - b) > 3) return true;
-  if (brightness > 60 && brightness < 200 && r >= g * 0.95 && r >= b * 0.95) return true;
-  if (brightness >= 80 && brightness <= 200) {
-    const maxC = Math.max(r, g, b);
-    const minC = Math.min(r, g, b);
-    if ((maxC - minC) < 40 && r >= minC) return true;
-  }
   return false;
 }
 
@@ -271,7 +265,7 @@ function normalizeSignal(sig: number[]) {
   return sig.map(v => (v - mean) / std);
 }
 
-function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+function applyIIROnce(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
   const hpRC = 1.0 / (2 * Math.PI * lowFreq);
   const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
   const hp = new Array(sig.length);
@@ -279,24 +273,21 @@ function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, high
   for (let i = 1; i < sig.length; i++) {
     hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
   }
-  const hp2 = new Array(sig.length);
-  hp2[0] = hp[0];
-  for (let i = 1; i < sig.length; i++) {
-    hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
-  }
   const lpRC = 1.0 / (2 * Math.PI * highFreq);
   const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
   const lp = new Array(sig.length);
-  lp[0] = hp2[0];
+  lp[0] = hp[0];
   for (let i = 1; i < sig.length; i++) {
-    lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
+    lp[i] = lp[i - 1] + lpAlpha * (hp[i] - lp[i - 1]);
   }
-  const lp2 = new Array(sig.length);
-  lp2[0] = lp[0];
-  for (let i = 1; i < sig.length; i++) {
-    lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
-  }
-  return lp2;
+  return lp;
+}
+
+function bandpassFilter(sig: number[], sampleRate: number, lowFreq: number, highFreq: number) {
+  const forward = applyIIROnce(sig, sampleRate, lowFreq, highFreq);
+  const reversed = forward.slice().reverse();
+  const backward = applyIIROnce(reversed, sampleRate, lowFreq, highFreq);
+  return backward.reverse();
 }
 
 function movingAverage(sig: number[], windowSize: number): number[] {
@@ -535,7 +526,17 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
   }
 
   const TARGET_FPS = 10;
-  const needsInterpolation = rawFps < 4;
+  let needsInterpolation = rawFps < 8;
+
+  if (!needsInterpolation && timestamps.length > 2) {
+    const intervals: number[] = [];
+    for (let i = 1; i < timestamps.length; i++) {
+      intervals.push(timestamps[i] - timestamps[i - 1]);
+    }
+    const meanInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const hasJitter = intervals.some(gap => gap > meanInterval * 2);
+    if (hasJitter) needsInterpolation = true;
+  }
 
   let redSig: number[];
   let greenSig: number[];
@@ -625,7 +626,7 @@ function processFingerSignals(redValues: number[], greenValues: number[], timest
   const maxWave = Math.max(...waveform.map(Math.abs)) || 1;
   const normalizedWaveform = waveform.map(v => v / maxWave);
 
-  console.log(`HeartRate: ${n}raw/${redSig.length}interp rawFps=${rawFps.toFixed(1)} effectiveFps=${actualFps.toFixed(1)} best=${bestBpm}bpm score=${bestScore.toFixed(3)} method=${bestMethod} fftR=${fftRed.bpm}/${fftRed.snr.toFixed(2)} fftG=${fftGreen.bpm}/${fftGreen.snr.toFixed(2)} acR=${acRed.bpm}/${acRed.confidence.toFixed(2)} acG=${acGreen.bpm}/${acGreen.confidence.toFixed(2)} pkR=${peakRed.bpm}/${peakRed.confidence.toFixed(2)} pkG=${peakGreen.bpm}/${peakGreen.confidence.toFixed(2)}`);
+  if (__DEV__) console.log(`HeartRate: ${n}raw/${redSig.length}interp rawFps=${rawFps.toFixed(1)} effectiveFps=${actualFps.toFixed(1)} best=${bestBpm}bpm score=${bestScore.toFixed(3)} method=${bestMethod} fftR=${fftRed.bpm}/${fftRed.snr.toFixed(2)} fftG=${fftGreen.bpm}/${fftGreen.snr.toFixed(2)} acR=${acRed.bpm}/${acRed.confidence.toFixed(2)} acG=${acGreen.bpm}/${acGreen.confidence.toFixed(2)} pkR=${peakRed.bpm}/${peakRed.confidence.toFixed(2)} pkG=${peakGreen.bpm}/${peakGreen.confidence.toFixed(2)}`);
 
   return {
     heartRate,
@@ -656,7 +657,7 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
   const gValues = validSignals.map(s => s.g);
   const gMin = Math.min(...gValues);
   const gMax = Math.max(...gValues);
-  if (gMax - gMin < 0.3) return { ...invalidResult, message: "No color variation detected - ensure face is visible and well-lit" };
+  if (gMax - gMin < 5) return { ...invalidResult, message: "No color variation detected - ensure face is visible and well-lit" };
 
   const rRaw = validSignals.map(s => s.r);
   const gRaw = validSignals.map(s => s.g);
@@ -669,6 +670,7 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
 
   const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
   const posSignal = new Array(vn).fill(0);
+  const posWeight = new Array(vn).fill(0);
 
   for (let start = 0; start < vn - windowSize; start += Math.floor(windowSize / 2)) {
     const end = Math.min(start + windowSize, vn);
@@ -694,7 +696,14 @@ function processFaceSignals(signals: Array<{r: number; g: number; b: number}>, f
     const xsStd = Math.sqrt(xs.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
     const ysStd = Math.sqrt(ys.reduce((s: number, v: number) => s + v * v, 0) / len) || 1;
     const alpha = xsStd / ysStd;
-    for (let i = 0; i < len; i++) posSignal[start + i] += xs[i] + alpha * ys[i];
+    for (let i = 0; i < len; i++) {
+      posSignal[start + i] += xs[i] + alpha * ys[i];
+      posWeight[start + i]++;
+    }
+  }
+
+  for (let i = 0; i < vn; i++) {
+    if (posWeight[i] > 0) posSignal[i] /= posWeight[i];
   }
 
   const minFreq = 0.83;
@@ -775,6 +784,7 @@ export default function HeartRateScreen() {
   const [result, setResult] = useState<HeartRateResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fingerDetected, setFingerDetected] = useState(false);
+  const [detectionUnavailable, setDetectionUnavailable] = useState(false);
   const [liveBpm, setLiveBpm] = useState(0);
   const [torchOn, setTorchOn] = useState(false);
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
@@ -895,7 +905,7 @@ export default function HeartRateScreen() {
           }
           const smoothed = smoothRGB(rgbHistoryRef.current);
           const detected = isFingerCovering(smoothed.r, smoothed.g, smoothed.b);
-          console.log(`FingerCheck: r=${smoothed.r.toFixed(0)} g=${smoothed.g.toFixed(0)} b=${smoothed.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
+          if (__DEV__) console.log(`FingerCheck: r=${smoothed.r.toFixed(0)} g=${smoothed.g.toFixed(0)} b=${smoothed.b.toFixed(0)} detected=${detected} confirms=${fingerConfirmCount.current}`);
           if (detected) {
             fingerConfirmCount.current++;
             if (fingerConfirmCount.current >= FINGER_CONFIRM_FRAMES) {
@@ -914,12 +924,12 @@ export default function HeartRateScreen() {
         }
       }
     } catch (e) {
-      console.log("FingerCheck error:", e);
+      if (__DEV__) console.log("FingerCheck error:", e);
       fingerCheckErrorCount.current++;
       if (fingerCheckErrorCount.current >= 3) {
-        console.log("takePictureAsync not available in video mode, showing manual start");
+        if (__DEV__) console.log("takePictureAsync not available in video mode, showing manual start");
         if (fingerCheckRef.current) { clearInterval(fingerCheckRef.current); fingerCheckRef.current = null; }
-        setFingerDetected(true);
+        setDetectionUnavailable(true);
       }
     } finally {
       processingRef.current = false;
@@ -1042,7 +1052,7 @@ export default function HeartRateScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
     } catch (err) {
-      console.log("Recording/analysis error:", err);
+      if (__DEV__) console.log("Recording/analysis error:", err);
       recordingRef.current = false;
       if (measureActiveRef.current) {
         setError(t("Recording failed. Please try again.", "فشل التسجيل. يرجى المحاولة مرة أخرى."));
@@ -1062,6 +1072,7 @@ export default function HeartRateScreen() {
     measurementStartedRef.current = false;
     rgbHistoryRef.current = [];
     setFingerDetected(false);
+    setDetectionUnavailable(false);
     setState("waiting_finger");
 
     setTorchOn(false);
@@ -1157,6 +1168,7 @@ export default function HeartRateScreen() {
     setLiveBpm(0);
     setCountdown(MEASUREMENT_DURATION);
     setFingerDetected(false);
+    setDetectionUnavailable(false);
     setAnalyzeProgress({ current: 0, total: 0 });
     if (IS_MOBILE) {
       setTorchOn(true);
@@ -1276,6 +1288,32 @@ export default function HeartRateScreen() {
                   <Text style={styles.fingerSampleText}>
                     {t("Recording...", "جاري التسجيل...")}
                   </Text>
+                </View>
+              )}
+              {detectionUnavailable && state === "waiting_finger" && (
+                <View style={styles.manualStartContainer}>
+                  <Text style={[styles.manualStartHint, isRTL && { textAlign: "right" }]}>
+                    {t(
+                      "Auto-detection unavailable. Place your finger over the camera and flash, then tap Start.",
+                      "الاكتشاف التلقائي غير متاح. ضع إصبعك على الكاميرا والفلاش، ثم اضغط ابدأ."
+                    )}
+                  </Text>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.manualStartButton,
+                      pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+                    ]}
+                    onPress={() => {
+                      setFingerDetected(true);
+                      measurementStartedRef.current = true;
+                      startFingerMeasurement();
+                    }}
+                  >
+                    <Ionicons name="play" size={20} color="#fff" />
+                    <Text style={styles.manualStartButtonText}>
+                      {t("Start Measurement", "ابدأ القياس")}
+                    </Text>
+                  </Pressable>
                 </View>
               )}
             </View>
@@ -1712,6 +1750,34 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
     marginTop: 4,
+  },
+  manualStartContainer: {
+    alignItems: "center" as const,
+    marginTop: 16,
+    paddingHorizontal: 20,
+  },
+  manualStartHint: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    textAlign: "center" as const,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  manualStartButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    backgroundColor: Colors.light.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    gap: 8,
+  },
+  manualStartButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#fff",
   },
   fingerWaitInner: {
     alignItems: "center",

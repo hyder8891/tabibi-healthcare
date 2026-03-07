@@ -22,7 +22,7 @@ function processRppg(signals, fps) {
   const gMax = Math.max(...gRaw);
   const gRange = gMax - gMin;
 
-  if (gRange < 0.3) {
+  if (gRange < 5) {
     return {
       heartRate: 0,
       confidence: "low",
@@ -64,6 +64,7 @@ function processRppg(signals, fps) {
 
   const windowSize = Math.max(Math.floor(actualFps * 1.6), 10);
   const posSignal = new Array(vn).fill(0);
+  const posWeight = new Array(vn).fill(0);
 
   for (let start = 0; start < vn - windowSize; start += Math.floor(windowSize / 2)) {
     const end = Math.min(start + windowSize, vn);
@@ -97,7 +98,12 @@ function processRppg(signals, fps) {
 
     for (let i = 0; i < len; i++) {
       posSignal[start + i] += xs[i] + alpha * ys[i];
+      posWeight[start + i]++;
     }
+  }
+
+  for (let i = 0; i < vn; i++) {
+    if (posWeight[i] > 0) posSignal[i] /= posWeight[i];
   }
 
   const posDetrended = detrendSignal(posSignal);
@@ -107,7 +113,7 @@ function processRppg(signals, fps) {
   const minFreq = 0.75;
   const maxFreq = 3.0;
 
-  function bandpassFilter(sig, sampleRate, lowFreq, highFreq) {
+  function applyIIROnce(sig, sampleRate, lowFreq, highFreq) {
     const hpRC = 1.0 / (2 * Math.PI * lowFreq);
     const hpAlpha = hpRC / (hpRC + 1.0 / sampleRate);
     const hp = new Array(sig.length);
@@ -115,25 +121,22 @@ function processRppg(signals, fps) {
     for (let i = 1; i < sig.length; i++) {
       hp[i] = hpAlpha * (hp[i - 1] + sig[i] - sig[i - 1]);
     }
-    const hp2 = new Array(sig.length);
-    hp2[0] = hp[0];
-    for (let i = 1; i < sig.length; i++) {
-      hp2[i] = hpAlpha * (hp2[i - 1] + hp[i] - hp[i - 1]);
-    }
 
     const lpRC = 1.0 / (2 * Math.PI * highFreq);
     const lpAlpha = (1.0 / sampleRate) / (lpRC + 1.0 / sampleRate);
     const lp = new Array(sig.length);
-    lp[0] = hp2[0];
+    lp[0] = hp[0];
     for (let i = 1; i < sig.length; i++) {
-      lp[i] = lp[i - 1] + lpAlpha * (hp2[i] - lp[i - 1]);
+      lp[i] = lp[i - 1] + lpAlpha * (hp[i] - lp[i - 1]);
     }
-    const lp2 = new Array(sig.length);
-    lp2[0] = lp[0];
-    for (let i = 1; i < sig.length; i++) {
-      lp2[i] = lp2[i - 1] + lpAlpha * (lp[i] - lp2[i - 1]);
-    }
-    return lp2;
+    return lp;
+  }
+
+  function bandpassFilter(sig, sampleRate, lowFreq, highFreq) {
+    const forward = applyIIROnce(sig, sampleRate, lowFreq, highFreq);
+    const reversed = forward.slice().reverse();
+    const backward = applyIIROnce(reversed, sampleRate, lowFreq, highFreq);
+    return backward.reverse();
   }
 
   const filteredPOS = bandpassFilter(posDetrended, actualFps, minFreq, maxFreq);
