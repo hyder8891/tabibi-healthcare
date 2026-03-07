@@ -3,6 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 import { z } from "zod";
 import { requireAuth } from "./middleware";
 import { avicenna } from "../avicenna";
+import { matchDiseases } from "../utils/diseaseMatch";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -524,6 +525,22 @@ export function registerAiRoutes(app: Express): void {
         }
       } catch (err) {
         console.error("Avicenna context injection error:", err instanceof Error ? err.message : "Unknown");
+      }
+
+      try {
+        const conversationText = messages.filter((m: any) => m.role === 'user').map((m: any) => m.content || m.text || '').join(' ');
+        const matchedDiseases = matchDiseases(conversationText);
+        if (matchedDiseases.length > 0) {
+          systemContext += '\n\n## ACTIVE DISEASE SUSPECTS (matched from conversation):\n';
+          matchedDiseases.slice(0, 3).forEach(d => {
+            systemContext += `\n### ${d.nameAr} (${d.nameEn}) — urgency: ${d.urgency}\n`;
+            systemContext += `Screening questions to ask naturally:\n`;
+            d.questionsAr.forEach(q => { systemContext += `- ${q}\n`; });
+            systemContext += `Key tests: ${d.tests.join(', ')}\n`;
+          });
+        }
+      } catch (e) {
+        console.error('disease match error', e);
       }
 
       let imageAnalysis = "";
