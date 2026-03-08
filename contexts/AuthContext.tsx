@@ -57,7 +57,7 @@ interface AuthContextValue {
   needsEmailVerification: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  loginWithGoogle: (idToken?: string) => Promise<void>;
   sendPhoneOTP: (phoneNumber: string) => Promise<void>;
   verifyPhoneOTP: (code: string, displayName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -205,7 +205,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistUser(backendUser);
   }, []);
 
-  const loginWithGoogle = useCallback(async () => {
+  const loginWithGoogle = useCallback(async (externalIdToken?: string) => {
+    if (externalIdToken) {
+      const credential = GoogleAuthProvider.credential(externalIdToken);
+      const cred = await signInWithCredential(auth, credential);
+      firebaseUserRef.current = cred.user;
+      const backendUser = await syncWithBackend(cred.user);
+      setUser(backendUser);
+      await persistUser(backendUser);
+      return;
+    }
     if (Platform.OS === "web") {
       const cred = await signInWithPopup(auth, googleProvider);
       firebaseUserRef.current = cred.user;
@@ -214,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await persistUser(backendUser);
     } else {
       if (!GoogleSignin) {
-        throw new Error("Google Sign-In is not available. Please install @react-native-google-signin/google-signin.");
+        throw new Error("Google Sign-In is not available on this device.");
       }
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
       const signInResult = await GoogleSignin.signIn();
@@ -241,8 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
       confirmationResultRef.current = confirmation;
     } else {
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
-      confirmationResultRef.current = confirmation;
+      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
   }, []);
 
@@ -315,8 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
       confirmationResultRef.current = confirmation;
     } else {
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
-      confirmationResultRef.current = confirmation;
+      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
   }, []);
 

@@ -21,9 +21,13 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Google from "expo-auth-session/providers/google";
+import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type AuthMode = "login" | "signup";
 type IdentifierType = "email" | "phone";
@@ -62,6 +66,39 @@ export default function AuthScreen() {
 
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+
+  const [googleAuthRequest, googleAuthResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
+  });
+
+  useEffect(() => {
+    if (!googleAuthResponse) return;
+    if (googleAuthResponse.type === "success") {
+      const idToken = googleAuthResponse.params?.id_token;
+      if (idToken) {
+        setGoogleLoading(true);
+        setError("");
+        loginWithGoogle(idToken)
+          .then(() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          })
+          .catch((err: any) => {
+            const code = err?.code || "";
+            setError(getFirebaseErrorMessage(code));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          })
+          .finally(() => setGoogleLoading(false));
+      } else {
+        setError(t("Failed to get Google credentials. Please try again.", "\u0641\u0634\u0644 \u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0628\u064a\u0627\u0646\u0627\u062a Google. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+        setGoogleLoading(false);
+      }
+    } else if (googleAuthResponse.type === "error") {
+      setError(t("Google Sign-In failed. Please try again.", "\u0641\u0634\u0644 \u062a\u0633\u062c\u064a\u0644 Google. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+      setGoogleLoading(false);
+    } else if (googleAuthResponse.type === "dismiss") {
+      setGoogleLoading(false);
+    }
+  }, [googleAuthResponse]);
 
   const formScale = useSharedValue(1);
   const formAnimStyle = useAnimatedStyle(() => ({
@@ -201,8 +238,15 @@ export default function AuthScreen() {
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+      if (err?.message === "PHONE_AUTH_NATIVE_UNSUPPORTED") {
+        setError(t(
+          "Phone sign-in is available on the web version. Please use email or Google to sign in on this device.",
+          "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0628\u0627\u0644\u0647\u0627\u062a\u0641 \u0645\u062a\u0627\u062d \u0639\u0644\u0649 \u0646\u0633\u062e\u0629 \u0627\u0644\u0648\u064a\u0628. \u064a\u0631\u062c\u0649 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0623\u0648 Google \u0644\u0644\u062a\u0633\u062c\u064a\u0644 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632."
+        ));
+      } else {
+        const code = err?.code || "";
+        setError(getFirebaseErrorMessage(code));
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -264,15 +308,27 @@ export default function AuthScreen() {
     setGoogleLoading(true);
     setError("");
     try {
-      await loginWithGoogle();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (Platform.OS === "web") {
+        await loginWithGoogle();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        if (!googleAuthRequest) {
+          setError(t("Google Sign-In is not ready. Please try again.", "\u062a\u0633\u062c\u064a\u0644 Google \u063a\u064a\u0631 \u062c\u0627\u0647\u0632. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+          setGoogleLoading(false);
+          return;
+        }
+        const result = await promptGoogleAsync();
+        if (result?.type === "dismiss" || result?.type === "cancel") {
+          setGoogleLoading(false);
+          return;
+        }
+      }
     } catch (err: any) {
       const code = err?.code || "";
       if (code !== "auth/popup-closed-by-user") {
         setError(getFirebaseErrorMessage(code));
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
       setGoogleLoading(false);
     }
   };
