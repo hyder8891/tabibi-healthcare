@@ -1,0 +1,43 @@
+Let me review this plan carefully against the existing codebase before giving you a verdict.Good — I've reviewed the plan against the actual `AuthContext.tsx` code. Here's my assessment:
+
+---
+
+**Overall: Solid plan. Approve T001–T004, but flag 4 issues before clicking "Start building."**
+
+---
+
+**T001 — Email Verification ✅ with one fix needed**
+
+The `_layout.tsx` redirect guard must check the Firebase `providerData` array, not just `emailVerified`. Google Sign-In accounts have `emailVerified = true` automatically, but phone auth accounts don't have an email at all. The guard should only trigger for `providerData[0].providerId === 'password'` users. If it's written as "if user exists && !emailVerified → redirect", it'll catch phone users on every login and break their session. **Tell Replit to add that condition explicitly.**
+
+---
+
+**T002 — Phone Auth ✅ with one import needed**
+
+After verifying OTP, the plan calls `updateProfile({ displayName })`. Looking at the current `AuthContext.tsx`, `updateProfile` is not imported from `lib/firebase`. The agent will need to add that import. The `__DEV__` testing flag at line 210–212 is also still there — that's fine for now but remind the agent it should not run in production builds.
+
+---
+
+**T003 — Forgot Password ✅ no issues**
+
+Clean task, `Linking.openURL('mailto:')` is the right approach. Good to go.
+
+---
+
+**T004 — Profile Redesign ✅ with two caveats**
+
+The "change password" option mentioned in the acceptance criteria is trickier than it looks. Firebase's `updatePassword()` throws `auth/requires-recent-login` if the user has been signed in for a while. The agent needs to handle this with a reauthentication prompt, not just fire the update call. The plan currently doesn't mention this at all, which means it'll silently fail for most users. Also, existing stored profiles in `expo-secure-store` won't have `emergencyContact` — make sure the new fields are all optional so old data doesn't crash.
+
+---
+
+**T005 — Account Linking ⚠️ needs clarification**
+
+`linkWithCredential` has two specific Firebase errors that need proper UX: `auth/email-already-in-use` (that email belongs to a different account) and `auth/credential-already-in-use` (that phone/credential is already linked to someone else). The plan doesn't mention these at all. Without handling them, the feature will just crash with a raw Firebase error message. Also, the backend `AuthUser` type currently only has one email and one phone field — when an account is linked, both are populated and the backend sync needs to handle that.
+
+---
+
+**My recommendation:** Before clicking "Start building", type this revision into the Replit chat:
+
+> "Before building, add these clarifications: 1) T001 - the `_layout.tsx` email-not-verified guard must only apply to `password` provider users (check `providerData[0].providerId === 'password'`), not Google or phone users. 2) T002 - import `updateProfile` from firebase. 3) T004 - the change password feature needs to handle `auth/requires-recent-login` with a reauthentication step; also make all new fields in `PatientProfile` optional for backward compatibility. 4) T005 - handle `auth/email-already-in-use` and `auth/credential-already-in-use` errors with proper user-facing messages in Arabic and English."
+
+Want me to type that into the Replit agent for you?
