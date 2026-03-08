@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,11 +27,17 @@ import { useSettings } from "@/contexts/SettingsContext";
 
 type AuthMode = "login" | "signup";
 type IdentifierType = "email" | "phone";
-type ActiveView = "form" | "forgotPassword" | "otpVerify";
+type ActiveView = "form" | "forgotPassword" | "otpVerify" | "emailVerify";
+
+const RESEND_COOLDOWN = 60;
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
-  const { loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP, resetPassword } = useAuth();
+  const {
+    loginWithEmail, signupWithEmail, loginWithGoogle,
+    sendPhoneOTP, verifyPhoneOTP, resetPassword,
+    sendVerificationEmail, checkEmailVerification,
+  } = useAuth();
   const { t, isRTL } = useSettings();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : Math.max(insets.bottom, 16);
@@ -41,6 +48,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [phone, setPhone] = useState("");
+  const [phoneName, setPhoneName] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [resetEmail, setResetEmail] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -48,6 +56,8 @@ export default function AuthScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetSent, setResetSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [verifyingEmail, setVerifyingEmail] = useState(false);
 
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
@@ -56,6 +66,22 @@ export default function AuthScreen() {
   const formAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: formScale.value }],
   }));
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const startCooldown = () => setResendCooldown(RESEND_COOLDOWN);
 
   const toggleMode = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -94,13 +120,15 @@ export default function AuthScreen() {
       case "auth/network-request-failed":
         return t("Network error. Please check your connection.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0634\u0628\u0643\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0627\u062a\u0635\u0627\u0644.");
       case "auth/invalid-phone-number":
-        return t("Please enter a valid phone number with country code (e.g. +1...)", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641 \u0635\u062d\u064a\u062d \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629");
+        return t("Please enter a valid phone number with country code (e.g. +964...)", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641 \u0635\u062d\u064a\u062d \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629");
       case "auth/invalid-verification-code":
         return t("Invalid verification code. Please try again.", "\u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u063a\u064a\u0631 \u0635\u062d\u064a\u062d. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
       case "auth/code-expired":
         return t("Verification code expired. Please request a new one.", "\u0627\u0646\u062a\u0647\u062a \u0635\u0644\u0627\u062d\u064a\u0629 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642. \u064a\u0631\u062c\u0649 \u0637\u0644\u0628 \u0631\u0645\u0632 \u062c\u062f\u064a\u062f.");
       case "auth/missing-phone-number":
         return t("Please enter your phone number", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641\u0643");
+      case "auth/credential-already-in-use":
+        return t("This credential is already linked to another account.", "\u0647\u0630\u0627 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0645\u0631\u062a\u0628\u0637 \u0628\u062d\u0633\u0627\u0628 \u0622\u062e\u0631 \u0628\u0627\u0644\u0641\u0639\u0644.");
       default:
         return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
     }
@@ -126,6 +154,8 @@ export default function AuthScreen() {
         await loginWithEmail(email.trim(), password);
       } else {
         await signupWithEmail(email.trim(), password);
+        setActiveView("emailVerify");
+        startCooldown();
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
@@ -144,7 +174,11 @@ export default function AuthScreen() {
       return;
     }
     if (!cleaned.startsWith("+")) {
-      setError(t("Phone number must start with country code (e.g. +1, +966)", "\u064a\u062c\u0628 \u0623\u0646 \u064a\u0628\u062f\u0623 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +966)"));
+      setError(t("Phone number must start with country code (e.g. +964)", "\u064a\u062c\u0628 \u0623\u0646 \u064a\u0628\u062f\u0623 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)"));
+      return;
+    }
+    if (mode === "signup" && !phoneName.trim()) {
+      setError(t("Please enter your name", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0627\u0633\u0645\u0643"));
       return;
     }
 
@@ -157,6 +191,7 @@ export default function AuthScreen() {
       setActiveView("otpVerify");
       setOtpDigits(["", "", "", "", "", ""]);
       setOtpCode("");
+      startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       const code = err?.code || "";
@@ -178,6 +213,10 @@ export default function AuthScreen() {
     if (text && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
     }
+
+    if (fullCode.length === 6) {
+      handleVerifyOTPWithCode(fullCode);
+    }
   };
 
   const handleOtpKeyPress = (key: string, index: number) => {
@@ -190,8 +229,7 @@ export default function AuthScreen() {
     }
   };
 
-  const handleVerifyOTP = async () => {
-    const code = otpDigits.join("");
+  const handleVerifyOTPWithCode = async (code: string) => {
     if (code.length !== 6) {
       setError(t("Please enter the 6-digit code", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u0643\u0648\u0646 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645"));
       return;
@@ -202,16 +240,18 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await verifyPhoneOTP(code);
+      await verifyPhoneOTP(code, mode === "signup" ? phoneName.trim() : undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+      const errCode = err?.code || "";
+      setError(getFirebaseErrorMessage(errCode));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleVerifyOTP = () => handleVerifyOTPWithCode(otpDigits.join(""));
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
@@ -240,6 +280,7 @@ export default function AuthScreen() {
     try {
       await resetPassword(resetEmail.trim());
       setResetSent(true);
+      startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       const code = err?.code || "";
@@ -248,6 +289,198 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
+
+  const handleResendVerificationEmail = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    setError("");
+    try {
+      await sendVerificationEmail();
+      startCooldown();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      setError(t("Failed to resend. Please try again.", "\u0641\u0634\u0644 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckVerification = async () => {
+    setVerifyingEmail(true);
+    setError("");
+    try {
+      const verified = await checkEmailVerification();
+      if (!verified) {
+        setError(t("Email not verified yet. Please check your inbox.", "\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0628\u0631\u064a\u062f \u0628\u0639\u062f. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0635\u0646\u062f\u0648\u0642 \u0627\u0644\u0648\u0627\u0631\u062f."));
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      setError(t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+    } finally {
+      setVerifyingEmail(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    if (resendCooldown > 0) return;
+    setOtpDigits(["", "", "", "", "", ""]);
+    setOtpCode("");
+    setError("");
+    setLoading(true);
+    try {
+      await sendPhoneOTP(phone.trim());
+      startCooldown();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      const code = err?.code || "";
+      setError(getFirebaseErrorMessage(code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendResetEmail = async () => {
+    if (resendCooldown > 0) return;
+    setLoading(true);
+    setError("");
+    try {
+      await resetPassword(resetEmail.trim());
+      startCooldown();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err: any) {
+      const code = err?.code || "";
+      setError(getFirebaseErrorMessage(code));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderHeader = () => (
+    <View style={styles.headerSection}>
+      <LinearGradient
+        colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.logoBg}
+      >
+        <MaterialCommunityIcons name="stethoscope" size={40} color="#fff" />
+      </LinearGradient>
+    </View>
+  );
+
+  const renderBackButton = (onPress: () => void) => (
+    <Pressable onPress={onPress} style={styles.backButton} hitSlop={12}>
+      <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.light.text} />
+    </Pressable>
+  );
+
+  const renderError = () =>
+    error ? (
+      <View style={styles.errorRow}>
+        <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
+        <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{error}</Text>
+      </View>
+    ) : null;
+
+  const renderGradientButton = (text: string, onPress: () => void, isLoading: boolean, disabled?: boolean) => (
+    <Pressable
+      style={({ pressed }) => [
+        styles.submitButton,
+        pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
+        (isLoading || disabled) && { opacity: 0.7 },
+      ]}
+      onPress={onPress}
+      disabled={isLoading || disabled}
+    >
+      <LinearGradient
+        colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.submitGradient}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.submitText}>{text}</Text>
+        )}
+      </LinearGradient>
+    </Pressable>
+  );
+
+  if (activeView === "emailVerify") {
+    return (
+      <View style={[styles.container, { paddingTop: topInset }]}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomInset + 20 }]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {renderHeader()}
+
+            <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
+              {renderBackButton(() => { setActiveView("form"); setError(""); })}
+
+              <View style={styles.verificationHeader}>
+                <View style={styles.verificationIconBg}>
+                  <Ionicons name="mail-unread" size={32} color={Colors.light.primary} />
+                </View>
+                <Text style={[styles.verificationTitle, isRTL && { textAlign: "right" }]}>
+                  {t("Verify Your Email", "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0628\u0631\u064a\u062f\u0643")}
+                </Text>
+                <Text style={[styles.verificationSubtitle, isRTL && { textAlign: "right" }]}>
+                  {t(
+                    `We sent a verification link to ${email}. Please check your inbox and click the link to verify.`,
+                    `\u0623\u0631\u0633\u0644\u0646\u0627 \u0631\u0627\u0628\u0637 \u062a\u062d\u0642\u0642 \u0625\u0644\u0649 ${email}. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0635\u0646\u062f\u0648\u0642 \u0627\u0644\u0648\u0627\u0631\u062f \u0648\u0627\u0644\u0646\u0642\u0631 \u0639\u0644\u0649 \u0627\u0644\u0631\u0627\u0628\u0637.`,
+                  )}
+                </Text>
+              </View>
+
+              {renderError()}
+
+              {renderGradientButton(
+                t("I've Verified My Email", "\u0644\u0642\u062f \u062a\u062d\u0642\u0642\u062a \u0645\u0646 \u0628\u0631\u064a\u062f\u064a"),
+                handleCheckVerification,
+                verifyingEmail,
+              )}
+
+              <View style={{ height: 12 }} />
+
+              <Pressable
+                style={({ pressed }) => [
+                  styles.outlineButton,
+                  pressed && { opacity: 0.8 },
+                ]}
+                onPress={() => Linking.openURL("mailto:")}
+              >
+                <Ionicons name="open-outline" size={18} color={Colors.light.primary} />
+                <Text style={styles.outlineButtonText}>
+                  {t("Open Email App", "\u0641\u062a\u062d \u062a\u0637\u0628\u064a\u0642 \u0627\u0644\u0628\u0631\u064a\u062f")}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                onPress={handleResendVerificationEmail}
+                style={styles.resendButton}
+                disabled={loading || resendCooldown > 0}
+              >
+                <Text style={[styles.resendText, resendCooldown > 0 && { color: Colors.light.textTertiary }]}>
+                  {resendCooldown > 0
+                    ? t(`Resend in ${resendCooldown}s`, `\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644 \u062e\u0644\u0627\u0644 ${resendCooldown} \u062b\u0627\u0646\u064a\u0629`)
+                    : t("Resend Verification Email", "\u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u062d\u0642\u0642")}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    );
+  }
 
   if (activeView === "otpVerify") {
     return (
@@ -262,25 +495,10 @@ export default function AuthScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.headerSection}>
-              <LinearGradient
-                colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.logoBg}
-              >
-                <MaterialCommunityIcons name="stethoscope" size={40} color="#fff" />
-              </LinearGradient>
-            </View>
+            {renderHeader()}
 
             <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
-              <Pressable
-                onPress={() => { setActiveView("form"); setError(""); }}
-                style={styles.backButton}
-                hitSlop={12}
-              >
-                <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.light.text} />
-              </Pressable>
+              {renderBackButton(() => { setActiveView("form"); setError(""); })}
 
               <View style={styles.verificationHeader}>
                 <View style={styles.verificationIconBg}>
@@ -314,51 +532,23 @@ export default function AuthScreen() {
                 ))}
               </View>
 
-              {error ? (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
-                  <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{error}</Text>
-                </View>
-              ) : null}
+              {renderError()}
+
+              {renderGradientButton(
+                t("Verify Code", "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0645\u0632"),
+                handleVerifyOTP,
+                loading,
+              )}
 
               <Pressable
-                style={({ pressed }) => [
-                  styles.submitButton,
-                  pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                  loading && { opacity: 0.7 },
-                ]}
-                onPress={handleVerifyOTP}
-                disabled={loading}
-                testID="verify-otp-button"
-              >
-                <LinearGradient
-                  colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.submitGradient}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text style={styles.submitText}>
-                      {t("Verify Code", "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0631\u0645\u0632")}
-                    </Text>
-                  )}
-                </LinearGradient>
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setOtpDigits(["", "", "", "", "", ""]);
-                  setOtpCode("");
-                  setError("");
-                  handlePhoneSubmit();
-                }}
+                onPress={handleResendOTP}
                 style={styles.resendButton}
-                disabled={loading}
+                disabled={loading || resendCooldown > 0}
               >
-                <Text style={styles.resendText}>
-                  {t("Resend Code", "\u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632")}
+                <Text style={[styles.resendText, resendCooldown > 0 && { color: Colors.light.textTertiary }]}>
+                  {resendCooldown > 0
+                    ? t(`Resend in ${resendCooldown}s`, `\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644 \u062e\u0644\u0627\u0644 ${resendCooldown} \u062b\u0627\u0646\u064a\u0629`)
+                    : t("Resend Code", "\u0625\u0639\u0627\u062f\u0629 \u0625\u0631\u0633\u0627\u0644 \u0627\u0644\u0631\u0645\u0632")}
                 </Text>
               </Pressable>
             </Animated.View>
@@ -382,36 +572,26 @@ export default function AuthScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            <View style={styles.headerSection}>
-              <LinearGradient
-                colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.logoBg}
-              >
-                <MaterialCommunityIcons name="stethoscope" size={40} color="#fff" />
-              </LinearGradient>
-            </View>
+            {renderHeader()}
 
             <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
-              <Pressable
-                onPress={() => { setActiveView("form"); setError(""); setResetSent(false); }}
-                style={styles.backButton}
-                hitSlop={12}
-              >
-                <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.light.text} />
-              </Pressable>
+              {renderBackButton(() => { setActiveView("form"); setError(""); setResetSent(false); })}
 
               <View style={styles.verificationHeader}>
                 <View style={styles.verificationIconBg}>
-                  <Ionicons name="key" size={32} color={Colors.light.primary} />
+                  <Ionicons name={resetSent ? "checkmark-circle" : "key"} size={32} color={resetSent ? Colors.light.success : Colors.light.primary} />
                 </View>
                 <Text style={[styles.verificationTitle, isRTL && { textAlign: "right" }]}>
-                  {t("Reset Password", "\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631")}
+                  {resetSent
+                    ? t("Check Your Email", "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0628\u0631\u064a\u062f\u0643")
+                    : t("Reset Password", "\u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631")}
                 </Text>
                 <Text style={[styles.verificationSubtitle, isRTL && { textAlign: "right" }]}>
                   {resetSent
-                    ? t("Check your email for a password reset link.", "\u062a\u062d\u0642\u0642 \u0645\u0646 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0644\u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631.")
+                    ? t(
+                        `We sent a password reset link to ${resetEmail}. Please check your inbox.`,
+                        `\u0623\u0631\u0633\u0644\u0646\u0627 \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u062a\u0639\u064a\u064a\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0625\u0644\u0649 ${resetEmail}. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0635\u0646\u062f\u0648\u0642 \u0627\u0644\u0648\u0627\u0631\u062f.`,
+                      )
                     : t("Enter your email and we'll send you a reset link.", "\u0623\u062f\u062e\u0644 \u0628\u0631\u064a\u062f\u0643 \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0648\u0633\u0646\u0631\u0633\u0644 \u0644\u0643 \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0639\u064a\u064a\u0646.")}
                 </Text>
               </View>
@@ -435,57 +615,49 @@ export default function AuthScreen() {
                 </View>
               )}
 
-              {error ? (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
-                  <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{error}</Text>
-                </View>
-              ) : null}
+              {renderError()}
 
               {!resetSent ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.submitButton,
-                    pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                    loading && { opacity: 0.7 },
-                  ]}
-                  onPress={handleResetPassword}
-                  disabled={loading}
-                >
-                  <LinearGradient
-                    colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.submitGradient}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.submitText}>
-                        {t("Send Reset Link", "\u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0639\u064a\u064a\u0646")}
-                      </Text>
-                    )}
-                  </LinearGradient>
-                </Pressable>
+                renderGradientButton(
+                  t("Send Reset Link", "\u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u062a\u0639\u064a\u064a\u0646"),
+                  handleResetPassword,
+                  loading,
+                )
               ) : (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.submitButton,
-                    pressed && { opacity: 0.9, transform: [{ scale: 0.98 }] },
-                  ]}
-                  onPress={() => { setActiveView("form"); setResetSent(false); setError(""); }}
-                >
-                  <LinearGradient
-                    colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.submitGradient}
+                <>
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.outlineButton,
+                      pressed && { opacity: 0.8 },
+                    ]}
+                    onPress={() => Linking.openURL("mailto:")}
                   >
-                    <Text style={styles.submitText}>
-                      {t("Back to Login", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644")}
+                    <Ionicons name="open-outline" size={18} color={Colors.light.primary} />
+                    <Text style={styles.outlineButtonText}>
+                      {t("Open Email App", "\u0641\u062a\u062d \u062a\u0637\u0628\u064a\u0642 \u0627\u0644\u0628\u0631\u064a\u062f")}
                     </Text>
-                  </LinearGradient>
-                </Pressable>
+                  </Pressable>
+
+                  <View style={{ height: 12 }} />
+
+                  {renderGradientButton(
+                    t("Back to Login", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644"),
+                    () => { setActiveView("form"); setResetSent(false); setError(""); },
+                    false,
+                  )}
+
+                  <Pressable
+                    onPress={handleResendResetEmail}
+                    style={styles.resendButton}
+                    disabled={loading || resendCooldown > 0}
+                  >
+                    <Text style={[styles.resendText, resendCooldown > 0 && { color: Colors.light.textTertiary }]}>
+                      {resendCooldown > 0
+                        ? t(`Resend in ${resendCooldown}s`, `\u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644 \u062e\u0644\u0627\u0644 ${resendCooldown} \u062b\u0627\u0646\u064a\u0629`)
+                        : t("Didn't receive it? Resend", "\u0644\u0645 \u064a\u0635\u0644\u0643\u061f \u0623\u0639\u062f \u0627\u0644\u0625\u0631\u0633\u0627\u0644")}
+                    </Text>
+                  </Pressable>
+                </>
               )}
             </Animated.View>
           </ScrollView>
@@ -633,35 +805,51 @@ export default function AuthScreen() {
                 )}
               </>
             ) : (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
-                  {t("Phone Number", "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641")}
-                </Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="call-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
-                  <TextInput
-                    style={[styles.textInput, isRTL && { textAlign: "right" }]}
-                    value={phone}
-                    onChangeText={setPhone}
-                    placeholder={t("+1 (555) 000-0000", "+966 5XX XXX XXXX")}
-                    placeholderTextColor={Colors.light.textTertiary}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                    testID="phone-input"
-                  />
+              <>
+                {mode === "signup" && (
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
+                      {t("Full Name", "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644")}
+                    </Text>
+                    <View style={styles.inputWrapper}>
+                      <Ionicons name="person-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                      <TextInput
+                        style={[styles.textInput, isRTL && { textAlign: "right" }]}
+                        value={phoneName}
+                        onChangeText={setPhoneName}
+                        placeholder={t("Your full name", "\u0627\u0633\u0645\u0643 \u0627\u0644\u0643\u0627\u0645\u0644")}
+                        placeholderTextColor={Colors.light.textTertiary}
+                        autoCapitalize="words"
+                        testID="phone-name-input"
+                      />
+                    </View>
+                  </View>
+                )}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
+                    {t("Phone Number", "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641")}
+                  </Text>
+                  <View style={styles.inputWrapper}>
+                    <Ionicons name="call-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.textInput, isRTL && { textAlign: "right" }]}
+                      value={phone}
+                      onChangeText={setPhone}
+                      placeholder={t("+964 7XX XXX XXXX", "+964 7XX XXX XXXX")}
+                      placeholderTextColor={Colors.light.textTertiary}
+                      keyboardType="phone-pad"
+                      autoComplete="tel"
+                      testID="phone-input"
+                    />
+                  </View>
+                  <Text style={[styles.phoneHint, isRTL && { textAlign: "right" }]}>
+                    {t("Include country code (e.g. +964)", "\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)")}
+                  </Text>
                 </View>
-                <Text style={[styles.phoneHint, isRTL && { textAlign: "right" }]}>
-                  {t("Include country code (e.g. +1, +966)", "\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +966)")}
-                </Text>
-              </View>
+              </>
             )}
 
-            {error ? (
-              <View style={styles.errorRow}>
-                <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
-                <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{error}</Text>
-              </View>
-            ) : null}
+            {renderError()}
 
             <Pressable
               style={({ pressed }) => [
@@ -925,6 +1113,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "DMSans_600SemiBold",
     color: "#fff",
+  },
+  outlineButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: Colors.light.primary,
+    paddingVertical: 13,
+  },
+  outlineButtonText: {
+    fontSize: 15,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
   },
   dividerRow: {
     flexDirection: "row",

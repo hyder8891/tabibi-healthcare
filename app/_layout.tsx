@@ -26,7 +26,7 @@ SplashScreen.preventAutoHideAsync();
 const PUBLIC_ROUTES = ["privacy", "terms"];
 
 function RootLayoutNav() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, needsEmailVerification } = useAuth();
   const [checkedOnboarding, setCheckedOnboarding] = useState(false);
   const segments = useSegments();
 
@@ -40,6 +40,10 @@ function RootLayoutNav() {
       router.replace("/auth");
       return;
     }
+    if (needsEmailVerification) {
+      router.replace("/auth");
+      return;
+    }
     getProfile().then((profile) => {
       if (!profile.onboardingComplete) {
         router.replace("/onboarding");
@@ -48,7 +52,7 @@ function RootLayoutNav() {
       }
       setCheckedOnboarding(true);
     });
-  }, [user, isLoading]);
+  }, [user, isLoading, needsEmailVerification]);
 
   if (isLoading) {
     return (

@@ -1,6 +1,13 @@
+export interface EmergencyContact {
+  name?: string;
+  phone?: string;
+  relationship?: string;
+}
+
 export interface PatientProfile {
   name?: string;
   age?: number;
+  dateOfBirth?: string;
   weight?: number;
   height?: number;
   gender?: string;
@@ -12,6 +19,7 @@ export interface PatientProfile {
   lastBpm?: number;
   lastBpmDate?: number;
   onboardingComplete?: boolean;
+  emergencyContact?: EmergencyContact;
 }
 
 export interface ScannedMedication {

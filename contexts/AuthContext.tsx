@@ -9,11 +9,17 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  sendEmailVerification,
   signInWithPopup,
   signInWithPhoneNumber,
   signInWithCredential,
+  linkWithCredential,
+  updateProfile as firebaseUpdateProfile,
+  updatePassword as firebaseUpdatePassword,
+  reauthenticateWithCredential,
   RecaptchaVerifier,
   GoogleAuthProvider,
+  EmailAuthProvider,
   googleProvider,
   type FirebaseUser,
   type ConfirmationResult,
@@ -47,12 +53,19 @@ interface AuthUser {
 interface AuthContextValue {
   user: AuthUser | null;
   isLoading: boolean;
+  isEmailVerified: boolean;
+  needsEmailVerification: boolean;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   sendPhoneOTP: (phoneNumber: string) => Promise<void>;
-  verifyPhoneOTP: (code: string) => Promise<void>;
+  verifyPhoneOTP: (code: string, displayName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  sendVerificationEmail: () => Promise<void>;
+  checkEmailVerification: () => Promise<boolean>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  linkEmailToPhone: (email: string, password: string) => Promise<void>;
+  linkPhoneToEmail: (phoneNumber: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -61,9 +74,16 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEmailVerified, setIsEmailVerified] = useState(true);
+  const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
+
+  const isPasswordProvider = (fbUser: FirebaseUser | null): boolean => {
+    if (!fbUser) return false;
+    return fbUser.providerData.some(p => p.providerId === "password");
+  };
 
   const persistUser = async (userData: AuthUser | null) => {
     try {
@@ -125,6 +145,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (firebaseUser) {
         firebaseUserRef.current = firebaseUser;
+        const needsVerify = isPasswordProvider(firebaseUser) && !firebaseUser.emailVerified;
+        if (mounted) {
+          setIsEmailVerified(!needsVerify);
+          setNeedsEmailVerification(needsVerify);
+        }
         try {
           const backendUser = await syncWithBackend(firebaseUser);
           if (mounted) {
@@ -138,6 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         firebaseUserRef.current = null;
         if (mounted) {
           setUser(null);
+          setIsEmailVerified(true);
+          setNeedsEmailVerification(false);
           await persistUser(null);
         }
       }
@@ -166,6 +193,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signupWithEmail = useCallback(async (email: string, password: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     firebaseUserRef.current = cred.user;
+    await sendEmailVerification(cred.user);
+    setNeedsEmailVerification(true);
+    setIsEmailVerified(false);
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
@@ -212,12 +242,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const verifyPhoneOTP = useCallback(async (code: string) => {
+  const verifyPhoneOTP = useCallback(async (code: string, displayName?: string) => {
     if (!confirmationResultRef.current) {
       throw new Error("No pending phone verification. Please request a code first.");
     }
     const cred = await confirmationResultRef.current.confirm(code);
     firebaseUserRef.current = cred.user;
+    if (displayName && cred.user) {
+      await firebaseUpdateProfile(cred.user, { displayName });
+    }
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
@@ -228,19 +261,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sendPasswordResetEmail(auth, email);
   }, []);
 
+  const sendVerificationEmailFn = useCallback(async () => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) throw new Error("Not signed in");
+    await sendEmailVerification(fbUser);
+  }, []);
+
+  const checkEmailVerification = useCallback(async (): Promise<boolean> => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) return false;
+    await fbUser.reload();
+    const verified = fbUser.emailVerified;
+    if (verified) {
+      setIsEmailVerified(true);
+      setNeedsEmailVerification(false);
+      const backendUser = await syncWithBackend(fbUser);
+      setUser(backendUser);
+      await persistUser(backendUser);
+    }
+    return verified;
+  }, []);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string) => {
+    const fbUser = auth.currentUser;
+    if (!fbUser || !fbUser.email) throw new Error("Not signed in with email");
+    const credential = EmailAuthProvider.credential(fbUser.email, currentPassword);
+    await reauthenticateWithCredential(fbUser, credential);
+    await firebaseUpdatePassword(fbUser, newPassword);
+  }, []);
+
+  const linkEmailToPhone = useCallback(async (email: string, password: string) => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) throw new Error("Not signed in");
+    const credential = EmailAuthProvider.credential(email, password);
+    await linkWithCredential(fbUser, credential);
+    await sendEmailVerification(fbUser);
+    const backendUser = await syncWithBackend(fbUser);
+    setUser(backendUser);
+    await persistUser(backendUser);
+  }, []);
+
+  const linkPhoneToEmail = useCallback(async (phoneNumber: string) => {
+    const fbUser = auth.currentUser;
+    if (!fbUser) throw new Error("Not signed in");
+    if (Platform.OS === "web") {
+      if (!recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+      }
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
+      confirmationResultRef.current = confirmation;
+    } else {
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber);
+      confirmationResultRef.current = confirmation;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await firebaseSignOut(auth);
     } catch {}
     firebaseUserRef.current = null;
     setUser(null);
+    setIsEmailVerified(true);
+    setNeedsEmailVerification(false);
     await persistUser(null);
     confirmationResultRef.current = null;
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP, resetPassword, logout }),
-    [user, isLoading, loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP, resetPassword, logout],
+    () => ({
+      user, isLoading, isEmailVerified, needsEmailVerification,
+      loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP,
+      resetPassword, sendVerificationEmail: sendVerificationEmailFn, checkEmailVerification,
+      changePassword, linkEmailToPhone, linkPhoneToEmail, logout,
+    }),
+    [user, isLoading, isEmailVerified, needsEmailVerification,
+      loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP,
+      resetPassword, sendVerificationEmailFn, checkEmailVerification,
+      changePassword, linkEmailToPhone, linkPhoneToEmail, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

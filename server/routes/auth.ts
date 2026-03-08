@@ -41,11 +41,13 @@ export function registerAuthRoutes(app: Express): void {
           });
         }
       } else {
-        if (firebaseUser.name || firebaseUser.picture) {
-          user = await storage.updateUser(user.id, {
-            name: firebaseUser.name || user.name,
-            photoUrl: firebaseUser.picture || user.photoUrl,
-          });
+        const updates: Record<string, any> = {};
+        if (firebaseUser.name && firebaseUser.name !== user.name) updates.name = firebaseUser.name;
+        if (firebaseUser.picture && firebaseUser.picture !== user.photoUrl) updates.photoUrl = firebaseUser.picture;
+        if (firebaseUser.email && !user.email) updates.email = firebaseUser.email;
+        if (firebaseUser.phone_number && !user.phone) updates.phone = firebaseUser.phone_number;
+        if (Object.keys(updates).length > 0) {
+          user = await storage.updateUser(user.id, updates);
         }
       }
 
