@@ -688,14 +688,15 @@ class PharmacyService {
   /**
    * Encrypt password (use a proper encryption library in production)
    * @param {string} password - Plain text password
-   * @returns {string} Encrypted password
+   * @returns {string} Encrypted password as iv:ciphertext (hex)
    */
   encryptPassword(password) {
-    // In production, use a proper encryption library like 'bcrypt' or 'crypto'
-    const cipher = crypto.createCipher('aes-256-cbc', process.env.ENCRYPTION_KEY);
+    const key = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
     let encrypted = cipher.update(password, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return encrypted;
+    return iv.toString('hex') + ':' + encrypted;
   }
 }
 
