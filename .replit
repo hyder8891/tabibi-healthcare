@@ -79,3 +79,4 @@ ensurePreviewReachable = "/status"
 
 [userenv.shared]
 ENCRYPTION_KEY = "f73322312daa5f35599e45a61dd406150c34a3192aa54b5c18509dbf9f21baf5"
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = "238884248738-qp43962v0of6vreq5383nmavob924tmc.apps.googleusercontent.com"
