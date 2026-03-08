@@ -185,6 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithEmail = useCallback(async (email: string, password: string) => {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     firebaseUserRef.current = cred.user;
+    if (isPasswordProvider(cred.user) && !cred.user.emailVerified) {
+      setNeedsEmailVerification(true);
+      setIsEmailVerified(false);
+    }
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);

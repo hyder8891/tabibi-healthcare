@@ -29,6 +29,7 @@ function RootLayoutNav() {
   const { user, isLoading, needsEmailVerification } = useAuth();
   const [checkedOnboarding, setCheckedOnboarding] = useState(false);
   const segments = useSegments();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (isLoading) return;
@@ -41,7 +42,9 @@ function RootLayoutNav() {
       return;
     }
     if (needsEmailVerification) {
-      router.replace("/auth");
+      if (pathname !== "/auth") {
+        router.replace("/auth");
+      }
       return;
     }
     getProfile().then((profile) => {

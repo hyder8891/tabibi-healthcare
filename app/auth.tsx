@@ -37,6 +37,7 @@ export default function AuthScreen() {
     loginWithEmail, signupWithEmail, loginWithGoogle,
     sendPhoneOTP, verifyPhoneOTP, resetPassword,
     sendVerificationEmail, checkEmailVerification,
+    needsEmailVerification, user,
   } = useAuth();
   const { t, isRTL } = useSettings();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -66,6 +67,12 @@ export default function AuthScreen() {
   const formAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: formScale.value }],
   }));
+
+  useEffect(() => {
+    if (needsEmailVerification && user && activeView !== "emailVerify") {
+      setActiveView("emailVerify");
+    }
+  }, [needsEmailVerification, user]);
 
   useEffect(() => {
     if (resendCooldown <= 0) return;
