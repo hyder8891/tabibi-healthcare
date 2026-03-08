@@ -21,11 +21,24 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Google from "expo-auth-session/providers/google";
 import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
+
+let GoogleModule: typeof import("expo-auth-session/providers/google") | null = null;
+try {
+  GoogleModule = require("expo-auth-session/providers/google");
+} catch {
+  GoogleModule = null;
+}
+
+function useGoogleIdTokenAuthRequestSafe(config: { clientId: string }) {
+  if (GoogleModule?.useIdTokenAuthRequest) {
+    return GoogleModule.useIdTokenAuthRequest(config);
+  }
+  return [null, null, async () => null] as [null, null, () => Promise<null>];
+}
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -67,7 +80,7 @@ export default function AuthScreen() {
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
 
-  const [googleAuthRequest, googleAuthResponse, promptGoogleAsync] = Google.useIdTokenAuthRequest({
+  const [googleAuthRequest, googleAuthResponse, promptGoogleAsync] = useGoogleIdTokenAuthRequestSafe({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
   });
 
