@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
+import { firebaseConfig } from "@/lib/firebase";
 import {
   View,
   Text,
@@ -78,6 +80,7 @@ export default function AuthScreen() {
   const [verifyingEmail, setVerifyingEmail] = useState(false);
 
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
+  const recaptchaVerifierRef = useRef<any>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
 
   const [googleAuthRequest, googleAuthResponse, promptGoogleAsync] = useGoogleIdTokenAuthRequestSafe({
@@ -244,7 +247,7 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await sendPhoneOTP(cleaned);
+      await sendPhoneOTP(cleaned, recaptchaVerifierRef.current);
       setActiveView("otpVerify");
       setOtpDigits(["", "", "", "", "", ""]);
       setOtpCode("");
@@ -321,21 +324,8 @@ export default function AuthScreen() {
     setGoogleLoading(true);
     setError("");
     try {
-      if (Platform.OS === "web") {
-        await loginWithGoogle();
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        if (!googleAuthRequest) {
-          setError(t("Google Sign-In is not ready. Please try again.", "\u062a\u0633\u062c\u064a\u0644 Google \u063a\u064a\u0631 \u062c\u0627\u0647\u0632. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
-          setGoogleLoading(false);
-          return;
-        }
-        const result = await promptGoogleAsync();
-        if (result?.type === "dismiss" || result?.type === "cancel") {
-          setGoogleLoading(false);
-          return;
-        }
-      }
+      await loginWithGoogle();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
       const code = err?.code || "";
       if (code !== "auth/popup-closed-by-user") {
@@ -405,7 +395,7 @@ export default function AuthScreen() {
     setError("");
     setLoading(true);
     try {
-      await sendPhoneOTP(phone.trim());
+      await sendPhoneOTP(phone.trim(), recaptchaVerifierRef.current);
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
@@ -1000,6 +990,11 @@ export default function AuthScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaVerifierRef}
+        firebaseConfig={firebaseConfig}
+        attemptInvisibleVerification={true}
+      />
       {Platform.OS === "web" && <div id="recaptcha-container" style={{ position: "fixed" as any, bottom: 0, left: 0, opacity: 0, pointerEvents: "none" as any }} />}
     </View>
   );

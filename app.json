@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "\u0637\u0628\u064a\u0628\u064a - Tabibi",
+    "name": "طبيبي - Tabibi",
     "slug": "tabibi",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "tabibi",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.tabibi.health",
-      "versionCode": 1,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
