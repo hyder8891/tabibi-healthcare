@@ -816,6 +816,16 @@ export default function AuthScreen() {
                   </Pressable>
                 )}
               </>
+            ) : Platform.OS !== "web" ? (
+              <View style={styles.phoneNativeNotice}>
+                <Ionicons name="information-circle-outline" size={18} color={Colors.light.primary} />
+                <Text style={[styles.phoneNativeNoticeText, isRTL && { textAlign: "right" }]}>
+                  {t(
+                    "Phone sign-in is currently available on the web version only. Please use email or Google on this device.",
+                    "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0628\u0627\u0644\u0647\u0627\u062a\u0641 \u0645\u062a\u0627\u062d \u062d\u0627\u0644\u064a\u0627\u064b \u0639\u0644\u0649 \u0646\u0633\u062e\u0629 \u0627\u0644\u0648\u064a\u0628 \u0641\u0642\u0637. \u064a\u0631\u062c\u0649 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0623\u0648 Google."
+                  )}
+                </Text>
+              </View>
             ) : (
               <>
                 {mode === "signup" && (
@@ -863,6 +873,7 @@ export default function AuthScreen() {
 
             {renderError()}
 
+            {!(identifierType === "phone" && Platform.OS !== "web") && (
             <Pressable
               style={({ pressed }) => [
                 styles.submitButton,
@@ -895,6 +906,7 @@ export default function AuthScreen() {
                 )}
               </LinearGradient>
             </Pressable>
+            )}
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -1077,6 +1089,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.text,
+  },
+  phoneNativeNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: Colors.light.primary + "12",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.primary + "30",
+  },
+  phoneNativeNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.text,
+    lineHeight: 18,
   },
   phoneHint: {
     fontSize: 12,
