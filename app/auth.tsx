@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { FirebaseRecaptchaVerifierModal } from "expo-firebase-recaptcha";
-import { firebaseConfig } from "@/lib/firebase";
 import {
   View,
   Text,
@@ -23,26 +21,9 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
-
-let GoogleModule: typeof import("expo-auth-session/providers/google") | null = null;
-try {
-  GoogleModule = require("expo-auth-session/providers/google");
-} catch {
-  GoogleModule = null;
-}
-
-function useGoogleIdTokenAuthRequestSafe(config: { clientId: string }) {
-  if (GoogleModule?.useIdTokenAuthRequest) {
-    return GoogleModule.useIdTokenAuthRequest(config);
-  }
-  return [null, null, async () => null] as [null, null, () => Promise<null>];
-}
-
-WebBrowser.maybeCompleteAuthSession();
 
 type AuthMode = "login" | "signup";
 type IdentifierType = "email" | "phone";
@@ -80,41 +61,7 @@ export default function AuthScreen() {
   const [verifyingEmail, setVerifyingEmail] = useState(false);
 
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
-  const recaptchaVerifierRef = useRef<any>(null);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
-
-  const [googleAuthRequest, googleAuthResponse, promptGoogleAsync] = useGoogleIdTokenAuthRequestSafe({
-    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
-  });
-
-  useEffect(() => {
-    if (!googleAuthResponse) return;
-    if (googleAuthResponse.type === "success") {
-      const idToken = googleAuthResponse.params?.id_token;
-      if (idToken) {
-        setGoogleLoading(true);
-        setError("");
-        loginWithGoogle(idToken)
-          .then(() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          })
-          .catch((err: any) => {
-            const code = err?.code || "";
-            setError(getFirebaseErrorMessage(code));
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          })
-          .finally(() => setGoogleLoading(false));
-      } else {
-        setError(t("Failed to get Google credentials. Please try again.", "\u0641\u0634\u0644 \u0627\u0644\u062d\u0635\u0648\u0644 \u0639\u0644\u0649 \u0628\u064a\u0627\u0646\u0627\u062a Google. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
-        setGoogleLoading(false);
-      }
-    } else if (googleAuthResponse.type === "error") {
-      setError(t("Google Sign-In failed. Please try again.", "\u0641\u0634\u0644 \u062a\u0633\u062c\u064a\u0644 Google. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
-      setGoogleLoading(false);
-    } else if (googleAuthResponse.type === "dismiss") {
-      setGoogleLoading(false);
-    }
-  }, [googleAuthResponse]);
 
   const formScale = useSharedValue(1);
   const formAnimStyle = useAnimatedStyle(() => ({
@@ -247,7 +194,7 @@ export default function AuthScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      await sendPhoneOTP(cleaned, recaptchaVerifierRef.current);
+      await sendPhoneOTP(cleaned);
       setActiveView("otpVerify");
       setOtpDigits(["", "", "", "", "", ""]);
       setOtpCode("");
@@ -395,7 +342,7 @@ export default function AuthScreen() {
     setError("");
     setLoading(true);
     try {
-      await sendPhoneOTP(phone.trim(), recaptchaVerifierRef.current);
+      await sendPhoneOTP(phone.trim());
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: any) {
@@ -620,7 +567,6 @@ export default function AuthScreen() {
             </Animated.View>
           </ScrollView>
         </KeyboardAvoidingView>
-        {Platform.OS === "web" && <div id="recaptcha-container" style={{ position: "fixed" as any, bottom: 0, left: 0, opacity: 0, pointerEvents: "none" as any }} />}
       </View>
     );
   }
@@ -990,12 +936,6 @@ export default function AuthScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <FirebaseRecaptchaVerifierModal
-        ref={recaptchaVerifierRef}
-        firebaseConfig={firebaseConfig}
-        attemptInvisibleVerification={true}
-      />
-      {Platform.OS === "web" && <div id="recaptcha-container" style={{ position: "fixed" as any, bottom: 0, left: 0, opacity: 0, pointerEvents: "none" as any }} />}
     </View>
   );
 }

@@ -58,7 +58,7 @@ interface AuthContextValue {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken?: string) => Promise<void>;
-  sendPhoneOTP: (phoneNumber: string, appVerifier?: any) => Promise<void>;
+  sendPhoneOTP: (phoneNumber: string) => Promise<void>;
   verifyPhoneOTP: (code: string, displayName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
@@ -240,22 +240,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const sendPhoneOTP = useCallback(async (phoneNumber: string, appVerifier?: any) => {
-    if (Platform.OS === "web") {
-      if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
-          size: "invisible",
-        });
-      }
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
-      confirmationResultRef.current = confirmation;
-    } else {
-      if (!appVerifier) {
-        throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
-      }
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      confirmationResultRef.current = confirmation;
+  const sendPhoneOTP = useCallback(async (phoneNumber: string) => {
+    if (Platform.OS !== "web") {
+      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+        size: "invisible",
+      });
+    }
+    const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
+    confirmationResultRef.current = confirmation;
   }, []);
 
   const verifyPhoneOTP = useCallback(async (code: string, displayName?: string) => {
@@ -320,19 +315,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const linkPhoneToEmail = useCallback(async (phoneNumber: string) => {
     const fbUser = auth.currentUser;
     if (!fbUser) throw new Error("Not signed in");
-    if (Platform.OS === "web") {
-      if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-      }
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
-      confirmationResultRef.current = confirmation;
-    } else {
-      if (!appVerifier) {
-        throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
-      }
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-      confirmationResultRef.current = confirmation;
+    if (Platform.OS !== "web") {
+      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+    }
+    const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
+    confirmationResultRef.current = confirmation;
   }, []);
 
   const logout = useCallback(async () => {
