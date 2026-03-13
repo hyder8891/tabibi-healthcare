@@ -936,6 +936,9 @@ export default function AuthScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {Platform.OS === "web" && (
+        <View nativeID="recaptcha-container" style={{ position: "absolute", opacity: 0, pointerEvents: "none" }} />
+      )}
     </View>
   );
 }
