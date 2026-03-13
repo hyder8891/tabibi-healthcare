@@ -114,7 +114,14 @@ export default function AuthScreen() {
     if (err instanceof TypeError) return true;
     if (err instanceof Error) {
       const msg = err.message.toLowerCase();
-      return msg.includes("network") || msg.includes("fetch") || msg.includes("connection") || msg.startsWith("4") || msg.startsWith("5");
+      return msg.includes("network") || msg.includes("fetch failed") || msg.includes("connection refused") || msg.includes("timeout") || msg.includes("abort");
+    }
+    return false;
+  };
+
+  const isBackendError = (err: unknown): boolean => {
+    if (err instanceof Error && !isNetworkError(err) && !isFirebaseError(err)) {
+      return /^\d{3}:/.test(err.message);
     }
     return false;
   };
@@ -161,7 +168,9 @@ export default function AuthScreen() {
     if (isNetworkError(err)) {
       return t("Connection error. Please check your internet and try again.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
     }
-    console.error("[Auth Error]", err);
+    if (isBackendError(err)) {
+      return t("Server error. Please try again later.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062e\u0627\u062f\u0645. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0644\u0627\u062d\u0642\u0627\u064b.");
+    }
     return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
   };
 
