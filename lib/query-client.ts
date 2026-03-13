@@ -1,5 +1,6 @@
 import { fetch } from "expo/fetch";
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { Platform } from "react-native";
 
 let getAuthToken: (() => Promise<string | null>) | null = null;
 
@@ -15,13 +16,17 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export function getApiUrl(): string {
-  let host = process.env.EXPO_PUBLIC_DOMAIN;
+  if (Platform.OS !== "web") {
+    return "https://app.tabibi.clinic/";
+  }
+
+  const host = process.env.EXPO_PUBLIC_DOMAIN;
 
   if (!host) {
     throw new Error("EXPO_PUBLIC_DOMAIN is not set");
   }
 
-  let url = new URL(`https://${host}`);
+  const url = new URL(`https://${host}`);
 
   return url.href;
 }

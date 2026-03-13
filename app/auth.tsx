@@ -106,6 +106,19 @@ export default function AuthScreen() {
     setError("");
   };
 
+  const isFirebaseError = (err: unknown): err is { code: string; message: string } => {
+    return err !== null && typeof err === "object" && "code" in err && typeof (err as { code: unknown }).code === "string";
+  };
+
+  const isNetworkError = (err: unknown): boolean => {
+    if (err instanceof TypeError) return true;
+    if (err instanceof Error) {
+      const msg = err.message.toLowerCase();
+      return msg.includes("network") || msg.includes("fetch") || msg.includes("connection") || msg.startsWith("4") || msg.startsWith("5");
+    }
+    return false;
+  };
+
   const getFirebaseErrorMessage = (code: string): string => {
     switch (code) {
       case "auth/email-already-in-use":
@@ -141,6 +154,17 @@ export default function AuthScreen() {
     }
   };
 
+  const getErrorMessage = (err: unknown): string => {
+    if (isFirebaseError(err)) {
+      return getFirebaseErrorMessage(err.code);
+    }
+    if (isNetworkError(err)) {
+      return t("Connection error. Please check your internet and try again.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+    }
+    console.error("[Auth Error]", err);
+    return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+  };
+
   const handleEmailSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       setError(t("Please fill in all fields", "\u064a\u0631\u062c\u0649 \u0645\u0644\u0621 \u062c\u0645\u064a\u0639 \u0627\u0644\u062d\u0642\u0648\u0644"));
@@ -165,9 +189,9 @@ export default function AuthScreen() {
         startCooldown();
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+    } catch (err: unknown) {
+      console.error("[Auth] Email submit error:", err);
+      setError(getErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -200,15 +224,15 @@ export default function AuthScreen() {
       setOtpCode("");
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      if (err?.message === "PHONE_AUTH_NATIVE_UNSUPPORTED") {
+    } catch (err: unknown) {
+      console.error("[Auth] Phone submit error:", err);
+      if (err instanceof Error && err.message === "PHONE_AUTH_NATIVE_UNSUPPORTED") {
         setError(t(
           "Phone sign-in is available on the web version. Please use email or Google to sign in on this device.",
           "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0628\u0627\u0644\u0647\u0627\u062a\u0641 \u0645\u062a\u0627\u062d \u0639\u0644\u0649 \u0646\u0633\u062e\u0629 \u0627\u0644\u0648\u064a\u0628. \u064a\u0631\u062c\u0649 \u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0623\u0648 Google \u0644\u0644\u062a\u0633\u062c\u064a\u0644 \u0639\u0644\u0649 \u0647\u0630\u0627 \u0627\u0644\u062c\u0647\u0627\u0632."
         ));
       } else {
-        const code = err?.code || "";
-        setError(getFirebaseErrorMessage(code));
+        setError(getErrorMessage(err));
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -256,9 +280,9 @@ export default function AuthScreen() {
     try {
       await verifyPhoneOTP(code, mode === "signup" ? phoneName.trim() : undefined);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const errCode = err?.code || "";
-      setError(getFirebaseErrorMessage(errCode));
+    } catch (err: unknown) {
+      console.error("[Auth] OTP verify error:", err);
+      setError(getErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -273,10 +297,11 @@ export default function AuthScreen() {
     try {
       await loginWithGoogle();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const code = err?.code || "";
-      if (code !== "auth/popup-closed-by-user") {
-        setError(getFirebaseErrorMessage(code));
+    } catch (err: unknown) {
+      console.error("[Auth] Google sign-in error:", err);
+      const isPopupCancelled = isFirebaseError(err) && err.code === "auth/popup-closed-by-user";
+      if (!isPopupCancelled) {
+        setError(getErrorMessage(err));
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setGoogleLoading(false);
@@ -295,9 +320,9 @@ export default function AuthScreen() {
       setResetSent(true);
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+    } catch (err: unknown) {
+      console.error("[Auth] Reset password error:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -311,8 +336,9 @@ export default function AuthScreen() {
       await sendVerificationEmail();
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      setError(t("Failed to resend. Please try again.", "\u0641\u0634\u0644 \u0625\u0639\u0627\u062f\u0629 \u0627\u0644\u0625\u0631\u0633\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+    } catch (err: unknown) {
+      console.error("[Auth] Resend verification error:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -328,8 +354,9 @@ export default function AuthScreen() {
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-    } catch {
-      setError(t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
+    } catch (err: unknown) {
+      console.error("[Auth] Check verification error:", err);
+      setError(getErrorMessage(err));
     } finally {
       setVerifyingEmail(false);
     }
@@ -345,9 +372,9 @@ export default function AuthScreen() {
       await sendPhoneOTP(phone.trim());
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+    } catch (err: unknown) {
+      console.error("[Auth] Resend OTP error:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -361,9 +388,9 @@ export default function AuthScreen() {
       await resetPassword(resetEmail.trim());
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      const code = err?.code || "";
-      setError(getFirebaseErrorMessage(code));
+    } catch (err: unknown) {
+      console.error("[Auth] Resend reset email error:", err);
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
