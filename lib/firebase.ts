@@ -18,6 +18,8 @@ import {
   reauthenticateWithCredential,
   signOut as firebaseSignOut,
   onAuthStateChanged,
+  type Auth,
+  type Persistence,
   type User as FirebaseUser,
   type ConfirmationResult,
 } from "firebase/auth";
@@ -31,25 +33,31 @@ export const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-function createAuth() {
+interface ReactNativeAsyncStorageInterface {
+  getItem: (key: string) => Promise<string | null>;
+  setItem: (key: string, value: string) => Promise<void>;
+  removeItem: (key: string) => Promise<void>;
+}
+
+function createAuth(): Auth {
   if (Platform.OS === "web") {
     return getAuth(app);
   }
   try {
-    const firebaseAuth = require("@firebase/auth") as {
-      getReactNativePersistence: (storage: any) => any;
+    const firebaseAuthModule = require("@firebase/auth") as {
+      getReactNativePersistence: (storage: ReactNativeAsyncStorageInterface) => Persistence;
     };
-    const { getReactNativePersistence } = firebaseAuth;
-    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    const asyncStorageModule = require("@react-native-async-storage/async-storage") as {
+      default: ReactNativeAsyncStorageInterface;
+    };
     return initializeAuth(app, {
-      persistence: getReactNativePersistence(AsyncStorage),
+      persistence: firebaseAuthModule.getReactNativePersistence(asyncStorageModule.default),
     });
   } catch (e: unknown) {
-    const error = e as { code?: string };
-    if (error?.code === "auth/already-initialized") {
+    if (e !== null && typeof e === "object" && "code" in e && (e as { code: string }).code === "auth/already-initialized") {
       return getAuth(app);
     }
-    return getAuth(app);
+    throw e;
   }
 }
 
