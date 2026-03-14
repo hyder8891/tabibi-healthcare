@@ -153,17 +153,46 @@ Whether the condition is mild, moderate, or severe, you MUST ALWAYS end with the
 - assessment with correct severity (mild/moderate/severe)
 - differentials (2-3 alternative diagnoses with distinguishing features)
 - triageLevel indicating time urgency (separate from severity)
-- pathway A (medicines) when OTC treatment is applicable — even for severe cases, patients may need symptomatic relief while seeking care
+- pathway A (medicines) ONLY when condition-specific OTC treatment exists — see SEVERITY-BASED MEDICATION GATE below
 - pathway B (tests) with appropriate urgency levels, estimated cost tiers, and where to get them
 - structured followUp with specific return timeline and red flags to watch for
 - warnings relevant to the condition
 NEVER leave the patient with just a text message and no structured recommendation. The app uses the JSON to display actionable guidance.
 
+SEVERITY-BASED MEDICATION GATE — MANDATORY:
+Before populating Pathway A medicines, apply these rules in order:
+
+GATE 1 — REFERRAL-ONLY CONDITIONS (pathwayA.active = false, medicines = []):
+For conditions that REQUIRE specialist medical management, do NOT recommend ANY OTC medicines. Set pathwayA.active = false and medicines = []. These include:
+- Cancer, tumors, masses, malignancies (any type — brain, lung, breast, etc.)
+- Fractures, dislocations, or structural bone/joint damage
+- Organ damage or failure (kidney, liver, heart, lung)
+- Stroke, TIA, or acute neurological deficits
+- Internal bleeding or hemorrhage
+- Suspected blood disorders (leukemia, severe anemia requiring transfusion)
+- Any condition identified from medical imaging that shows serious pathology
+- Conditions requiring surgery or hospitalization
+For these: Focus ENTIRELY on Pathway B (specialist referral, diagnostic tests, imaging). The patient needs a doctor, NOT pills.
+
+GATE 2 — CONDITION-SPECIFIC TREATMENT ONLY:
+For moderate-to-severe conditions where OTC treatment exists, recommend ONLY medicines that directly treat the underlying condition:
+- Bacterial infection → antibiotics (with doctor referral note)
+- Acid reflux → PPIs/antacids
+- Allergic reaction → antihistamines
+- Asthma exacerbation → bronchodilator inhaler
+- Dehydration → ORS
+Do NOT add "symptomatic relief" analgesics alongside condition-specific medicines unless the patient explicitly reports pain as a SEPARATE complaint.
+
+GATE 3 — MILD/ROUTINE CONDITIONS:
+Only for clearly mild, self-limiting conditions may you recommend symptomatic relief including analgesics IF pain/fever is present.
+
 CONDITION-APPROPRIATE MEDICATION SELECTION — CRITICAL:
 First identify the correct drug CLASS for the condition, THEN find the appropriate Iraqi brand.
 
 ANTI-REPETITION RULE — MANDATORY:
-You MUST NOT recommend Paracetamol (Samarra Paracetamol) and/or Ibuprofen (Brufen) unless the PRIMARY symptom is pain or fever. These two drugs are NOT appropriate for:
+You MUST NOT recommend Paracetamol (Samarra Paracetamol) and/or Ibuprofen (Brufen) unless the PRIMARY symptom is pain or fever AND the condition passes the SEVERITY-BASED MEDICATION GATE above. These two drugs are NOT appropriate for:
+- Cancer, tumors, or any malignancy (these need specialist referral, NOT painkillers)
+- Serious findings from medical imaging (masses, fractures, organ pathology)
 - GI complaints (use PPIs, antacids, antispasmodics, antiemetics, ORS)
 - Respiratory issues without fever (use mucolytics, antihistamines, inhalers)
 - Skin conditions (use topical treatments)
@@ -172,7 +201,14 @@ You MUST NOT recommend Paracetamol (Samarra Paracetamol) and/or Ibuprofen (Brufe
 - Anxiety/insomnia/dizziness/fatigue (these need targeted treatment, NOT painkillers)
 - Eye/ear infections (use topical drops)
 - Nutritional deficiencies (use supplements)
-If the condition does not involve pain or fever as the MAIN complaint, recommending Paracetamol or Ibuprofen is WRONG. Choose the drug class that treats the actual pathology.
+- ANY condition where the triage level is "immediate" or "within-hours"
+If the condition does not involve pain or fever as the MAIN complaint, recommending Paracetamol or Ibuprofen is a CRITICAL ERROR. Choose the drug class that treats the actual pathology, or set pathwayA.active = false if no OTC treatment is appropriate.
+
+SELF-CHECK BEFORE FINALIZING MEDICINES:
+Before outputting your JSON, verify:
+1. Is this a referral-only condition? → pathwayA.active = false
+2. Does every medicine in pathwayA.medicines directly treat the diagnosed condition? If any medicine is just "symptomatic relief" for a serious condition, REMOVE it.
+3. Did I default to Paracetamol/Ibuprofen out of habit? If the condition is NOT primarily pain/fever, REMOVE them and find the correct drug class.
 
 ANALGESICS & ANTI-INFLAMMATORIES (ONLY when pain/fever is the primary symptom):
 - Mild pain/headache/fever without inflammation: Paracetamol (first-line)
@@ -556,6 +592,7 @@ export function registerAiRoutes(app: Express): void {
       }
 
       let imageAnalysis = "";
+      let imageSeverityFlag = false;
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.imageData && lastMessage.role === "user") {
         try {
@@ -584,6 +621,12 @@ Be thorough and specific. Provide your analysis in the same language the user is
           });
           imageAnalysis = sanitizeInput(imageResponse.text || "");
 
+          const severityKeywords = /\b(cancer|carcinoma|malignant|malignancy|tumor|tumou?r|neoplasm|metastas[ie]s|mass|lesion|nodule|fracture|hemorrhage|haemorrhage|bleeding|stroke|infarct|thrombosis|embolism|aneurysm|organ failure|cirrhosis|fibrosis|pneumothorax|pleural effusion|سرطان|ورم|كتلة|كسر|نزيف|جلطة|انسداد)\b/i;
+          if (severityKeywords.test(imageAnalysis)) {
+            imageSeverityFlag = true;
+            console.log("Image severity flag triggered — serious pathology detected in image analysis");
+          }
+
           console.log("Image analysis completed, length:", imageAnalysis.length);
         } catch (imgErr) {
           console.error("Image analysis error:", imgErr);
@@ -608,6 +651,9 @@ Be thorough and specific. Provide your analysis in the same language the user is
           let content = m.role === "user" ? sanitizeInput(m.content) : m.content;
           if (m === lastMessage && imageAnalysis) {
             content += `\n\n[MEDICAL IMAGE ANALYSIS RESULTS]:\n${imageAnalysis}\n\nPlease incorporate these image findings into your clinical assessment. Discuss what the image shows and its clinical relevance.`;
+            if (imageSeverityFlag) {
+              content += `\n\n[CRITICAL SAFETY OVERRIDE]: The image analysis has identified potentially SERIOUS pathology (cancer, tumor, mass, fracture, hemorrhage, or organ damage). You MUST:\n1. Set assessment.severity to "severe"\n2. Set pathwayA.active to false and medicines to [] — do NOT recommend ANY OTC medicines including Paracetamol or Ibuprofen\n3. Focus ENTIRELY on Pathway B with specialist referral and urgent diagnostic tests\n4. Set triageLevel to "immediate" or "within-hours"\nThis is a GATE 1 referral-only condition. The patient needs specialist medical care, NOT pills.`;
+            }
           }
           parts.push({ text: content });
         }
@@ -626,7 +672,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
           config: {
             systemInstruction: systemContext,
             maxOutputTokens: 4096,
-            thinkingConfig: { thinkingBudget: 0 },
+            thinkingConfig: { thinkingBudget: 1024 },
           },
         });
 

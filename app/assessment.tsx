@@ -385,10 +385,40 @@ export default function AssessmentScreen() {
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
-          .replace(/\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/g, "")
           .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/gs, "");
+
+        const removeBalancedJson = (str: string): string => {
+          let result = "";
+          let i = 0;
+          while (i < str.length) {
+            if (str[i] === "{") {
+              const inner = str.substring(i);
+              if (/"(assessment|recommendations|pathwayA|pathwayB|followUp|triageLevel|differentials|condition|severity)"/.test(inner.substring(0, 200))) {
+                let depth = 0;
+                let j = 0;
+                for (; j < inner.length; j++) {
+                  if (inner[j] === "{") depth++;
+                  else if (inner[j] === "}") {
+                    depth--;
+                    if (depth === 0) { j++; break; }
+                  }
+                }
+                if (depth === 0) {
+                  i += j;
+                  continue;
+                }
+              }
+            }
+            result += str[i];
+            i++;
+          }
+          return result;
+        };
+
+        cleaned = removeBalancedJson(cleaned);
+
         if (isStreaming) {
-          const jsonStart = cleaned.search(/\{["\s]*(emergency|assessment|quickReplies)/);
+          const jsonStart = cleaned.search(/\{["\s]*(emergency|assessment|quickReplies|recommendations|pathwayA|condition|differentials)/);
           if (jsonStart !== -1) {
             cleaned = cleaned.substring(0, jsonStart);
           }
@@ -410,6 +440,15 @@ export default function AssessmentScreen() {
             }
           }
         }
+
+        cleaned = cleaned.replace(/["\s]*:\s*[\[{][\s\S]{0,50}$/g, "").trim();
+
+        const jsonLikeLines = cleaned.split("\n").filter(l => /^\s*"[^"]+"\s*:/.test(l)).length;
+        const totalLines = cleaned.split("\n").length;
+        if (totalLines > 3 && jsonLikeLines / totalLines > 0.5) {
+          cleaned = cleaned.split("\n").filter(l => !/^\s*"[^"]+"\s*:/.test(l) && !/^\s*[{}\[\],]\s*$/.test(l)).join("\n").trim();
+        }
+
         return cleaned.trim();
       };
 
@@ -468,12 +507,27 @@ export default function AssessmentScreen() {
                 }
 
                 if (!parsedResult) {
-                  const rawJsonMatch = fullText.match(
-                    /\{[\s\S]*?"assessment"[\s\S]*?"recommendations"[\s\S]*?"followUp"[\s\S]*?\}\s*\}/,
-                  );
-                  if (rawJsonMatch) {
+                  const assessmentKeys = ["assessment", "recommendations", "pathwayA", "pathwayB", "followUp", "triageLevel", "differentials"];
+                  const findJsonBlock = (str: string): string | null => {
+                    for (let idx = 0; idx < str.length; idx++) {
+                      if (str[idx] !== "{") continue;
+                      const snippet = str.substring(idx, idx + 300);
+                      if (!assessmentKeys.some(k => snippet.includes(`"${k}"`))) continue;
+                      let depth = 0;
+                      for (let j = idx; j < str.length; j++) {
+                        if (str[j] === "{") depth++;
+                        else if (str[j] === "}") {
+                          depth--;
+                          if (depth === 0) return str.substring(idx, j + 1);
+                        }
+                      }
+                    }
+                    return null;
+                  };
+                  const rawBlock = findJsonBlock(fullText);
+                  if (rawBlock) {
                     try {
-                      const raw = JSON.parse(rawJsonMatch[0]);
+                      const raw = JSON.parse(rawBlock);
                       parsedResult = normalizeResult(raw);
                       setAssessmentResult(parsedResult);
                     } catch (e) {
