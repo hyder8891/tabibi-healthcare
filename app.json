@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "com.tabibi.health",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#0F766E",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
