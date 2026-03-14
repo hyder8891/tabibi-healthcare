@@ -9,13 +9,15 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "distribution": "store",
@@ -28,7 +30,8 @@
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "mydoctor-40043",
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "238884248738-qp43962v0of6vreq5383nmavob924tmc.apps.googleusercontent.com",
         "EXPO_PUBLIC_DOMAIN": "https://app.tabibi.clinic"
-      }
+      },
+      "channel": "production"
     }
   },
   "submit": {
