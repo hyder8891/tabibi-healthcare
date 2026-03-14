@@ -7,6 +7,27 @@ import { adminAuth, getAdminAccessToken } from "../firebase-admin";
 const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "";
 const IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1";
 
+function mapFirebaseErrorToFriendly(rawCode: string): string {
+  const upper = rawCode.toUpperCase();
+  if (upper.includes("INVALID_SESSION_INFO") || upper.includes("TOO_LONG_SESSION_INFO"))
+    return "SESSION_INVALID";
+  if (upper.includes("SESSION_EXPIRED"))
+    return "SESSION_EXPIRED";
+  if (upper.includes("INVALID_CODE") || upper.includes("INVALID_TEMPORARY_PROOF"))
+    return "INVALID_CODE";
+  if (upper.includes("QUOTA_EXCEEDED") || upper.includes("TOO_MANY_ATTEMPTS"))
+    return "TOO_MANY_ATTEMPTS";
+  if (upper.includes("INVALID_PHONE_NUMBER") || upper.includes("MISSING_PHONE_NUMBER"))
+    return "INVALID_PHONE_NUMBER";
+  if (upper.includes("CAPTCHA") || upper.includes("RECAPTCHA"))
+    return "CAPTCHA_FAILED";
+  if (upper.includes("BLOCKED") || upper.includes("ADMIN_ONLY"))
+    return "BLOCKED";
+  if (upper.includes("USER_DISABLED"))
+    return "USER_DISABLED";
+  return "UNKNOWN_ERROR";
+}
+
 const phoneRateLimits = new Map<string, { count: number; resetAt: number }>();
 const PHONE_RATE_LIMIT_WINDOW = 60 * 1000;
 const PHONE_RATE_LIMIT_MAX = 3;
@@ -165,9 +186,9 @@ export function registerAuthRoutes(app: Express): void {
         );
         const data = await response.json();
         if (!response.ok) {
-          const errorCode = data?.error?.message || "UNKNOWN_ERROR";
-          console.error("Firebase sendVerificationCode error:", errorCode);
-          return res.status(response.status).json({ message: errorCode });
+          const rawCode = data?.error?.message || "UNKNOWN_ERROR";
+          console.error("Firebase sendVerificationCode error:", rawCode);
+          return res.status(response.status).json({ message: mapFirebaseErrorToFriendly(rawCode) });
         }
         return res.json({ sessionInfo: data.sessionInfo });
       }
@@ -224,9 +245,9 @@ export function registerAuthRoutes(app: Express): void {
         );
         const data = await response.json();
         if (!response.ok) {
-          const errorCode = data?.error?.message || "UNKNOWN_ERROR";
-          console.error("Firebase signInWithPhoneNumber error:", errorCode);
-          return res.status(response.status).json({ message: errorCode });
+          const rawCode = data?.error?.message || "UNKNOWN_ERROR";
+          console.error("Firebase signInWithPhoneNumber error:", rawCode);
+          return res.status(response.status).json({ message: mapFirebaseErrorToFriendly(rawCode) });
         }
         const uid = data.localId;
         if (displayName) {

@@ -19,6 +19,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   FadeIn,
+  FadeOut,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
@@ -61,6 +62,9 @@ export default function AuthScreen() {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [verifyingEmail, setVerifyingEmail] = useState(false);
 
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; phone?: string; phoneName?: string }>({});
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
 
@@ -91,10 +95,71 @@ export default function AuthScreen() {
 
   useEffect(() => {
     if (authError) {
-      setError(getFirebaseErrorMessage(authError));
+      showError(getFirebaseErrorMessage(authError));
       clearAuthError();
     }
   }, [authError]);
+
+  const showError = useCallback((msg: string) => {
+    setError(msg);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = setTimeout(() => {
+      setError("");
+      errorTimerRef.current = null;
+    }, 5000);
+  }, []);
+
+  const dismissError = useCallback(() => {
+    setError("");
+    if (errorTimerRef.current) {
+      clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
+  const clearFieldError = useCallback((field: keyof typeof fieldErrors) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const handleEmailChange = useCallback((text: string) => {
+    setEmail(text);
+    dismissError();
+    clearFieldError("email");
+  }, [dismissError, clearFieldError]);
+
+  const handlePasswordChange = useCallback((text: string) => {
+    setPassword(text);
+    dismissError();
+    clearFieldError("password");
+  }, [dismissError, clearFieldError]);
+
+  const handlePhoneChange = useCallback((text: string) => {
+    setPhone(text);
+    dismissError();
+    clearFieldError("phone");
+  }, [dismissError, clearFieldError]);
+
+  const handlePhoneNameChange = useCallback((text: string) => {
+    setPhoneName(text);
+    dismissError();
+    clearFieldError("phoneName");
+  }, [dismissError, clearFieldError]);
+
+  const handleResetEmailChange = useCallback((text: string) => {
+    setResetEmail(text);
+    dismissError();
+  }, [dismissError]);
 
   const startCooldown = () => setResendCooldown(RESEND_COOLDOWN);
 
@@ -104,14 +169,16 @@ export default function AuthScreen() {
       formScale.value = withSpring(1, { damping: 15 });
     });
     setMode((m) => (m === "login" ? "signup" : "login"));
-    setError("");
+    dismissError();
+    setFieldErrors({});
   };
 
   const toggleIdentifierType = (type: IdentifierType) => {
     if (type === identifierType) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setIdentifierType(type);
-    setError("");
+    dismissError();
+    setFieldErrors({});
   };
 
   const isWebPlatform = Platform.OS === "web";
@@ -178,6 +245,36 @@ export default function AuthScreen() {
     }
   };
 
+  const getBackendErrorMessage = (code: string): string => {
+    switch (code) {
+      case "SESSION_INVALID":
+        return t("Your session has expired. Please request a new code.", "\u0627\u0646\u062a\u0647\u062a \u062c\u0644\u0633\u062a\u0643. \u064a\u0631\u062c\u0649 \u0637\u0644\u0628 \u0631\u0645\u0632 \u062c\u062f\u064a\u062f.");
+      case "SESSION_EXPIRED":
+        return t("Your session has expired. Please request a new code.", "\u0627\u0646\u062a\u0647\u062a \u062c\u0644\u0633\u062a\u0643. \u064a\u0631\u062c\u0649 \u0637\u0644\u0628 \u0631\u0645\u0632 \u062c\u062f\u064a\u062f.");
+      case "INVALID_CODE":
+        return t("Invalid verification code. Please try again.", "\u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642 \u063a\u064a\u0631 \u0635\u062d\u064a\u062d. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+      case "TOO_MANY_ATTEMPTS":
+        return t("Too many attempts. Please try again later.", "\u0645\u062d\u0627\u0648\u0644\u0627\u062a \u0643\u062b\u064a\u0631\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0644\u0627\u062d\u0642\u0627\u064b.");
+      case "INVALID_PHONE_NUMBER":
+        return t("Please enter a valid phone number with country code (e.g. +964...)", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641 \u0635\u062d\u064a\u062d \u0645\u0639 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629");
+      case "CAPTCHA_FAILED":
+        return t("Captcha verification failed. Please try again.", "\u0641\u0634\u0644 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0643\u0627\u0628\u062a\u0634\u0627. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+      case "BLOCKED":
+        return t("This action has been blocked. Please contact support.", "\u062a\u0645 \u062d\u0638\u0631 \u0647\u0630\u0627 \u0627\u0644\u0625\u062c\u0631\u0627\u0621. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645.");
+      case "USER_DISABLED":
+        return t("This account has been disabled.", "\u062a\u0645 \u062a\u0639\u0637\u064a\u0644 \u0647\u0630\u0627 \u0627\u0644\u062d\u0633\u0627\u0628.");
+      case "UNKNOWN_ERROR":
+        return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+      default:
+        return code;
+    }
+  };
+
+  const KNOWN_BACKEND_CODES = [
+    "SESSION_INVALID", "SESSION_EXPIRED", "INVALID_CODE", "TOO_MANY_ATTEMPTS",
+    "INVALID_PHONE_NUMBER", "CAPTCHA_FAILED", "BLOCKED", "USER_DISABLED", "UNKNOWN_ERROR",
+  ];
+
   const getErrorMessage = (err: unknown): string => {
     if (isFirebaseError(err)) {
       return getFirebaseErrorMessage(err.code);
@@ -185,30 +282,43 @@ export default function AuthScreen() {
     if (isNetworkError(err)) {
       return t("Connection error. Please check your internet and try again.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
     }
-    if (isBackendError(err)) {
-      const msg = (err as Error).message;
+    if (err instanceof Error) {
+      const msg = err.message;
       const bodyText = msg.replace(/^\d{3}:\s*/, "");
-      if (bodyText && bodyText !== msg) {
-        return bodyText;
+      const cleanText = bodyText || msg;
+      if (KNOWN_BACKEND_CODES.includes(cleanText)) {
+        return getBackendErrorMessage(cleanText);
       }
-      return t("Server error. Please try again later.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062e\u0627\u062f\u0645. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0644\u0627\u062d\u0642\u0627\u064b.");
+      if (cleanText && cleanText !== msg) {
+        return cleanText;
+      }
     }
     return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
   };
 
   const handleEmailSubmit = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError(t("Please fill in all fields", "\u064a\u0631\u062c\u0649 \u0645\u0644\u0621 \u062c\u0645\u064a\u0639 \u0627\u0644\u062d\u0642\u0648\u0644"));
-      return;
-    }
+    const errors: typeof fieldErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setError(t("Please enter a valid email", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0628\u0631\u064a\u062f \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0635\u062d\u064a\u062d"));
+
+    if (!email.trim()) {
+      errors.email = t("Email is required", "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0645\u0637\u0644\u0648\u0628");
+    } else if (!emailRegex.test(email.trim())) {
+      errors.email = t("Please enter a valid email", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0628\u0631\u064a\u062f \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0635\u062d\u064a\u062d");
+    }
+    if (!password.trim()) {
+      errors.password = t("Password is required", "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0645\u0637\u0644\u0648\u0628\u0629");
+    } else if (mode === "signup" && password.length < 6) {
+      errors.password = t("Password must be at least 6 characters", "\u064a\u062c\u0628 \u0623\u0646 \u062a\u0643\u0648\u0646 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 6 \u0623\u062d\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644");
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
     setLoading(true);
-    setError("");
+    dismissError();
+    setFieldErrors({});
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -222,7 +332,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Email submit error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -231,21 +341,25 @@ export default function AuthScreen() {
 
   const handlePhoneSubmit = async () => {
     const cleaned = phone.trim();
+    const errors: typeof fieldErrors = {};
+
     if (!cleaned) {
-      setError(t("Please enter your phone number", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641\u0643"));
-      return;
-    }
-    if (!cleaned.startsWith("+")) {
-      setError(t("Phone number must start with country code (e.g. +964)", "\u064a\u062c\u0628 \u0623\u0646 \u064a\u0628\u062f\u0623 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)"));
-      return;
+      errors.phone = t("Phone number is required", "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0645\u0637\u0644\u0648\u0628");
+    } else if (!cleaned.startsWith("+")) {
+      errors.phone = t("Phone number must start with country code (e.g. +964)", "\u064a\u062c\u0628 \u0623\u0646 \u064a\u0628\u062f\u0623 \u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641 \u0628\u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)");
     }
     if (mode === "signup" && !phoneName.trim()) {
-      setError(t("Please enter your name", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0627\u0633\u0645\u0643"));
+      errors.phoneName = t("Name is required", "\u0627\u0644\u0627\u0633\u0645 \u0645\u0637\u0644\u0648\u0628");
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
 
     setLoading(true);
-    setError("");
+    dismissError();
+    setFieldErrors({});
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -257,7 +371,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Phone submit error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -265,6 +379,7 @@ export default function AuthScreen() {
   };
 
   const handleOtpDigitChange = (text: string, index: number) => {
+    dismissError();
     const newDigits = [...otpDigits];
     newDigits[index] = text;
     setOtpDigits(newDigits);
@@ -293,12 +408,12 @@ export default function AuthScreen() {
 
   const handleVerifyOTPWithCode = async (code: string) => {
     if (code.length !== 6) {
-      setError(t("Please enter the 6-digit code", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u0643\u0648\u0646 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645"));
+      showError(t("Please enter the 6-digit code", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0627\u0644\u0631\u0645\u0632 \u0627\u0644\u0645\u0643\u0648\u0646 \u0645\u0646 6 \u0623\u0631\u0642\u0627\u0645"));
       return;
     }
 
     setLoading(true);
-    setError("");
+    dismissError();
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
@@ -306,7 +421,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] OTP verify error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setLoading(false);
@@ -317,7 +432,7 @@ export default function AuthScreen() {
 
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
-    setError("");
+    dismissError();
     try {
       await loginWithGoogle();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -327,7 +442,7 @@ export default function AuthScreen() {
         (err instanceof Error && err.message === "GOOGLE_SIGNIN_CANCELLED");
       if (!isCancelled) {
         console.error("[Auth] Google sign-in error:", err);
-        setError(getErrorMessage(err));
+        showError(getErrorMessage(err));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     } finally {
@@ -337,11 +452,11 @@ export default function AuthScreen() {
 
   const handleResetPassword = async () => {
     if (!resetEmail.trim() || !resetEmail.includes("@")) {
-      setError(t("Please enter a valid email", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0628\u0631\u064a\u062f \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0635\u062d\u064a\u062d"));
+      showError(t("Please enter a valid email", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0628\u0631\u064a\u062f \u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u0635\u062d\u064a\u062d"));
       return;
     }
     setLoading(true);
-    setError("");
+    dismissError();
     try {
       await resetPassword(resetEmail.trim());
       setResetSent(true);
@@ -349,7 +464,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Reset password error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -358,14 +473,14 @@ export default function AuthScreen() {
   const handleResendVerificationEmail = async () => {
     if (resendCooldown > 0) return;
     setLoading(true);
-    setError("");
+    dismissError();
     try {
       await sendVerificationEmail();
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Resend verification error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -373,17 +488,17 @@ export default function AuthScreen() {
 
   const handleCheckVerification = async () => {
     setVerifyingEmail(true);
-    setError("");
+    dismissError();
     try {
       const verified = await checkEmailVerification();
       if (!verified) {
-        setError(t("Email not verified yet. Please check your inbox.", "\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0628\u0631\u064a\u062f \u0628\u0639\u062f. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0635\u0646\u062f\u0648\u0642 \u0627\u0644\u0648\u0627\u0631\u062f."));
+        showError(t("Email not verified yet. Please check your inbox.", "\u0644\u0645 \u064a\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0628\u0631\u064a\u062f \u0628\u0639\u062f. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0635\u0646\u062f\u0648\u0642 \u0627\u0644\u0648\u0627\u0631\u062f."));
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (err: unknown) {
       console.error("[Auth] Check verification error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setVerifyingEmail(false);
     }
@@ -393,7 +508,7 @@ export default function AuthScreen() {
     if (resendCooldown > 0) return;
     setOtpDigits(["", "", "", "", "", ""]);
     setOtpCode("");
-    setError("");
+    dismissError();
 
     setLoading(true);
     try {
@@ -402,7 +517,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Resend OTP error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -411,14 +526,14 @@ export default function AuthScreen() {
   const handleResendResetEmail = async () => {
     if (resendCooldown > 0) return;
     setLoading(true);
-    setError("");
+    dismissError();
     try {
       await resetPassword(resetEmail.trim());
       startCooldown();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
       console.error("[Auth] Resend reset email error:", err);
-      setError(getErrorMessage(err));
+      showError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -443,12 +558,20 @@ export default function AuthScreen() {
     </Pressable>
   );
 
+  const renderFieldError = (field: keyof typeof fieldErrors) =>
+    fieldErrors[field] ? (
+      <Text style={[styles.fieldErrorText, isRTL && { textAlign: "right" }]}>{fieldErrors[field]}</Text>
+    ) : null;
+
   const renderError = () =>
     error ? (
-      <View style={styles.errorRow}>
+      <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)} style={styles.errorRow}>
         <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
         <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{error}</Text>
-      </View>
+        <Pressable onPress={dismissError} hitSlop={8} testID="dismiss-error">
+          <Ionicons name="close" size={18} color={Colors.light.emergency} />
+        </Pressable>
+      </Animated.View>
     ) : null;
 
   const renderGradientButton = (text: string, onPress: () => void, isLoading: boolean, disabled?: boolean) => (
@@ -492,7 +615,7 @@ export default function AuthScreen() {
             {renderHeader()}
 
             <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
-              {renderBackButton(() => { setActiveView("form"); setError(""); })}
+              {renderBackButton(() => { setActiveView("form"); dismissError(); setFieldErrors({}); })}
 
               <View style={styles.verificationHeader}>
                 <View style={styles.verificationIconBg}>
@@ -566,7 +689,7 @@ export default function AuthScreen() {
             {renderHeader()}
 
             <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
-              {renderBackButton(() => { setActiveView("form"); setError(""); })}
+              {renderBackButton(() => { setActiveView("form"); dismissError(); setFieldErrors({}); })}
 
               <View style={styles.verificationHeader}>
                 <View style={styles.verificationIconBg}>
@@ -642,7 +765,7 @@ export default function AuthScreen() {
             {renderHeader()}
 
             <Animated.View entering={FadeIn.duration(300)} style={styles.formCard}>
-              {renderBackButton(() => { setActiveView("form"); setError(""); setResetSent(false); })}
+              {renderBackButton(() => { setActiveView("form"); dismissError(); setFieldErrors({}); setResetSent(false); })}
 
               <View style={styles.verificationHeader}>
                 <View style={styles.verificationIconBg}>
@@ -670,7 +793,7 @@ export default function AuthScreen() {
                     <TextInput
                       style={[styles.textInput, isRTL && { textAlign: "right" }]}
                       value={resetEmail}
-                      onChangeText={setResetEmail}
+                      onChangeText={handleResetEmailChange}
                       placeholder={t("Email address", "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a")}
                       placeholderTextColor={Colors.light.textTertiary}
                       keyboardType="email-address"
@@ -709,7 +832,7 @@ export default function AuthScreen() {
 
                   {renderGradientButton(
                     t("Back to Login", "\u0627\u0644\u0639\u0648\u062f\u0629 \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644"),
-                    () => { setActiveView("form"); setResetSent(false); setError(""); },
+                    () => { setActiveView("form"); setResetSent(false); dismissError(); setFieldErrors({}); },
                     false,
                   )}
 
@@ -818,12 +941,12 @@ export default function AuthScreen() {
                   <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
                     {t("Email", "\u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0625\u0644\u0643\u062a\u0631\u0648\u0646\u064a")}
                   </Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="mail-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                  <View style={[styles.inputWrapper, fieldErrors.email && styles.inputWrapperError]}>
+                    <Ionicons name="mail-outline" size={20} color={fieldErrors.email ? Colors.light.emergency : Colors.light.textTertiary} style={styles.inputIcon} />
                     <TextInput
                       style={[styles.textInput, isRTL && { textAlign: "right" }]}
                       value={email}
-                      onChangeText={setEmail}
+                      onChangeText={handleEmailChange}
                       placeholder={t("your@email.com", "your@email.com")}
                       placeholderTextColor={Colors.light.textTertiary}
                       keyboardType="email-address"
@@ -832,18 +955,19 @@ export default function AuthScreen() {
                       testID="email-input"
                     />
                   </View>
+                  {renderFieldError("email")}
                 </View>
 
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
                     {t("Password", "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631")}
                   </Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="lock-closed-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                  <View style={[styles.inputWrapper, fieldErrors.password && styles.inputWrapperError]}>
+                    <Ionicons name="lock-closed-outline" size={20} color={fieldErrors.password ? Colors.light.emergency : Colors.light.textTertiary} style={styles.inputIcon} />
                     <TextInput
                       style={[styles.textInput, { flex: 1 }, isRTL && { textAlign: "right" }]}
                       value={password}
-                      onChangeText={setPassword}
+                      onChangeText={handlePasswordChange}
                       placeholder={t("Min 6 characters", "\u0623\u0642\u0644 6 \u0623\u062d\u0631\u0641")}
                       placeholderTextColor={Colors.light.textTertiary}
                       secureTextEntry={!showPassword}
@@ -858,11 +982,24 @@ export default function AuthScreen() {
                       />
                     </Pressable>
                   </View>
+                  {renderFieldError("password")}
+                  {mode === "signup" && password.length > 0 && (
+                    <View style={styles.passwordStrengthRow}>
+                      <Ionicons
+                        name={password.length >= 6 ? "checkmark-circle" : "ellipse-outline"}
+                        size={14}
+                        color={password.length >= 6 ? Colors.light.success : Colors.light.textTertiary}
+                      />
+                      <Text style={[styles.passwordStrengthText, password.length >= 6 && styles.passwordStrengthMet]}>
+                        {t("At least 6 characters", "\u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 6 \u0623\u062d\u0631\u0641")}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {mode === "login" && (
                   <Pressable
-                    onPress={() => { setActiveView("forgotPassword"); setError(""); setResetEmail(email); }}
+                    onPress={() => { setActiveView("forgotPassword"); dismissError(); setFieldErrors({}); setResetEmail(email); }}
                     style={styles.forgotButton}
                   >
                     <Text style={[styles.forgotText, isRTL && { textAlign: "right" }]}>
@@ -878,30 +1015,31 @@ export default function AuthScreen() {
                     <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
                       {t("Full Name", "\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644")}
                     </Text>
-                    <View style={styles.inputWrapper}>
-                      <Ionicons name="person-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                    <View style={[styles.inputWrapper, fieldErrors.phoneName && styles.inputWrapperError]}>
+                      <Ionicons name="person-outline" size={20} color={fieldErrors.phoneName ? Colors.light.emergency : Colors.light.textTertiary} style={styles.inputIcon} />
                       <TextInput
                         style={[styles.textInput, isRTL && { textAlign: "right" }]}
                         value={phoneName}
-                        onChangeText={setPhoneName}
+                        onChangeText={handlePhoneNameChange}
                         placeholder={t("Your full name", "\u0627\u0633\u0645\u0643 \u0627\u0644\u0643\u0627\u0645\u0644")}
                         placeholderTextColor={Colors.light.textTertiary}
                         autoCapitalize="words"
                         testID="phone-name-input"
                       />
                     </View>
+                    {renderFieldError("phoneName")}
                   </View>
                 )}
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, isRTL && { textAlign: "right" }]}>
                     {t("Phone Number", "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062a\u0641")}
                   </Text>
-                  <View style={styles.inputWrapper}>
-                    <Ionicons name="call-outline" size={20} color={Colors.light.textTertiary} style={styles.inputIcon} />
+                  <View style={[styles.inputWrapper, fieldErrors.phone && styles.inputWrapperError]}>
+                    <Ionicons name="call-outline" size={20} color={fieldErrors.phone ? Colors.light.emergency : Colors.light.textTertiary} style={styles.inputIcon} />
                     <TextInput
                       style={[styles.textInput, isRTL && { textAlign: "right" }]}
                       value={phone}
-                      onChangeText={setPhone}
+                      onChangeText={handlePhoneChange}
                       placeholder={t("+964 7XX XXX XXXX", "+964 7XX XXX XXXX")}
                       placeholderTextColor={Colors.light.textTertiary}
                       keyboardType="phone-pad"
@@ -909,9 +1047,12 @@ export default function AuthScreen() {
                       testID="phone-input"
                     />
                   </View>
-                  <Text style={[styles.phoneHint, isRTL && { textAlign: "right" }]}>
-                    {t("Include country code (e.g. +964)", "\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)")}
-                  </Text>
+                  {renderFieldError("phone")}
+                  {!fieldErrors.phone && (
+                    <Text style={[styles.phoneHint, isRTL && { textAlign: "right" }]}>
+                      {t("Include country code (e.g. +964)", "\u0623\u062f\u062e\u0644 \u0631\u0645\u0632 \u0627\u0644\u062f\u0648\u0644\u0629 (\u0645\u062b\u0644 +964)")}
+                    </Text>
+                  )}
                 </View>
               </>
             )}
@@ -1124,6 +1265,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
   },
+  inputWrapperError: {
+    borderColor: Colors.light.emergency,
+    borderWidth: 1.5,
+  },
   inputIcon: {
     marginRight: 10,
   },
@@ -1139,6 +1284,28 @@ const styles = StyleSheet.create({
     color: Colors.light.textTertiary,
     marginTop: 6,
     marginLeft: 4,
+  },
+  fieldErrorText: {
+    fontSize: 12,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.emergency,
+    marginTop: 4,
+    marginLeft: 4,
+  },
+  passwordStrengthRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  passwordStrengthText: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textTertiary,
+  },
+  passwordStrengthMet: {
+    color: Colors.light.success,
   },
   forgotButton: {
     alignSelf: "flex-end",
