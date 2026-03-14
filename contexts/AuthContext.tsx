@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { useIdTokenAuthRequest } from "expo-auth-session/providers/google";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { setAuthTokenGetter } from "@/lib/query-client";
 import {
   auth,
@@ -17,6 +17,7 @@ import {
   getRedirectResult,
   signInWithPhoneNumber,
   signInWithCredential,
+  signInWithCustomToken,
   linkWithCredential,
   PhoneAuthProvider,
   updateProfile as firebaseUpdateProfile,
@@ -67,14 +68,14 @@ interface AuthContextValue {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken?: string) => Promise<void>;
-  sendPhoneOTP: (phoneNumber: string, nativeVerificationId?: string) => Promise<void>;
+  sendPhoneOTP: (phoneNumber: string) => Promise<void>;
   verifyPhoneOTP: (code: string, displayName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   checkEmailVerification: () => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   linkEmailToPhone: (email: string, password: string) => Promise<void>;
-  linkPhoneToEmail: (phoneNumber: string, nativeVerificationId?: string) => Promise<void>;
+  linkPhoneToEmail: (phoneNumber: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -91,6 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
   const phoneSessionInfoRef = useRef<string | null>(null);
+  const pendingPhoneRef = useRef<string>("");
 
   const [_googleRequest, _googleResponse, googlePromptAsync] = useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
@@ -310,7 +312,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [googlePromptAsync]);
 
-  const sendPhoneOTP = useCallback(async (phoneNumber: string, nativeVerificationId?: string) => {
+  const sendPhoneOTP = useCallback(async (phoneNumber: string) => {
+    pendingPhoneRef.current = phoneNumber;
+
     if (Platform.OS === "web") {
       if (recaptchaVerifierRef.current) {
         recaptchaVerifierRef.current.clear();
@@ -330,11 +334,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     } else {
-      if (!nativeVerificationId) {
-        throw new Error("NEEDS_WEBVIEW_RECAPTCHA");
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/auth/phone/send-code", baseUrl);
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to send verification code");
       }
-      phoneSessionInfoRef.current = nativeVerificationId;
-      confirmationResultRef.current = null;
+      if (data.sessionInfo) {
+        phoneSessionInfoRef.current = data.sessionInfo;
+      } else {
+        phoneSessionInfoRef.current = null;
+      }
     }
   }, []);
 
@@ -353,11 +368,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await persistUser(backendUser);
       confirmationResultRef.current = null;
     } else {
-      if (!phoneSessionInfoRef.current) {
-        throw new Error("No pending phone verification. Please request a code first.");
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/auth/phone/verify-code", baseUrl);
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          phoneNumber: pendingPhoneRef.current,
+          sessionInfo: phoneSessionInfoRef.current || undefined,
+          code,
+          displayName,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to verify code");
       }
-      const credential = PhoneAuthProvider.credential(phoneSessionInfoRef.current, code);
-      const cred = await signInWithCredential(auth, credential);
+
+      if (!data.customToken) {
+        throw new Error("Server did not return authentication token");
+      }
+
+      const cred = await signInWithCustomToken(auth, data.customToken);
       firebaseUserRef.current = cred.user;
       if (displayName && cred.user) {
         await firebaseUpdateProfile(cred.user, { displayName });
@@ -365,7 +397,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const backendUser = await syncWithBackend(cred.user);
       setUser(backendUser);
       await persistUser(backendUser);
+
       phoneSessionInfoRef.current = null;
+      pendingPhoneRef.current = "";
     }
   }, []);
 
@@ -413,7 +447,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistUser(backendUser);
   }, []);
 
-  const linkPhoneToEmail = useCallback(async (phoneNumber: string, nativeVerificationId?: string) => {
+  const linkPhoneToEmail = useCallback(async (phoneNumber: string) => {
     const fbUser = auth.currentUser;
     if (!fbUser) throw new Error("Not signed in");
     if (Platform.OS === "web") {
@@ -433,11 +467,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw err;
       }
     } else {
-      if (!nativeVerificationId) {
-        throw new Error("NEEDS_WEBVIEW_RECAPTCHA");
+      pendingPhoneRef.current = phoneNumber;
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/auth/phone/send-code", baseUrl);
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phoneNumber }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to send verification code");
       }
-      phoneSessionInfoRef.current = nativeVerificationId;
-      confirmationResultRef.current = null;
+      if (data.sessionInfo) {
+        phoneSessionInfoRef.current = data.sessionInfo;
+      } else {
+        phoneSessionInfoRef.current = null;
+      }
     }
   }, []);
 

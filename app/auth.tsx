@@ -10,7 +10,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
-  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -22,11 +21,9 @@ import Animated, {
   FadeIn,
 } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
-import { WebView } from "react-native-webview";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSettings } from "@/contexts/SettingsContext";
-import { getApiUrl } from "@/lib/query-client";
 
 type AuthMode = "login" | "signup";
 type IdentifierType = "email" | "phone";
@@ -66,9 +63,6 @@ export default function AuthScreen() {
 
   const otpInputRefs = useRef<(TextInput | null)[]>([]);
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
-  const [showRecaptchaWebView, setShowRecaptchaWebView] = useState(false);
-  const [pendingPhoneNumber, setPendingPhoneNumber] = useState("");
-  const isNativePlatform = Platform.OS !== "web";
 
   const formScale = useSharedValue(1);
   const formAnimStyle = useAnimatedStyle(() => ({
@@ -250,16 +244,10 @@ export default function AuthScreen() {
       return;
     }
 
+    setLoading(true);
     setError("");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (isNativePlatform) {
-      setPendingPhoneNumber(cleaned);
-      setShowRecaptchaWebView(true);
-      return;
-    }
-
-    setLoading(true);
     try {
       await sendPhoneOTP(cleaned);
       setActiveView("otpVerify");
@@ -275,36 +263,6 @@ export default function AuthScreen() {
       setLoading(false);
     }
   };
-
-  const handleRecaptchaWebViewMessage = useCallback(async (event: { nativeEvent: { data: string } }) => {
-    setShowRecaptchaWebView(false);
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === "success" && data.verificationId) {
-        setLoading(true);
-        try {
-          await sendPhoneOTP(pendingPhoneNumber, data.verificationId);
-          setActiveView("otpVerify");
-          setOtpDigits(["", "", "", "", "", ""]);
-          setOtpCode("");
-          startCooldown();
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch (err: unknown) {
-          console.error("[Auth] Native phone OTP error:", err);
-          setError(err instanceof Error ? err.message : t("Failed to send verification code", "\u0641\u0634\u0644 \u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642"));
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        } finally {
-          setLoading(false);
-        }
-      } else if (data.type === "error") {
-        setError(data.message || t("Failed to send verification code", "\u0641\u0634\u0644 \u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642"));
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-    } catch (e: unknown) {
-      console.error("[Auth] WebView message parse error:", e);
-      setError(t("Verification failed. Please try again.", "\u0641\u0634\u0644 \u0627\u0644\u062a\u062d\u0642\u0642. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."));
-    }
-  }, [pendingPhoneNumber, sendPhoneOTP, t]);
 
   const handleOtpDigitChange = (text: string, index: number) => {
     const newDigits = [...otpDigits];
@@ -436,12 +394,6 @@ export default function AuthScreen() {
     setOtpDigits(["", "", "", "", "", ""]);
     setOtpCode("");
     setError("");
-
-    if (isNativePlatform) {
-      setPendingPhoneNumber(phone.trim());
-      setShowRecaptchaWebView(true);
-      return;
-    }
 
     setLoading(true);
     try {
@@ -1042,40 +994,6 @@ export default function AuthScreen() {
       {Platform.OS === "web" && (
         <View nativeID="recaptcha-container" style={{ position: "absolute", opacity: 0 }} />
       )}
-      {isNativePlatform && (
-        <Modal
-          visible={showRecaptchaWebView}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowRecaptchaWebView(false)}
-        >
-          <View style={styles.recaptchaOverlay}>
-            <View style={styles.recaptchaContainer}>
-              <View style={styles.recaptchaHeader}>
-                <Text style={styles.recaptchaTitle}>
-                  {t("Sending verification code...", "\u062c\u0627\u0631\u064a \u0625\u0631\u0633\u0627\u0644 \u0631\u0645\u0632 \u0627\u0644\u062a\u062d\u0642\u0642...")}
-                </Text>
-                <Pressable
-                  onPress={() => setShowRecaptchaWebView(false)}
-                  hitSlop={12}
-                >
-                  <Ionicons name="close" size={24} color={Colors.light.text} />
-                </Pressable>
-              </View>
-              <WebView
-                source={{ uri: `${getApiUrl()}/api/auth/phone/webview?phone=${encodeURIComponent(pendingPhoneNumber)}` }}
-                onMessage={handleRecaptchaWebViewMessage}
-                javaScriptEnabled
-                domStorageEnabled
-                originWhitelist={["https://*", "http://*"]}
-                mixedContentMode="compatibility"
-                thirdPartyCookiesEnabled
-                style={styles.recaptchaWebView}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 }
@@ -1394,37 +1312,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textTertiary,
-  },
-  recaptchaOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  recaptchaContainer: {
-    width: "100%" as const,
-    maxWidth: 400,
-    height: 320,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    overflow: "hidden" as const,
-  },
-  recaptchaHeader: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "space-between" as const,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.borderLight,
-  },
-  recaptchaTitle: {
-    fontSize: 15,
-    fontFamily: "DMSans_500Medium",
-    color: Colors.light.text,
-  },
-  recaptchaWebView: {
-    flex: 1,
   },
 });

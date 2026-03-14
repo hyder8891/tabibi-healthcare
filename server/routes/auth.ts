@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { verifyFirebaseToken } from "../firebase-auth";
 import { requireAuth } from "./middleware";
+import { adminAuth, getAdminAccessToken } from "../firebase-admin";
 
 const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "";
 const IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1";
@@ -20,6 +21,42 @@ function checkPhoneRateLimit(key: string): boolean {
   if (entry.count >= PHONE_RATE_LIMIT_MAX) return false;
   entry.count++;
   return true;
+}
+
+const otpStore = new Map<string, { code: string; expiresAt: number; attempts: number }>();
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+async function sendSMSViaIdentityToolkit(phoneNumber: string): Promise<{ sessionInfo: string } | null> {
+  const accessToken = await getAdminAccessToken();
+  if (accessToken) {
+    try {
+      const response = await fetch(
+        `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ phoneNumber }),
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        return { sessionInfo: data.sessionInfo };
+      }
+      const errData = await response.json().catch(() => null);
+      console.warn("Identity Toolkit SMS send failed:", errData?.error?.message || response.status);
+    } catch (err: unknown) {
+      console.warn("Identity Toolkit SMS error:", err instanceof Error ? err.message : "Unknown");
+    }
+  }
+  return null;
 }
 
 export function registerAuthRoutes(app: Express): void {
@@ -113,30 +150,49 @@ export function registerAuthRoutes(app: Express): void {
       if (!checkPhoneRateLimit(`ip:${ip}`) || !checkPhoneRateLimit(`phone:${phoneNumber}`)) {
         return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
       }
-      if (!FIREBASE_API_KEY) {
-        return res.status(500).json({ message: "Firebase API key not configured" });
-      }
 
-      const response = await fetch(
-        `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phoneNumber,
-            ...(recaptchaToken ? { recaptchaToken } : {}),
-          }),
+      if (recaptchaToken) {
+        if (!FIREBASE_API_KEY) {
+          return res.status(500).json({ message: "Firebase API key not configured" });
         }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        const errorCode = data?.error?.message || "UNKNOWN_ERROR";
-        console.error("Firebase sendVerificationCode error:", errorCode);
-        return res.status(response.status).json({ message: errorCode });
+        const response = await fetch(
+          `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phoneNumber, recaptchaToken }),
+          }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          const errorCode = data?.error?.message || "UNKNOWN_ERROR";
+          console.error("Firebase sendVerificationCode error:", errorCode);
+          return res.status(response.status).json({ message: errorCode });
+        }
+        return res.json({ sessionInfo: data.sessionInfo });
       }
 
-      return res.json({ sessionInfo: data.sessionInfo });
+      const smsResult = await sendSMSViaIdentityToolkit(phoneNumber);
+      if (smsResult) {
+        return res.json({ sessionInfo: smsResult.sessionInfo, method: "firebase" });
+      }
+
+      const isDev = process.env.NODE_ENV === "development";
+      if (!isDev) {
+        console.error("No SMS provider configured for production. Phone auth unavailable.");
+        return res.status(503).json({ message: "SMS service not available. Please try again later." });
+      }
+
+      const otp = generateOTP();
+      otpStore.set(phoneNumber, {
+        code: otp,
+        expiresAt: Date.now() + OTP_EXPIRY_MS,
+        attempts: 0,
+      });
+
+      console.log(`[DEV OTP] Code for ${phoneNumber}: ${otp}`);
+
+      return res.json({ method: "otp", message: "Verification code sent" });
     } catch (error: unknown) {
       console.error("Phone send code error:", error instanceof Error ? error.message : "Unknown");
       return res.status(500).json({ message: "Failed to send verification code" });
@@ -145,127 +201,87 @@ export function registerAuthRoutes(app: Express): void {
 
   app.post("/api/auth/phone/verify-code", async (req: Request, res: Response) => {
     try {
-      const { sessionInfo, code } = req.body;
-      if (!sessionInfo || !code) {
-        return res.status(400).json({ message: "Session info and code are required" });
+      const { phoneNumber, sessionInfo, code, displayName } = req.body;
+      if (!code) {
+        return res.status(400).json({ message: "Verification code is required" });
       }
       const ip = req.ip || req.socket.remoteAddress || "unknown";
       if (!checkPhoneRateLimit(`verify:${ip}`)) {
         return res.status(429).json({ message: "Too many verification attempts. Please wait." });
       }
-      if (!FIREBASE_API_KEY) {
-        return res.status(500).json({ message: "Firebase API key not configured" });
-      }
 
-      const response = await fetch(
-        `${IDENTITY_TOOLKIT_URL}/accounts:signInWithPhoneNumber?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionInfo,
-            code,
-          }),
+      if (sessionInfo) {
+        if (!FIREBASE_API_KEY) {
+          return res.status(500).json({ message: "Firebase API key not configured" });
         }
-      );
-
-      const data = await response.json();
-      if (!response.ok) {
-        const errorCode = data?.error?.message || "UNKNOWN_ERROR";
-        console.error("Firebase signInWithPhoneNumber error:", errorCode);
-        return res.status(response.status).json({ message: errorCode });
+        const response = await fetch(
+          `${IDENTITY_TOOLKIT_URL}/accounts:signInWithPhoneNumber?key=${FIREBASE_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sessionInfo, code }),
+          }
+        );
+        const data = await response.json();
+        if (!response.ok) {
+          const errorCode = data?.error?.message || "UNKNOWN_ERROR";
+          console.error("Firebase signInWithPhoneNumber error:", errorCode);
+          return res.status(response.status).json({ message: errorCode });
+        }
+        const uid = data.localId;
+        if (displayName) {
+          try {
+            await adminAuth.updateUser(uid, { displayName });
+          } catch {}
+        }
+        const customToken = await adminAuth.createCustomToken(uid);
+        return res.json({ customToken, uid });
       }
 
-      return res.json({
-        idToken: data.idToken,
-        refreshToken: data.refreshToken,
-        localId: data.localId,
-        phoneNumber: data.phoneNumber,
-      });
+      if (!phoneNumber) {
+        return res.status(400).json({ message: "Phone number is required" });
+      }
+
+      const stored = otpStore.get(phoneNumber);
+      if (!stored) {
+        return res.status(400).json({ message: "No verification code found. Please request a new one." });
+      }
+      if (Date.now() > stored.expiresAt) {
+        otpStore.delete(phoneNumber);
+        return res.status(400).json({ message: "Verification code expired. Please request a new one." });
+      }
+      if (stored.attempts >= OTP_MAX_ATTEMPTS) {
+        otpStore.delete(phoneNumber);
+        return res.status(429).json({ message: "Too many failed attempts. Please request a new code." });
+      }
+      stored.attempts++;
+
+      if (stored.code !== code) {
+        return res.status(400).json({ message: "Invalid verification code. Please try again." });
+      }
+
+      otpStore.delete(phoneNumber);
+
+      let firebaseUser;
+      try {
+        firebaseUser = await adminAuth.getUserByPhoneNumber(phoneNumber);
+      } catch {
+        firebaseUser = await adminAuth.createUser({
+          phoneNumber,
+          ...(displayName ? { displayName } : {}),
+        });
+      }
+
+      if (displayName && !firebaseUser.displayName) {
+        await adminAuth.updateUser(firebaseUser.uid, { displayName });
+      }
+
+      const customToken = await adminAuth.createCustomToken(firebaseUser.uid);
+
+      return res.json({ customToken, uid: firebaseUser.uid });
     } catch (error: unknown) {
       console.error("Phone verify code error:", error instanceof Error ? error.message : "Unknown");
       return res.status(500).json({ message: "Failed to verify code" });
     }
-  });
-
-  app.get("/api/auth/phone/webview", (req: Request, res: Response) => {
-    const phone = req.query.phone as string || "";
-    const apiKey = FIREBASE_API_KEY;
-    const authDomain = process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "";
-    const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || "";
-
-    const html = `<!DOCTYPE html>
-<html><head>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Phone Verification</title>
-<style>
-*{box-sizing:border-box}
-body{display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f8f9fa;font-family:-apple-system,system-ui,sans-serif}
-.container{text-align:center;padding:24px;max-width:360px;width:100%}
-.status{margin-top:16px;color:#555;font-size:15px;line-height:1.4}
-.spinner{display:inline-block;width:32px;height:32px;border:3px solid #e0e0e0;border-top-color:#1a73e8;border-radius:50%;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-#recaptcha-container{display:flex;justify-content:center;margin:16px 0}
-</style>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-</head><body>
-<div class="container">
-<div class="spinner" id="spinner"></div>
-<p class="status" id="status">Preparing verification...</p>
-<div id="recaptcha-container"></div>
-</div>
-<script>
-function post(msg){
-  try{
-    if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(msg));
-  }catch(e){}
-}
-
-function run(){
-  try{
-    firebase.initializeApp({apiKey:"${apiKey}",authDomain:"${authDomain}",projectId:"${projectId}"});
-    var auth=firebase.auth();
-    var phone=decodeURIComponent("${encodeURIComponent(phone)}");
-
-    document.getElementById('status').textContent='Verifying...';
-
-    var verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{
-      size:'invisible',
-      callback:function(){
-        document.getElementById('status').textContent='Sending code to '+phone+'...';
-      },
-      'expired-callback':function(){
-        document.getElementById('status').textContent='Verification expired. Please close and try again.';
-        post({type:'error',message:'reCAPTCHA expired'});
-      }
-    });
-
-    verifier.render().then(function(){
-      return auth.signInWithPhoneNumber(phone,verifier);
-    }).then(function(confirmation){
-      document.getElementById('spinner').style.display='none';
-      document.getElementById('status').textContent='Code sent!';
-      post({type:'success',verificationId:confirmation.verificationId});
-    }).catch(function(err){
-      document.getElementById('spinner').style.display='none';
-      var msg=err.code||err.message||'Unknown error';
-      document.getElementById('status').textContent='Error: '+msg;
-      post({type:'error',message:msg});
-    });
-  }catch(err){
-    document.getElementById('spinner').style.display='none';
-    var msg=err.message||'Setup failed';
-    document.getElementById('status').textContent='Error: '+msg;
-    post({type:'error',message:msg});
-  }
-}
-
-if(document.readyState==='complete')run();
-else window.addEventListener('load',run);
-</script>
-</body></html>`;
-    res.setHeader("Content-Type", "text/html");
-    return res.send(html);
   });
 }
