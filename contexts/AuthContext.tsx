@@ -301,6 +301,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await persistUser(backendUser);
         } else if (result.type === "error") {
           throw new Error(result.error?.message || "Google Sign-In failed");
+        } else if (result.type === "dismiss" || result.type === "cancel") {
+          throw new Error("GOOGLE_SIGNIN_CANCELLED");
         }
       }
     }

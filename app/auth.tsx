@@ -329,12 +329,15 @@ export default function AuthScreen() {
       await loginWithGoogle();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err: unknown) {
-      console.error("[Auth] Google sign-in error:", err);
-      const isPopupCancelled = isFirebaseError(err) && err.code === "auth/popup-closed-by-user";
-      if (!isPopupCancelled) {
+      const isCancelled =
+        (isFirebaseError(err) && err.code === "auth/popup-closed-by-user") ||
+        (err instanceof Error && err.message === "GOOGLE_SIGNIN_CANCELLED");
+      if (!isCancelled) {
+        console.error("[Auth] Google sign-in error:", err);
         setError(getErrorMessage(err));
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
       setGoogleLoading(false);
     }
   };
