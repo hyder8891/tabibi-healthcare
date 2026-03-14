@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef, ReactNode } from "react";
 import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import { useIdTokenAuthRequest } from "expo-auth-session/providers/google";
 import { apiRequest } from "@/lib/query-client";
 import { setAuthTokenGetter } from "@/lib/query-client";
 import {
@@ -27,6 +29,8 @@ import {
   type ConfirmationResult,
 } from "@/lib/firebase";
 import { Platform } from "react-native";
+
+WebBrowser.maybeCompleteAuthSession();
 
 let GoogleSignin: any = null;
 if (Platform.OS !== "web") {
@@ -85,6 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
+
+  const [_googleRequest, _googleResponse, googlePromptAsync] = useIdTokenAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
+  });
 
   const isPasswordProvider = (fbUser: FirebaseUser | null): boolean => {
     if (!fbUser) return false;
@@ -269,23 +277,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw popupErr;
       }
     } else {
-      if (!GoogleSignin) {
-        throw new Error("Google Sign-In is not available on this device.");
+      if (GoogleSignin) {
+        await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+        const signInResult = await GoogleSignin.signIn();
+        const idToken = signInResult?.data?.idToken ?? signInResult?.idToken;
+        if (!idToken) {
+          throw new Error("Failed to get ID token from Google Sign-In.");
+        }
+        const credential = GoogleAuthProvider.credential(idToken);
+        const cred = await signInWithCredential(auth, credential);
+        firebaseUserRef.current = cred.user;
+        const backendUser = await syncWithBackend(cred.user);
+        setUser(backendUser);
+        await persistUser(backendUser);
+      } else {
+        const result = await googlePromptAsync();
+        if (result.type === "success" && result.params?.id_token) {
+          const credential = GoogleAuthProvider.credential(result.params.id_token);
+          const cred = await signInWithCredential(auth, credential);
+          firebaseUserRef.current = cred.user;
+          const backendUser = await syncWithBackend(cred.user);
+          setUser(backendUser);
+          await persistUser(backendUser);
+        } else if (result.type === "error") {
+          throw new Error(result.error?.message || "Google Sign-In failed");
+        }
       }
-      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      const signInResult = await GoogleSignin.signIn();
-      const idToken = signInResult?.data?.idToken ?? signInResult?.idToken;
-      if (!idToken) {
-        throw new Error("Failed to get ID token from Google Sign-In.");
-      }
-      const credential = GoogleAuthProvider.credential(idToken);
-      const cred = await signInWithCredential(auth, credential);
-      firebaseUserRef.current = cred.user;
-      const backendUser = await syncWithBackend(cred.user);
-      setUser(backendUser);
-      await persistUser(backendUser);
     }
-  }, []);
+  }, [googlePromptAsync]);
 
   const sendPhoneOTP = useCallback(async (phoneNumber: string) => {
     if (Platform.OS !== "web") {
