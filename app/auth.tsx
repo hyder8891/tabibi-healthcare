@@ -106,6 +106,8 @@ export default function AuthScreen() {
     setError("");
   };
 
+  const isWebPlatform = Platform.OS === "web" || typeof document !== "undefined";
+
   const isFirebaseError = (err: unknown): err is { code: string; message: string } => {
     return err !== null && typeof err === "object" && "code" in err && typeof (err as { code: unknown }).code === "string";
   };
@@ -172,6 +174,11 @@ export default function AuthScreen() {
       return t("Connection error. Please check your internet and try again.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
     }
     if (isBackendError(err)) {
+      const msg = (err as Error).message;
+      const bodyText = msg.replace(/^\d{3}:\s*/, "");
+      if (bodyText && bodyText !== msg) {
+        return bodyText;
+      }
       return t("Server error. Please try again later.", "\u062e\u0637\u0623 \u0641\u064a \u0627\u0644\u062e\u0627\u062f\u0645. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0644\u0627\u062d\u0642\u0627\u064b.");
     }
     return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
@@ -855,7 +862,7 @@ export default function AuthScreen() {
                   </Pressable>
                 )}
               </>
-            ) : Platform.OS !== "web" ? (
+            ) : !isWebPlatform ? (
               <View style={styles.phoneNativeNotice}>
                 <Ionicons name="information-circle-outline" size={18} color={Colors.light.primary} />
                 <Text style={[styles.phoneNativeNoticeText, isRTL && { textAlign: "right" }]}>
@@ -912,7 +919,7 @@ export default function AuthScreen() {
 
             {renderError()}
 
-            {!(identifierType === "phone" && Platform.OS !== "web") && (
+            {!(identifierType === "phone" && !isWebPlatform) && (
             <Pressable
               style={({ pressed }) => [
                 styles.submitButton,

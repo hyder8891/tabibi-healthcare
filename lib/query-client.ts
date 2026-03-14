@@ -16,10 +16,13 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export function getApiUrl(): string {
-  const host = process.env.EXPO_PUBLIC_DOMAIN;
+  const domain = process.env.EXPO_PUBLIC_DOMAIN;
 
-  if (host) {
-    const url = new URL(`https://${host}`);
+  if (domain) {
+    const normalized = domain.startsWith("http://") || domain.startsWith("https://")
+      ? domain
+      : `https://${domain}`;
+    const url = new URL(normalized);
     return url.href;
   }
 
