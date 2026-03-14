@@ -1068,18 +1068,8 @@ export default function AuthScreen() {
                 javaScriptEnabled
                 domStorageEnabled
                 originWhitelist={["https://*", "http://*"]}
-                onShouldStartLoadWithRequest={(request) => {
-                  const allowed = [
-                    getApiUrl(),
-                    "https://www.google.com/recaptcha",
-                    "https://www.gstatic.com/",
-                    "https://apis.google.com/",
-                    "https://identitytoolkit.googleapis.com/",
-                    "https://securetoken.googleapis.com/",
-                    "https://www.googleapis.com/",
-                  ];
-                  return allowed.some((prefix) => request.url.startsWith(prefix));
-                }}
+                mixedContentMode="compatibility"
+                thirdPartyCookiesEnabled
                 style={styles.recaptchaWebView}
               />
             </View>

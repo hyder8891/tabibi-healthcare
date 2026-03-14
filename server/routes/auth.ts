@@ -207,38 +207,62 @@ body{display:flex;align-items:center;justify-content:center;min-height:100vh;mar
 @keyframes spin{to{transform:rotate(360deg)}}
 #recaptcha-container{display:flex;justify-content:center;margin:16px 0}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 </head><body>
 <div class="container">
 <div class="spinner" id="spinner"></div>
 <p class="status" id="status">Preparing verification...</p>
 <div id="recaptcha-container"></div>
 </div>
-<script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import{getAuth,signInWithPhoneNumber,RecaptchaVerifier}from"https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-
-const app=initializeApp({apiKey:"${apiKey}",authDomain:"${authDomain}",projectId:"${projectId}"});
-const auth=getAuth(app);
-const phone=decodeURIComponent("${encodeURIComponent(phone)}");
-
+<script>
 function post(msg){
-  if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+  try{
+    if(window.ReactNativeWebView)window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+  }catch(e){}
 }
 
-try{
-  document.getElementById('status').textContent='Verifying you are human...';
-  const verifier=new RecaptchaVerifier(auth,'recaptcha-container',{size:'invisible'});
-  await verifier.render();
-  document.getElementById('status').textContent='Sending code to '+phone+'...';
-  const confirmation=await signInWithPhoneNumber(auth,phone,verifier);
-  document.getElementById('spinner').style.display='none';
-  document.getElementById('status').textContent='Code sent!';
-  post({type:'success',verificationId:confirmation.verificationId});
-}catch(err){
-  document.getElementById('spinner').style.display='none';
-  document.getElementById('status').textContent='Error: '+(err.message||'Unknown error');
-  post({type:'error',message:err.code||err.message||'Unknown error'});
+function run(){
+  try{
+    firebase.initializeApp({apiKey:"${apiKey}",authDomain:"${authDomain}",projectId:"${projectId}"});
+    var auth=firebase.auth();
+    var phone=decodeURIComponent("${encodeURIComponent(phone)}");
+
+    document.getElementById('status').textContent='Verifying...';
+
+    var verifier=new firebase.auth.RecaptchaVerifier('recaptcha-container',{
+      size:'invisible',
+      callback:function(){
+        document.getElementById('status').textContent='Sending code to '+phone+'...';
+      },
+      'expired-callback':function(){
+        document.getElementById('status').textContent='Verification expired. Please close and try again.';
+        post({type:'error',message:'reCAPTCHA expired'});
+      }
+    });
+
+    verifier.render().then(function(){
+      return auth.signInWithPhoneNumber(phone,verifier);
+    }).then(function(confirmation){
+      document.getElementById('spinner').style.display='none';
+      document.getElementById('status').textContent='Code sent!';
+      post({type:'success',verificationId:confirmation.verificationId});
+    }).catch(function(err){
+      document.getElementById('spinner').style.display='none';
+      var msg=err.code||err.message||'Unknown error';
+      document.getElementById('status').textContent='Error: '+msg;
+      post({type:'error',message:msg});
+    });
+  }catch(err){
+    document.getElementById('spinner').style.display='none';
+    var msg=err.message||'Setup failed';
+    document.getElementById('status').textContent='Error: '+msg;
+    post({type:'error',message:msg});
+  }
 }
+
+if(document.readyState==='complete')run();
+else window.addEventListener('load',run);
 </script>
 </body></html>`;
     res.setHeader("Content-Type", "text/html");
