@@ -16,19 +16,18 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 }
 
 export function getApiUrl(): string {
+  const host = process.env.EXPO_PUBLIC_DOMAIN;
+
+  if (host) {
+    const url = new URL(`https://${host}`);
+    return url.href;
+  }
+
   if (Platform.OS !== "web") {
     return "https://app.tabibi.clinic/";
   }
 
-  const host = process.env.EXPO_PUBLIC_DOMAIN;
-
-  if (!host) {
-    throw new Error("EXPO_PUBLIC_DOMAIN is not set");
-  }
-
-  const url = new URL(`https://${host}`);
-
-  return url.href;
+  throw new Error("EXPO_PUBLIC_DOMAIN is not set");
 }
 
 async function throwIfResNotOk(res: Response) {

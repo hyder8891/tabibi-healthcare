@@ -157,6 +157,9 @@ export default function AuthScreen() {
       case "auth/credential-already-in-use":
         return t("This credential is already linked to another account.", "\u0647\u0630\u0627 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0645\u0631\u062a\u0628\u0637 \u0628\u062d\u0633\u0627\u0628 \u0622\u062e\u0631 \u0628\u0627\u0644\u0641\u0639\u0644.");
       default:
+        if (code.includes("api-key")) {
+          return t("Service configuration error. Please contact support.", "\u062e\u0637\u0623 \u0641\u064a \u0625\u0639\u062f\u0627\u062f\u0627\u062a \u0627\u0644\u062e\u062f\u0645\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645.");
+        }
         return t("Something went wrong. Please try again.", "\u062d\u062f\u062b \u062e\u0637\u0623. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
     }
   };
