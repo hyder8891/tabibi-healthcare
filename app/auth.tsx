@@ -114,7 +114,7 @@ export default function AuthScreen() {
     setError("");
   };
 
-  const isWebPlatform = Platform.OS === "web" || typeof document !== "undefined";
+  const isWebPlatform = Platform.OS === "web";
 
   const isFirebaseError = (err: unknown): err is { code: string; message: string } => {
     return err !== null && typeof err === "object" && "code" in err && typeof (err as { code: unknown }).code === "string";

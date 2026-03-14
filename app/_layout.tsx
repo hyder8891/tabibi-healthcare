@@ -20,6 +20,9 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
+import Feather from "@expo/vector-icons/Feather";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -152,6 +155,9 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_600SemiBold,
     DMSans_700Bold,
+    ...Ionicons.font,
+    ...MaterialCommunityIcons.font,
+    ...Feather.font,
   });
 
   useEffect(() => {
