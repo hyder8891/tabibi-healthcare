@@ -11,6 +11,8 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithPhoneNumber,
   signInWithCredential,
   linkWithCredential,
@@ -55,6 +57,8 @@ interface AuthContextValue {
   isLoading: boolean;
   isEmailVerified: boolean;
   needsEmailVerification: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken?: string) => Promise<void>;
@@ -76,6 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isEmailVerified, setIsEmailVerified] = useState(true);
   const [needsEmailVerification, setNeedsEmailVerification] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const clearAuthError = useCallback(() => setAuthError(null), []);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
@@ -139,6 +145,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {}
     };
     loadCached();
+
+    if (Platform.OS === "web") {
+      getRedirectResult(auth)
+        .then(async (result) => {
+          if (result && result.user && mounted) {
+            firebaseUserRef.current = result.user;
+            try {
+              const backendUser = await syncWithBackend(result.user);
+              if (mounted) {
+                setUser(backendUser);
+                await persistUser(backendUser);
+              }
+            } catch (err) {
+              console.error("Backend sync after redirect failed:", err);
+            }
+          }
+        })
+        .catch((err) => {
+          if (mounted) {
+            const code = err && typeof err === "object" && "code" in err ? (err as { code: string }).code : "";
+            console.error("Google redirect sign-in failed:", code || err);
+            if (code) {
+              setAuthError(code);
+            }
+          }
+        });
+    }
 
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!mounted) return;
@@ -216,11 +249,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (Platform.OS === "web") {
-      const cred = await signInWithPopup(auth, googleProvider);
-      firebaseUserRef.current = cred.user;
-      const backendUser = await syncWithBackend(cred.user);
-      setUser(backendUser);
-      await persistUser(backendUser);
+      const isIframe = typeof window !== "undefined" && window.self !== window.top;
+      if (isIframe) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+      try {
+        const cred = await signInWithPopup(auth, googleProvider);
+        firebaseUserRef.current = cred.user;
+        const backendUser = await syncWithBackend(cred.user);
+        setUser(backendUser);
+        await persistUser(backendUser);
+      } catch (popupErr: unknown) {
+        const code = popupErr && typeof popupErr === "object" && "code" in popupErr ? (popupErr as { code: string }).code : "";
+        if (code === "auth/unauthorized-domain" || code === "auth/popup-blocked") {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        }
+        throw popupErr;
+      }
     } else {
       if (!GoogleSignin) {
         throw new Error("Google Sign-In is not available on this device.");
@@ -244,13 +291,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (Platform.OS !== "web") {
       throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
-    if (!recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
-        size: "invisible",
-      });
+    if (recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
     }
-    const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
-    confirmationResultRef.current = confirmation;
+    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+      size: "invisible",
+    });
+    recaptchaVerifierRef.current = verifier;
+    try {
+      await verifier.render();
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+      confirmationResultRef.current = confirmation;
+    } catch (err) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
+      throw err;
+    }
   }, []);
 
   const verifyPhoneOTP = useCallback(async (code: string, displayName?: string) => {
@@ -318,11 +375,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (Platform.OS !== "web") {
       throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
     }
-    if (!recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+    if (recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
     }
-    const confirmation = await signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifierRef.current);
-    confirmationResultRef.current = confirmation;
+    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+    recaptchaVerifierRef.current = verifier;
+    try {
+      await verifier.render();
+      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+      confirmationResultRef.current = confirmation;
+    } catch (err) {
+      recaptchaVerifierRef.current.clear();
+      recaptchaVerifierRef.current = null;
+      throw err;
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -340,11 +407,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       user, isLoading, isEmailVerified, needsEmailVerification,
+      authError, clearAuthError,
       loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP,
       resetPassword, sendVerificationEmail: sendVerificationEmailFn, checkEmailVerification,
       changePassword, linkEmailToPhone, linkPhoneToEmail, logout,
     }),
     [user, isLoading, isEmailVerified, needsEmailVerification,
+      authError, clearAuthError,
       loginWithEmail, signupWithEmail, loginWithGoogle, sendPhoneOTP, verifyPhoneOTP,
       resetPassword, sendVerificationEmailFn, checkEmailVerification,
       changePassword, linkEmailToPhone, linkPhoneToEmail, logout],

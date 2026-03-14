@@ -38,6 +38,7 @@ export default function AuthScreen() {
     sendPhoneOTP, verifyPhoneOTP, resetPassword,
     sendVerificationEmail, checkEmailVerification,
     needsEmailVerification, user,
+    authError, clearAuthError,
   } = useAuth();
   const { t, isRTL } = useSettings();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -87,6 +88,13 @@ export default function AuthScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [resendCooldown]);
+
+  useEffect(() => {
+    if (authError) {
+      setError(getFirebaseErrorMessage(authError));
+      clearAuthError();
+    }
+  }, [authError]);
 
   const startCooldown = () => setResendCooldown(RESEND_COOLDOWN);
 
@@ -158,6 +166,10 @@ export default function AuthScreen() {
         return t("Please enter your phone number", "\u064a\u0631\u062c\u0649 \u0625\u062f\u062e\u0627\u0644 \u0631\u0642\u0645 \u0647\u0627\u062a\u0641\u0643");
       case "auth/credential-already-in-use":
         return t("This credential is already linked to another account.", "\u0647\u0630\u0627 \u0627\u0644\u0627\u0639\u062a\u0645\u0627\u062f \u0645\u0631\u062a\u0628\u0637 \u0628\u062d\u0633\u0627\u0628 \u0622\u062e\u0631 \u0628\u0627\u0644\u0641\u0639\u0644.");
+      case "auth/captcha-check-failed":
+        return t("Captcha verification failed. Please try again.", "\u0641\u0634\u0644 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u0644\u0643\u0627\u0628\u062a\u0634\u0627. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.");
+      case "auth/unauthorized-domain":
+        return t("This domain is not authorized for sign-in. Please contact support.", "\u0647\u0630\u0627 \u0627\u0644\u0646\u0637\u0627\u0642 \u063a\u064a\u0631 \u0645\u0635\u0631\u062d \u0644\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645.");
       default:
         if (code.includes("api-key")) {
           return t("Service configuration error. Please contact support.", "\u062e\u0637\u0623 \u0641\u064a \u0625\u0639\u062f\u0627\u062f\u0627\u062a \u0627\u0644\u062e\u062f\u0645\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u0648\u0627\u0635\u0644 \u0645\u0639 \u0627\u0644\u062f\u0639\u0645.");
@@ -995,7 +1007,7 @@ export default function AuthScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       {Platform.OS === "web" && (
-        <View nativeID="recaptcha-container" style={{ position: "absolute", opacity: 0, pointerEvents: "none" }} />
+        <View nativeID="recaptcha-container" style={{ position: "absolute", opacity: 0 }} />
       )}
     </View>
   );
