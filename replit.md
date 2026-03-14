@@ -42,6 +42,6 @@ The AI assessment uses an adaptive phased clinical interview (Phase 0: red flag 
 
 ## Auth Architecture Notes
 - Google Sign-In: Uses `expo-auth-session/providers/google` with `useIdTokenAuthRequest` on native (Expo Go compatible), `signInWithPopup` on web. Both exchange credentials via Firebase `signInWithCredential`.
-- Phone Auth: Firebase JS SDK requires reCAPTCHA verifier which only works on web. On native Expo Go, phone auth shows a bilingual error directing users to use email or Google instead. Full phone auth requires an EAS development build with `@react-native-firebase/auth`.
+- Phone Auth: On web, uses Firebase JS SDK's `RecaptchaVerifier` + `signInWithPhoneNumber`. On native (Expo Go), uses a WebView-based reCAPTCHA flow: backend serves `/api/auth/phone/webview` with Firebase JS SDK, the WebView handles reCAPTCHA and returns a `verificationId`, then the native app uses `PhoneAuthProvider.credential(verificationId, code)` + `signInWithCredential`. Backend also exposes `/api/auth/phone/send-code` and `/api/auth/phone/verify-code` REST endpoints (rate-limited, 3 req/min per IP/phone).
 - Email Auth: Full flow with email verification after signup. Unverified users are shown verification screen on both signup and login.
 - Account Linking: Phone users can add email+password from Settings. Backend syncs linked credentials.

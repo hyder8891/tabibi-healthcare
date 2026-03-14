@@ -18,6 +18,7 @@ import {
   signInWithPhoneNumber,
   signInWithCredential,
   linkWithCredential,
+  PhoneAuthProvider,
   updateProfile as firebaseUpdateProfile,
   updatePassword as firebaseUpdatePassword,
   reauthenticateWithCredential,
@@ -66,14 +67,14 @@ interface AuthContextValue {
   loginWithEmail: (email: string, password: string) => Promise<void>;
   signupWithEmail: (email: string, password: string) => Promise<void>;
   loginWithGoogle: (idToken?: string) => Promise<void>;
-  sendPhoneOTP: (phoneNumber: string) => Promise<void>;
+  sendPhoneOTP: (phoneNumber: string, nativeVerificationId?: string) => Promise<void>;
   verifyPhoneOTP: (code: string, displayName?: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   sendVerificationEmail: () => Promise<void>;
   checkEmailVerification: () => Promise<boolean>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   linkEmailToPhone: (email: string, password: string) => Promise<void>;
-  linkPhoneToEmail: (phoneNumber: string) => Promise<void>;
+  linkPhoneToEmail: (phoneNumber: string, nativeVerificationId?: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
+  const phoneSessionInfoRef = useRef<string | null>(null);
 
   const [_googleRequest, _googleResponse, googlePromptAsync] = useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
@@ -308,42 +310,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [googlePromptAsync]);
 
-  const sendPhoneOTP = useCallback(async (phoneNumber: string) => {
-    if (Platform.OS !== "web") {
-      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
-    }
-    if (recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-    }
-    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
-      size: "invisible",
-    });
-    recaptchaVerifierRef.current = verifier;
-    try {
-      await verifier.render();
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-      confirmationResultRef.current = confirmation;
-    } catch (err) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-      throw err;
+  const sendPhoneOTP = useCallback(async (phoneNumber: string, nativeVerificationId?: string) => {
+    if (Platform.OS === "web") {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+      const verifier = new RecaptchaVerifier(auth, "recaptcha-container", {
+        size: "invisible",
+      });
+      recaptchaVerifierRef.current = verifier;
+      try {
+        await verifier.render();
+        const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+        confirmationResultRef.current = confirmation;
+      } catch (err) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+        throw err;
+      }
+    } else {
+      if (!nativeVerificationId) {
+        throw new Error("NEEDS_WEBVIEW_RECAPTCHA");
+      }
+      phoneSessionInfoRef.current = nativeVerificationId;
+      confirmationResultRef.current = null;
     }
   }, []);
 
   const verifyPhoneOTP = useCallback(async (code: string, displayName?: string) => {
-    if (!confirmationResultRef.current) {
-      throw new Error("No pending phone verification. Please request a code first.");
+    if (Platform.OS === "web") {
+      if (!confirmationResultRef.current) {
+        throw new Error("No pending phone verification. Please request a code first.");
+      }
+      const cred = await confirmationResultRef.current.confirm(code);
+      firebaseUserRef.current = cred.user;
+      if (displayName && cred.user) {
+        await firebaseUpdateProfile(cred.user, { displayName });
+      }
+      const backendUser = await syncWithBackend(cred.user);
+      setUser(backendUser);
+      await persistUser(backendUser);
+      confirmationResultRef.current = null;
+    } else {
+      if (!phoneSessionInfoRef.current) {
+        throw new Error("No pending phone verification. Please request a code first.");
+      }
+      const credential = PhoneAuthProvider.credential(phoneSessionInfoRef.current, code);
+      const cred = await signInWithCredential(auth, credential);
+      firebaseUserRef.current = cred.user;
+      if (displayName && cred.user) {
+        await firebaseUpdateProfile(cred.user, { displayName });
+      }
+      const backendUser = await syncWithBackend(cred.user);
+      setUser(backendUser);
+      await persistUser(backendUser);
+      phoneSessionInfoRef.current = null;
     }
-    const cred = await confirmationResultRef.current.confirm(code);
-    firebaseUserRef.current = cred.user;
-    if (displayName && cred.user) {
-      await firebaseUpdateProfile(cred.user, { displayName });
-    }
-    const backendUser = await syncWithBackend(cred.user);
-    setUser(backendUser);
-    await persistUser(backendUser);
-    confirmationResultRef.current = null;
   }, []);
 
   const resetPassword = useCallback(async (email: string) => {
@@ -390,26 +413,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await persistUser(backendUser);
   }, []);
 
-  const linkPhoneToEmail = useCallback(async (phoneNumber: string) => {
+  const linkPhoneToEmail = useCallback(async (phoneNumber: string, nativeVerificationId?: string) => {
     const fbUser = auth.currentUser;
     if (!fbUser) throw new Error("Not signed in");
-    if (Platform.OS !== "web") {
-      throw new Error("PHONE_AUTH_NATIVE_UNSUPPORTED");
-    }
-    if (recaptchaVerifierRef.current) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-    }
-    const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
-    recaptchaVerifierRef.current = verifier;
-    try {
-      await verifier.render();
-      const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
-      confirmationResultRef.current = confirmation;
-    } catch (err) {
-      recaptchaVerifierRef.current.clear();
-      recaptchaVerifierRef.current = null;
-      throw err;
+    if (Platform.OS === "web") {
+      if (recaptchaVerifierRef.current) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+      }
+      const verifier = new RecaptchaVerifier(auth, "recaptcha-container", { size: "invisible" });
+      recaptchaVerifierRef.current = verifier;
+      try {
+        await verifier.render();
+        const confirmation = await signInWithPhoneNumber(auth, phoneNumber, verifier);
+        confirmationResultRef.current = confirmation;
+      } catch (err) {
+        recaptchaVerifierRef.current.clear();
+        recaptchaVerifierRef.current = null;
+        throw err;
+      }
+    } else {
+      if (!nativeVerificationId) {
+        throw new Error("NEEDS_WEBVIEW_RECAPTCHA");
+      }
+      phoneSessionInfoRef.current = nativeVerificationId;
+      confirmationResultRef.current = null;
     }
   }, []);
 
