@@ -1028,6 +1028,52 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
+      if (!clientDisconnected && fullResponse && !extractAssessmentJson(fullResponse)) {
+        const currentQuestion = extractQuestionText(fullResponse);
+        const previousQuestions = messages
+          .filter((m: any) => m.role === "assistant" || m.role === "model")
+          .map((m: any) => extractQuestionText(m.content || m.text || ""))
+          .filter((q: string) => q.length > 10);
+
+        const isDuplicate = previousQuestions.some(
+          (prev: string) => computeSimilarity(currentQuestion, prev) > 0.6
+        );
+
+        if (isDuplicate) {
+          console.warn("[DedupCheck] Duplicate question detected — regenerating once");
+          try {
+            const dedupResponse = await ai.models.generateContent({
+              model: MODEL_FLASH,
+              contents: [
+                ...chatMessages,
+                { role: "model", parts: [{ text: fullResponse }] },
+                { role: "user", parts: [{ text: "You just repeated a question you already asked earlier in this conversation. Ask a DIFFERENT, NEW question that gathers information you have NOT already collected. Do not repeat or rephrase any previous question." }] },
+              ],
+              config: {
+                systemInstruction: systemContext,
+                maxOutputTokens: 2048,
+              },
+            });
+            const newText = dedupResponse.text || "";
+            if (newText && newText.length > 10) {
+              const newQuestion = extractQuestionText(newText);
+              const stillDuplicate = previousQuestions.some(
+                (prev: string) => computeSimilarity(newQuestion, prev) > 0.6
+              );
+              if (!stillDuplicate) {
+                res.write(`data: ${JSON.stringify({ correction: newText })}\n\n`);
+                fullResponse = newText;
+                console.log("[DedupCheck] Sent deduplicated question to client");
+              } else {
+                console.warn("[DedupCheck] Retry still duplicate, keeping original");
+              }
+            }
+          } catch (dedupErr) {
+            console.error("[DedupCheck] Retry failed:", dedupErr instanceof Error ? dedupErr.message : "Unknown");
+          }
+        }
+      }
+
       const flashAssessment = extractAssessmentJson(fullResponse);
 
       if (flashAssessment && !clientDisconnected) {
