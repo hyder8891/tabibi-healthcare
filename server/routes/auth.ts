@@ -7,6 +7,10 @@ import { adminAuth, getAdminAccessToken } from "../firebase-admin";
 const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "";
 const IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1";
 
+const ANDROID_PACKAGE_NAME = "com.tabibi.health";
+const ANDROID_CERT_SHA1 = (process.env.FIREBASE_ANDROID_SHA1 || "FC:57:E6:A6:D4:30:AB:D0:46:E7:87:D8:17:42:C4:89:92:4B:B7:30").replace(/:/g, "").toUpperCase();
+const IOS_BUNDLE_ID = "com.tabibi.health";
+
 function mapFirebaseErrorToFriendly(rawCode: string): string {
   const upper = rawCode.toUpperCase();
   if (upper.includes("INVALID_SESSION_INFO") || upper.includes("TOO_LONG_SESSION_INFO"))
@@ -53,30 +57,78 @@ function generateOTP(): string {
 }
 
 async function sendSMSViaIdentityToolkit(phoneNumber: string): Promise<{ sessionInfo: string } | null> {
-  const accessToken = await getAdminAccessToken();
-  if (accessToken) {
+  if (!FIREBASE_API_KEY) {
+    console.warn("Firebase API key not configured, cannot send SMS");
+    return null;
+  }
+
+  const strategies = [
+    {
+      name: "Android client headers",
+      headers: {
+        "Content-Type": "application/json",
+        "x-android-package": ANDROID_PACKAGE_NAME,
+        "x-android-cert": ANDROID_CERT_SHA1,
+      },
+      body: { phoneNumber },
+    },
+    {
+      name: "iOS client header",
+      headers: {
+        "Content-Type": "application/json",
+        "x-ios-bundle-identifier": IOS_BUNDLE_ID,
+      },
+      body: { phoneNumber },
+    },
+    {
+      name: "Admin bearer token",
+      useBearer: true,
+      headers: {
+        "Content-Type": "application/json",
+        "x-android-package": ANDROID_PACKAGE_NAME,
+        "x-android-cert": ANDROID_CERT_SHA1,
+      },
+      body: { phoneNumber },
+    },
+  ];
+
+  for (const strategy of strategies) {
     try {
+      const headers: Record<string, string> = { ...strategy.headers };
+
+      if (strategy.useBearer) {
+        const accessToken = await getAdminAccessToken();
+        if (!accessToken) continue;
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch(
         `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: JSON.stringify({ phoneNumber }),
+          headers,
+          body: JSON.stringify(strategy.body),
         }
       );
+
       if (response.ok) {
         const data = await response.json();
+        console.log(`Identity Toolkit SMS sent successfully via: ${strategy.name}`);
         return { sessionInfo: data.sessionInfo };
       }
+
       const errData = await response.json().catch(() => null);
-      console.warn("Identity Toolkit SMS send failed:", errData?.error?.message || response.status);
+      const errMsg = errData?.error?.message || response.status;
+      console.warn(`Identity Toolkit SMS (${strategy.name}) failed:`, errMsg);
+
+      if (String(errMsg).includes("TOO_MANY_ATTEMPTS") || String(errMsg).includes("QUOTA_EXCEEDED")) {
+        return null;
+      }
     } catch (err: unknown) {
-      console.warn("Identity Toolkit SMS error:", err instanceof Error ? err.message : "Unknown");
+      console.warn(`Identity Toolkit SMS (${strategy.name}) error:`, err instanceof Error ? err.message : "Unknown");
     }
   }
+
   return null;
 }
 
@@ -108,14 +160,32 @@ export function registerAuthRoutes(app: Express): void {
             authProvider: firebaseUser.firebase.sign_in_provider || "email",
           });
         } else {
-          user = await storage.createUser({
-            firebaseUid: firebaseUser.uid,
-            email: firebaseUser.email || null,
-            phone: firebaseUser.phone_number || null,
-            name: firebaseUser.name || null,
-            photoUrl: firebaseUser.picture || null,
-            authProvider: firebaseUser.firebase.sign_in_provider || "email",
-          });
+          try {
+            user = await storage.createUser({
+              firebaseUid: firebaseUser.uid,
+              email: firebaseUser.email || null,
+              phone: firebaseUser.phone_number || null,
+              name: firebaseUser.name || null,
+              photoUrl: firebaseUser.picture || null,
+              authProvider: firebaseUser.firebase.sign_in_provider || "email",
+            });
+          } catch (createErr: unknown) {
+            const errMsg = createErr instanceof Error ? createErr.message : "";
+            if (errMsg.includes("unique") && firebaseUser.email) {
+              user = await storage.getUserByEmail(firebaseUser.email);
+              if (user) {
+                user = await storage.updateUser(user.id, {
+                  firebaseUid: firebaseUser.uid,
+                  photoUrl: firebaseUser.picture || undefined,
+                  authProvider: firebaseUser.firebase.sign_in_provider || "email",
+                });
+              } else {
+                throw createErr;
+              }
+            } else {
+              throw createErr;
+            }
+          }
         }
       } else {
         const updates: Record<string, any> = {};
