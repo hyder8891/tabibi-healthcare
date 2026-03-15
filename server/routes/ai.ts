@@ -1000,6 +1000,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
+      const originalHadAssessment = !!extractAssessmentJson(fullResponse);
       if (!clientDisconnected && fullResponse && hasGarbledArabic(fullResponse)) {
         console.warn("[QualityCheck] Garbled Arabic detected in AI response — sending correction event");
         try {
@@ -1016,12 +1017,13 @@ Be thorough and specific. Provide your analysis in the same language the user is
             },
           });
           const correctedText = correctionResponse.text || "";
-          if (correctedText && !hasGarbledArabic(correctedText)) {
+          const correctionHasAssessment = !!extractAssessmentJson(correctedText);
+          if (correctedText && !hasGarbledArabic(correctedText) && (!originalHadAssessment || correctionHasAssessment)) {
             res.write(`data: ${JSON.stringify({ correction: correctedText })}\n\n`);
             fullResponse = correctedText;
             console.log("[QualityCheck] Sent corrected Arabic text to client");
           } else {
-            console.warn("[QualityCheck] Correction still garbled, keeping original");
+            console.warn("[QualityCheck] Correction rejected (still garbled or lost assessment JSON), keeping original");
           }
         } catch (corrErr) {
           console.error("[QualityCheck] Correction retry failed:", corrErr instanceof Error ? corrErr.message : "Unknown");
