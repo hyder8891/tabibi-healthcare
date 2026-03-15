@@ -73,11 +73,18 @@ export default function AssessmentScreen() {
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const initializedRef = useRef(false);
 
+  const headerHeightRef = useRef(0);
+
   useEffect(() => {
     if (assessmentResult && flatListRef.current) {
+      const scrollDelay = Platform.OS === "web" ? 600 : 400;
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-      }, 300);
+        try {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        } catch {
+          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+        }
+      }, scrollDelay);
     }
   }, [assessmentResult]);
 
@@ -800,7 +807,12 @@ export default function AssessmentScreen() {
         </Pressable>
       </Modal>
 
-      <View style={styles.header}>
+      <View
+        style={styles.header}
+        onLayout={(e) => {
+          headerHeightRef.current = e.nativeEvent.layout.height;
+        }}
+      >
         <Pressable
           onPress={() => router.back()}
           hitSlop={12}
@@ -1169,8 +1181,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   inlineResultCard: {
-    marginBottom: 8,
-    paddingTop: 8,
+    marginBottom: 12,
+    paddingTop: 16,
   },
   modalOverlay: {
     flex: 1,
