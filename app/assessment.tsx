@@ -81,18 +81,20 @@ export default function AssessmentScreen() {
   useEffect(() => {
     if (assessmentResult && flatListRef.current) {
       const scrollDelay = Platform.OS === "web" ? 600 : 400;
-      setTimeout(() => {
+      const doScroll = () => {
         const contentH = contentSizeRef.current;
         const viewportH = viewportHeightRef.current;
         if (contentH > 0 && viewportH > 0) {
+          const cardTopPadding = 40;
           const maxOffset = Math.max(0, contentH - viewportH);
-          const headerOffset = (headerHeightRef.current || 0) + (progressHeightRef.current || 0);
-          const targetOffset = Math.max(0, maxOffset - headerOffset);
+          const targetOffset = Math.max(0, maxOffset - cardTopPadding);
           flatListRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
         } else {
           flatListRef.current?.scrollToEnd({ animated: true });
         }
-      }, scrollDelay);
+      };
+      setTimeout(doScroll, scrollDelay);
+      setTimeout(doScroll, scrollDelay + 500);
     }
   }, [assessmentResult]);
 

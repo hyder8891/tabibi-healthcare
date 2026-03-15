@@ -406,7 +406,8 @@ export function RecommendationCard({
         )}
 
       {!(result?.recommendations?.pathwayA?.active && medicines.length > 0) &&
-        !(result?.recommendations?.pathwayB?.active && result?.recommendations?.pathwayB?.tests?.length > 0) && (
+        !(result?.recommendations?.pathwayB?.active && result?.recommendations?.pathwayB?.tests?.length > 0) &&
+        !(severity === "severe" || severity === "urgent" || triageLevel === "immediate") && (
           <View style={styles.selfCareSection}>
             <View style={[styles.selfCareBanner, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={styles.selfCareIconCircle}>
@@ -500,6 +501,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 12,
+    minHeight: 36,
+    flexWrap: "wrap",
   },
   badgeRow: {
     flexDirection: "row",

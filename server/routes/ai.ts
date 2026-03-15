@@ -60,6 +60,18 @@ function containsErUrgency(text: string): boolean {
     /اتصل\s+ب(الإسعاف|الاسعاف)/,
     /فوراً.*طوارئ|طوارئ.*فوراً/,
     /immediately.*emergency|emergency.*immediately/i,
+    /يجب\s*(عليك)?\s*(الذهاب|التوجه)\s*(إلى|الى|ل)\s*(الطوارئ|المستشفى|أقرب)/,
+    /استدع[ِي]?\s*(سيارة)?\s*(الإسعاف|الاسعاف|إسعاف|اسعاف)/,
+    /حالة\s*(صحية)?\s*(طارئة|خطيرة|حرجة)/,
+    /خطر\s*(على)?\s*(حياتك|الحياة)/,
+    /تهديد\s*(لل)?حياة/,
+    /life.?threatening/i,
+    /cardiac\s+(arrest|emergency)/i,
+    /heart\s+attack/i,
+    /نوبة\s*قلبية/,
+    /احتشاء/,
+    /جلطة/,
+    /ذبحة\s*صدرية/,
   ];
   return erPatterns.some(p => p.test(text));
 }
@@ -67,7 +79,8 @@ function containsErUrgency(text: string): boolean {
 function applyDeterministicRules(
   assessment: any,
   patientProfile: { age?: number; allergies?: string[]; isPediatric?: boolean; medications?: string[] } | null,
-  conversationText: string
+  conversationText: string,
+  originalFlashAssessment?: any
 ): any {
   if (!assessment) return assessment;
 
@@ -81,6 +94,19 @@ function applyDeterministicRules(
   }
   if (triage === "immediate") {
     if (assessment.assessment) assessment.assessment.severity = "severe";
+  }
+
+  if (originalFlashAssessment) {
+    const flashSeverity = originalFlashAssessment.assessment?.severity?.toLowerCase();
+    const flashTriage = originalFlashAssessment.triageLevel?.toLowerCase();
+    if (flashSeverity === "severe" && severity !== "severe") {
+      console.log(`[DeterministicRules] Pro downgraded severity from ${flashSeverity} to ${severity} — restoring Flash severity`);
+      if (assessment.assessment) assessment.assessment.severity = "severe";
+    }
+    if (flashTriage === "immediate" && triage !== "immediate") {
+      console.log(`[DeterministicRules] Pro downgraded triage from ${flashTriage} to ${triage} — restoring Flash triage`);
+      assessment.triageLevel = "immediate";
+    }
   }
 
   if (containsErUrgency(conversationText)) {
@@ -292,16 +318,10 @@ CRITICAL SAFETY RULES:
 ADAPTIVE ASSESSMENT FLOW — PHASED CLINICAL INTERVIEW:
 You are conducting an adaptive clinical interview, NOT a rigid questionnaire. Ask ONE question per message. NEVER combine multiple questions in one message. Progress through the phases below, but EXIT to your assessment the moment you have enough clinical confidence to narrow the differential to 1-2 conditions. Do NOT mechanically run through every phase if the picture is already clear.
 
-STORED RECORDS CONFIRMATION PROTOCOL:
-If the patient profile includes UNCONFIRMED medications or conditions on file, you MUST verify them with the patient EARLY in the interview (during Phase 0 or at the start of Phase 1). Ask a single, natural confirmation question — for example: "سجلاتك تُظهر أنك تتناول [medication names] — هل لا تزال تتناولها؟" / "Your records show you take [medication names] — are you still taking these?"
-- If the patient CONFIRMS the medications/conditions: treat them as active and factor them into your differential diagnosis, drug interaction checks, and recommendations.
-- If the patient DENIES them (e.g., "I don't have chronic diseases", "I stopped taking those"): immediately discard those items. Do NOT silently reference denied medications in your reasoning, differential diagnosis, or recommendation JSON. Treat denied items as if they do not exist.
-- Allergies labeled as SAFETY-CRITICAL are the ONE exception: always enforce allergy-based medication filtering regardless of patient confirmation.
 
 PHASE 0 — RED FLAG SCREENING (2-3 questions, mandatory for ALL presentations):
 - First question: Acknowledge the symptom warmly, then screen for the most dangerous possibility related to it (e.g., for headache: "Is it the worst headache of your life? Any neck stiffness or vision changes?")
 - Second question: Ask when it started and whether it was sudden or gradual
-- If the patient has stored medications/conditions on file, include a confirmation question in Phase 0 or early Phase 1 (can be combined with another question if natural)
 - After Phase 0, if no red flags found, send a SECTION HEADER transition: "جيد — لا توجد علامات طوارئ. دعني أسألك بعض الأسئلة لفهم حالتك بشكل أفضل." (or English equivalent: "Good — no emergency signs. Let me ask a few more questions to understand your symptoms better.")
 - GATE: You must have screened for dangerous differentials and know the onset before proceeding.
 
@@ -794,6 +814,73 @@ function buildPreviousQuestionsContext(messages: Array<{ role: string; content: 
   return `\n\nQUESTIONS ALREADY ASKED IN THIS SESSION (DO NOT repeat any of these — ask something NEW and different):\n${assistantMessages.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n`;
 }
 
+function hasPatientDisclosedMedications(
+  messages: Array<{ role: string; content?: string; text?: string }>,
+  patientProfile: { medications?: string[]; conditions?: string[] } | null
+): boolean {
+  const userMessages = messages.filter(m => m.role === "user");
+  if (userMessages.length < 3) return false;
+
+  const denialPatterns = [
+    /no\s*(chronic|medication|medicine|drug|condition|disease)/i,
+    /don'?t\s*(take|have|use)\s*(any\s*)?(medication|medicine|drug|chronic)/i,
+    /not\s*(taking|on)\s*(any\s*)?(medication|medicine)/i,
+    /لا\s*(أتناول|اتناول|آخذ|اخذ|أعاني|اعاني)/,
+    /ما\s*(عندي|أتناول|اتناول)\s*(أي|اي)?\s*(دواء|أدوية|ادوية|مرض|أمراض)/,
+    /ليس\s*(لدي|عندي)\s*(أي|اي)?\s*(مرض|أمراض|دواء|أدوية)/,
+    /لا\s*(يوجد|توجد)\s*(أي|اي)?\s*(أمراض|أدوية|مرض)/,
+    /stopped\s*(taking|using)/i,
+    /no\s*longer\s*(take|taking|use|using)/i,
+    /توقفت\s*(عن)/,
+  ];
+
+  const userTextAll = userMessages.map(m => (m.content || m.text || "").toLowerCase()).join(" ");
+  const isDenied = denialPatterns.some(p => p.test(userTextAll));
+  if (isDenied) return false;
+
+  if (patientProfile?.medications?.length) {
+    const medNames = patientProfile.medications.map(m => m.toLowerCase());
+    const mentionedByName = medNames.some(name => {
+      const shortName = name.split(/[\s-]/)[0];
+      return shortName.length >= 4 && userTextAll.includes(shortName);
+    });
+    if (mentionedByName) return true;
+  }
+
+  const medNamePatterns = [
+    /i\s*(take|'m\s*on|use|am\s*taking)\s+\w+/i,
+    /أتناول\s+\S+/,
+    /اتناول\s+\S+/,
+    /آخذ\s+\S+/,
+    /اخذ\s+\S+/,
+    /أستخدم\s+\S+/,
+    /استخدم\s+\S+/,
+  ];
+  const userVolunteeredMedName = medNamePatterns.some(p => p.test(userTextAll));
+  if (userVolunteeredMedName) return true;
+
+  for (let i = 0; i < messages.length - 1; i++) {
+    const msg = messages[i];
+    const nextMsg = messages[i + 1];
+    if ((msg.role === "assistant" || msg.role === "model") && nextMsg.role === "user") {
+      const assistantText = (msg.content || msg.text || "").toLowerCase();
+      const askedAboutMeds = /medication|medicine|دواء|أدوية|ادوية|تتناول|تأخذ|تاخذ/.test(assistantText) &&
+        /\?|؟/.test(assistantText);
+      if (askedAboutMeds) {
+        const userResponse = (nextMsg.content || nextMsg.text || "").toLowerCase();
+        const isAffirmative = !denialPatterns.some(p => p.test(userResponse)) &&
+          (
+            /yes|نعم|أي نعم|ايوه|اه|صح|أيوا|ايوا|yeah|yep/i.test(userResponse) ||
+            /أتناول|اتناول|آخذ|اخذ|أستخدم|استخدم|i\s*take|i'?m\s*on|taking/i.test(userResponse)
+          );
+        if (isAffirmative) return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export function registerAiRoutes(app: Express): void {
   app.post("/api/assess", requireAuth, async (req: Request, res: Response) => {
     try {
@@ -804,6 +891,7 @@ export function registerAiRoutes(app: Express): void {
       const { messages, patientProfile } = validation.data;
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
+      let medsDisclosed = false;
       if (patientProfile) {
         systemContext += `\n\nPATIENT PROFILE:\n`;
         if (patientProfile.name) systemContext += `- Name: ${sanitizeInput(patientProfile.name)}\n`;
@@ -813,17 +901,16 @@ export function registerAiRoutes(app: Express): void {
         if (patientProfile.height) systemContext += `- Height: ${patientProfile.height} cm\n`;
         if (patientProfile.bloodType) systemContext += `- Blood Type: ${sanitizeInput(patientProfile.bloodType)}\n`;
         if (patientProfile.isPediatric) systemContext += `- PEDIATRIC PATIENT: Use age/weight-appropriate dosing\n`;
-        if (patientProfile.medications && patientProfile.medications.length > 0) {
-          systemContext += `\nMEDICATIONS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n`;
+        medsDisclosed = hasPatientDisclosedMedications(messages, patientProfile);
+        if (patientProfile.medications && patientProfile.medications.length > 0 && medsDisclosed) {
+          systemContext += `\nMEDICATIONS ON FILE (for drug interaction checks only — patient has discussed medications):\n`;
           systemContext += `- Stored medications: ${patientProfile.medications.map(m => sanitizeInput(m)).join(", ")}\n`;
-          systemContext += `- ACTION REQUIRED: Early in the interview, ask the patient to confirm whether they still take these medications. Example: "سجلاتك تُظهر أنك تتناول [medications] — هل لا تزال تتناولها؟" / "Your records show you take [medications] — are you still taking these?"\n`;
-          systemContext += `- If the patient CONFIRMS: treat as active medications and check for drug interactions/ADRs with any recommendations.\n`;
-          systemContext += `- If the patient DENIES or says they stopped: do NOT reference these medications in your reasoning, differentials, or recommendation JSON. Treat them as inactive.\n`;
+          systemContext += `- Use these ONLY for drug interaction checks when recommending medications. Do NOT mention these medications unless the patient has already discussed them in this conversation.\n`;
         }
-        if (patientProfile.conditions && patientProfile.conditions.length > 0) {
-          systemContext += `\nCONDITIONS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n`;
+        if (patientProfile.conditions && patientProfile.conditions.length > 0 && medsDisclosed) {
+          systemContext += `\nCONDITIONS ON FILE (for clinical context only — patient has discussed conditions):\n`;
           systemContext += `- Stored conditions: ${patientProfile.conditions.map(c => sanitizeInput(c)).join(", ")}\n`;
-          systemContext += `- ACTION REQUIRED: Ask the patient to confirm these conditions. If the patient denies having a condition, do NOT use it in your differential diagnosis or recommendations.\n`;
+          systemContext += `- Use these ONLY if the patient has already discussed them. Do NOT mention these conditions proactively.\n`;
         }
         if (patientProfile.allergies && patientProfile.allergies.length > 0) {
           systemContext += `- Allergies (SAFETY-CRITICAL — always enforce even if unconfirmed): ${patientProfile.allergies.map(a => sanitizeInput(a)).join(", ")}\n`;
@@ -833,7 +920,7 @@ export function registerAiRoutes(app: Express): void {
 
       const userId = req.userId!;
       try {
-        const avicennaContext = await avicenna.buildAIContext(userId);
+        const avicennaContext = await avicenna.buildAIContext(userId, { includeMedications: medsDisclosed, includeConditions: medsDisclosed });
         if (avicennaContext) {
           systemContext += avicennaContext;
         }
@@ -1109,7 +1196,8 @@ Be thorough and specific. Provide your analysis in the same language the user is
         validatedAssessment = applyDeterministicRules(
           validatedAssessment,
           patientProfile || null,
-          fullResponse
+          fullResponse,
+          proResult ? flashAssessment : undefined
         );
 
         if (!clientDisconnected) {

@@ -356,28 +356,33 @@ export class AvicennaService {
       .orderBy(iraqiHealthKnowledge.prevalenceRank);
   }
 
-  async buildAIContext(userId: string): Promise<string> {
+  async buildAIContext(userId: string, options?: { includeMedications?: boolean; includeConditions?: boolean }): Promise<string> {
+    const includeMedications = options?.includeMedications ?? false;
+    const includeConditions = options?.includeConditions ?? false;
     let context = "";
 
     try {
       const profile = await this.getHealthProfile(userId);
       if (profile) {
-        context += "\n\nAVICENNA PATIENT RECORDS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n";
-        context += "NOTE: These records are from the patient's stored health profile. They may be outdated or no longer accurate. You MUST ask the patient to confirm any medications, conditions, or history before referencing them in your assessment, differentials, or recommendations. If the patient denies a stored item, treat it as inactive and do NOT use it.\n";
+        context += "\n\nAVICENNA PATIENT RECORDS ON FILE:\n";
 
-        const conditions = decryptHealthData(profile.chronicConditions);
-        if (conditions && conditions.length > 0) {
-          const safeConditions = conditions.map((c: string) => sanitizeContextString(String(c)));
-          context += `- Conditions on file (UNCONFIRMED): ${safeConditions.join(", ")}\n`;
+        if (includeConditions) {
+          const conditions = decryptHealthData(profile.chronicConditions);
+          if (conditions && conditions.length > 0) {
+            const safeConditions = conditions.map((c: string) => sanitizeContextString(String(c)));
+            context += `- Conditions on file: ${safeConditions.join(", ")}\n`;
+          }
         }
 
-        const medHistory = decryptHealthData(profile.medicationHistory);
-        if (medHistory && medHistory.length > 0) {
-          const recentMeds = medHistory.slice(-10);
-          const medSummary = recentMeds.map((m: any) =>
-            `${sanitizeContextString(String(m.name || ""))}${m.localBrand ? ` (${sanitizeContextString(String(m.localBrand))})` : ""} [${m.date}]`
-          ).join("; ");
-          context += `- Medication history on file (UNCONFIRMED): ${medSummary}\n`;
+        if (includeMedications) {
+          const medHistory = decryptHealthData(profile.medicationHistory);
+          if (medHistory && medHistory.length > 0) {
+            const recentMeds = medHistory.slice(-10);
+            const medSummary = recentMeds.map((m: any) =>
+              `${sanitizeContextString(String(m.name || ""))}${m.localBrand ? ` (${sanitizeContextString(String(m.localBrand))})` : ""} [${m.date}]`
+            ).join("; ");
+            context += `- Medication history on file: ${medSummary}\n`;
+          }
         }
 
         const allergies = decryptHealthData(profile.allergyDetails);
