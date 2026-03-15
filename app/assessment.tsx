@@ -507,16 +507,11 @@ export default function AssessmentScreen() {
                 const cleanStreaming = stripJson(fullText, true);
                 setStreamingMessage(cleanStreaming);
               }
-              if (data.correction) {
-                fullText = data.correction;
-                const cleanCorrection = stripJson(fullText, true);
-                setStreamingMessage(cleanCorrection);
-              }
               if (data.validatedAssessment) {
                 try {
                   parsedResult = normalizeResult(data.validatedAssessment);
                   setAssessmentResult(parsedResult);
-                  console.log("[ProValidation] Using Pro-validated assessment — severity:", parsedResult.assessment?.severity);
+                  console.log("[ProRecommendation] Using Pro-generated assessment — severity:", parsedResult.assessment?.severity);
                 } catch (e) {
                   console.warn("Failed to apply validated assessment:", e);
                 }

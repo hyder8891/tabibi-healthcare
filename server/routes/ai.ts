@@ -48,39 +48,10 @@ function extractAssessmentJson(text: string): any | null {
   return null;
 }
 
-function containsErUrgency(text: string): boolean {
-  const erPatterns = [
-    /go\s+to\s+(the\s+)?(er|emergency|hospital)/i,
-    /seek\s+immediate\s+(medical\s+)?(attention|care|help)/i,
-    /call\s+(an?\s+)?ambulance/i,
-    /emergency\s+room/i,
-    /توجه\s*(إلى|الى)?\s*(أقرب|اقرب)?\s*(طوارئ|مستشفى)/,
-    /اذهب\s*(إلى|الى)?\s*(الطوارئ|المستشفى)/,
-    /حالة\s+طوارئ/,
-    /اتصل\s+ب(الإسعاف|الاسعاف)/,
-    /فوراً.*طوارئ|طوارئ.*فوراً/,
-    /immediately.*emergency|emergency.*immediately/i,
-    /يجب\s*(عليك)?\s*(الذهاب|التوجه)\s*(إلى|الى|ل)\s*(الطوارئ|المستشفى|أقرب)/,
-    /استدع[ِي]?\s*(سيارة)?\s*(الإسعاف|الاسعاف|إسعاف|اسعاف)/,
-    /حالة\s*(صحية)?\s*(طارئة|خطيرة|حرجة)/,
-    /خطر\s*(على)?\s*(حياتك|الحياة)/,
-    /تهديد\s*(لل)?حياة/,
-    /life.?threatening/i,
-    /cardiac\s+(arrest|emergency)/i,
-    /heart\s+attack/i,
-    /نوبة\s*قلبية/,
-    /احتشاء/,
-    /جلطة/,
-    /ذبحة\s*صدرية/,
-  ];
-  return erPatterns.some(p => p.test(text));
-}
 
 function applyDeterministicRules(
   assessment: any,
-  patientProfile: { age?: number; allergies?: string[]; isPediatric?: boolean; medications?: string[] } | null,
-  conversationText: string,
-  originalFlashAssessment?: any
+  patientProfile: { age?: number; allergies?: string[]; isPediatric?: boolean; medications?: string[] } | null
 ): any {
   if (!assessment) return assessment;
 
@@ -94,28 +65,6 @@ function applyDeterministicRules(
   }
   if (triage === "immediate") {
     if (assessment.assessment) assessment.assessment.severity = "severe";
-  }
-
-  if (originalFlashAssessment) {
-    const flashSeverity = originalFlashAssessment.assessment?.severity?.toLowerCase();
-    const flashTriage = originalFlashAssessment.triageLevel?.toLowerCase();
-    if (flashSeverity === "severe" && severity !== "severe") {
-      console.log(`[DeterministicRules] Pro downgraded severity from ${flashSeverity} to ${severity} — restoring Flash severity`);
-      if (assessment.assessment) assessment.assessment.severity = "severe";
-    }
-    if (flashTriage === "immediate" && triage !== "immediate") {
-      console.log(`[DeterministicRules] Pro downgraded triage from ${flashTriage} to ${triage} — restoring Flash triage`);
-      assessment.triageLevel = "immediate";
-    }
-  }
-
-  if (containsErUrgency(conversationText)) {
-    if (assessment.assessment) {
-      assessment.assessment.severity = "severe";
-    }
-    if (!assessment.triageLevel || !["immediate", "within-hours"].includes(assessment.triageLevel?.toLowerCase())) {
-      assessment.triageLevel = "immediate";
-    }
   }
 
   const isPediatric = patientProfile?.isPediatric || (patientProfile?.age != null && patientProfile.age < 16);
@@ -153,23 +102,54 @@ function applyDeterministicRules(
   return assessment;
 }
 
-const PRO_VALIDATION_PROMPT = `You are a senior clinical reviewer validating an AI-generated medical assessment. You receive the original patient conversation and a structured JSON assessment produced by a junior AI.
+const PRO_RECOMMENDATION_PROMPT = `You are Tabibi Pro, a senior clinical diagnostician. You receive a complete patient conversation (Q&A between an AI interviewer and a patient) along with patient profile data.
 
-Your job is to review and CORRECT the JSON if needed. Check for:
+Your job is to generate the FINAL clinical recommendation based on the information gathered. You are the authoritative source for the diagnosis and treatment plan.
 
-1. SEVERITY-TRIAGE ALIGNMENT: If the conversation indicates the patient should go to the ER or seek immediate care, severity MUST be "severe" and triageLevel MUST be "immediate" or "within-hours". A "moderate" severity with ER advice is WRONG.
-2. DIFFERENTIAL PLAUSIBILITY: Are the differentials clinically reasonable given the symptoms discussed?
-3. MEDICATION APPROPRIATENESS: Are recommended medications appropriate for the diagnosed condition? Are there drug-drug interactions with the patient's current medications?
-4. MEDICATION-ALLERGY CROSS-CHECK: If the patient profile lists allergies, verify NONE of the recommended medicines (by brand name, generic name, or active ingredient) match any listed allergy. Remove any that do.
-5. CONFIDENCE CALIBRATION: Does the stated confidence match the completeness of information gathered?
+RULES:
+1. SEVERITY-TRIAGE ALIGNMENT: If the conversation indicates the patient should go to the ER or seek immediate care, severity MUST be "severe" and triageLevel MUST be "immediate". A "moderate" severity for a cardiac emergency is WRONG.
+2. DIAGNOSTIC ACCURACY: Use working-diagnosis language for acute presentations. Do not label acute-onset conditions with chronic disease names unless the history clearly supports it. For example, one week of bilateral knee swelling should NOT be labeled "Osteoarthritis" without age/history context.
+3. DIFFERENTIAL COMPLETENESS: Always provide 2-3 clinically plausible differentials that match the presentation (acuity, laterality, age).
+4. MEDICATION APPROPRIATENESS: Only recommend medications that directly treat the diagnosed condition. Follow the severity-based medication gate rules. Prefer Iraqi/locally-available brands.
+5. MEDICATION-ALLERGY CROSS-CHECK: If the patient has allergies, NONE of the recommended medicines may match any allergy.
+6. LANGUAGE: Match the language used in the conversation (Arabic or English). If Arabic, ALL text values in JSON must be in Arabic except medicine activeIngredient names.
 
-Return ONLY the corrected JSON assessment block — no explanation, no markdown fences, no extra text. If the assessment is already correct, return it unchanged. Preserve the exact same JSON structure.`;
+Return ONLY a valid JSON block (no markdown fences, no explanation, no extra text) with this exact structure:
+{
+  "assessment": {
+    "condition": "Most likely condition name",
+    "confidence": "high|medium|low",
+    "severity": "mild|moderate|severe",
+    "description": "Brief patient-friendly explanation"
+  },
+  "differentials": [
+    {"condition": "...", "likelihood": "possible|less likely", "distinguishingFeature": "..."}
+  ],
+  "triageLevel": "immediate|within-hours|within-24h|within-week|routine",
+  "pathway": "A or B",
+  "recommendations": {
+    "pathwayA": {
+      "active": true/false,
+      "medicines": [
+        {"name": "...", "localBrand": "...", "activeIngredient": "...", "class": "...", "dosage": "...", "frequency": "...", "duration": "...", "warnings": ["..."]}
+      ]
+    },
+    "pathwayB": {
+      "active": true/false,
+      "tests": [
+        {"name": "...", "type": "lab|imaging|referral", "urgency": "routine|urgent|emergency", "reason": "...", "facilityType": "lab|clinic|hospital", "capabilities": ["..."], "estimatedCost": "free-MOH|low|moderate|high", "availableAt": "MOH-lab|private-lab|hospital|any-pharmacy"}
+      ]
+    }
+  },
+  "warnings": ["..."],
+  "followUp": {"returnIn": "...", "redFlags": ["..."]}
+}`;
 
-async function validateWithPro(
+const PRO_RECOMMENDATION_TIMEOUT_MS = 15000;
+
+async function generateProRecommendation(
   conversationMessages: Array<{ role: string; content: string }>,
-  flashAssessment: any,
-  patientProfile: any,
-  timeoutMs: number = 10000
+  patientProfile: any
 ): Promise<any | null> {
   try {
     let contextSummary = "PATIENT CONVERSATION:\n";
@@ -181,29 +161,29 @@ async function validateWithPro(
       contextSummary += "\nPATIENT PROFILE:\n";
       if (patientProfile.age) contextSummary += `- Age: ${patientProfile.age}\n`;
       if (patientProfile.gender) contextSummary += `- Gender: ${patientProfile.gender}\n`;
-      if (patientProfile.medications?.length) contextSummary += `- Medications on file (check conversation for patient confirmation/denial): ${patientProfile.medications.join(", ")}\n`;
-      if (patientProfile.allergies?.length) contextSummary += `- Allergies (always enforce): ${patientProfile.allergies.join(", ")}\n`;
-      if (patientProfile.conditions?.length) contextSummary += `- Conditions on file (check conversation for patient confirmation/denial): ${patientProfile.conditions.join(", ")}\n`;
-      if (patientProfile.isPediatric) contextSummary += `- PEDIATRIC PATIENT\n`;
+      if (patientProfile.medications?.length) contextSummary += `- Medications on file: ${patientProfile.medications.join(", ")}\n`;
+      if (patientProfile.allergies?.length) contextSummary += `- Allergies (SAFETY-CRITICAL): ${patientProfile.allergies.join(", ")}\n`;
+      if (patientProfile.conditions?.length) contextSummary += `- Conditions on file: ${patientProfile.conditions.join(", ")}\n`;
+      if (patientProfile.isPediatric) contextSummary += `- PEDIATRIC PATIENT — use age/weight-appropriate dosing, no aspirin\n`;
     }
 
-    contextSummary += `\nASSESSMENT JSON TO VALIDATE:\n${JSON.stringify(flashAssessment, null, 2)}`;
+    contextSummary += "\nBased on the conversation above, generate the complete clinical recommendation JSON.";
 
     const proResponse = await Promise.race([
       ai.models.generateContent({
         model: MODEL_PRO,
         contents: [{ role: "user", parts: [{ text: contextSummary }] }],
         config: {
-          systemInstruction: PRO_VALIDATION_PROMPT,
+          systemInstruction: PRO_RECOMMENDATION_PROMPT,
           maxOutputTokens: 4096,
-          thinkingConfig: { thinkingBudget: 2048 },
+          thinkingConfig: { thinkingBudget: 4096 },
         },
       }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), PRO_RECOMMENDATION_TIMEOUT_MS)),
     ]);
 
     if (!proResponse) {
-      console.log("[ProValidation] Timed out after", timeoutMs, "ms — using Flash assessment with deterministic rules only");
+      console.log("[ProRecommendation] Timed out after", PRO_RECOMMENDATION_TIMEOUT_MS, "ms");
       return null;
     }
 
@@ -213,14 +193,14 @@ async function validateWithPro(
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      console.log("[ProValidation] Successfully validated and corrected assessment");
+      console.log("[ProRecommendation] Successfully generated recommendation — severity:", parsed.assessment?.severity, "triage:", parsed.triageLevel);
       return parsed;
     }
 
-    console.warn("[ProValidation] Could not parse Pro response — using Flash assessment");
+    console.warn("[ProRecommendation] Could not parse Pro response");
     return null;
   } catch (err) {
-    console.error("[ProValidation] Error:", err instanceof Error ? err.message : "Unknown");
+    console.error("[ProRecommendation] Error:", err instanceof Error ? err.message : "Unknown");
     return null;
   }
 }
@@ -748,72 +728,6 @@ Before generating a final recommendation, silently cross-check the patient sympt
 Silently scan these rules for every patient. Do NOT tell the patient you are checking a database. If a trigger matches, ask the screening question naturally within the conversation before concluding. Never skip a trigger because you are already confident in a different diagnosis -- in Iraq, endemic co-diagnoses are common.
 `;
 
-function extractQuestionText(text: string): string {
-  const stripped = text
-    .replace(/\{[\s\S]*\}/g, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .trim();
-  const lines = stripped.split("\n").filter(l => l.trim().length > 0);
-  const questionLines = lines.filter(l => l.includes("?") || l.includes("؟"));
-  return questionLines.length > 0 ? questionLines.join(" ") : lines.slice(-2).join(" ");
-}
-
-function computeSimilarity(a: string, b: string): number {
-  const normalize = (s: string) =>
-    s.toLowerCase()
-      .replace(/[^\p{L}\p{N}\s]/gu, "")
-      .replace(/\s+/g, " ")
-      .trim();
-  const na = normalize(a);
-  const nb = normalize(b);
-  if (!na || !nb) return 0;
-
-  if (na === nb) return 1.0;
-  if (na.includes(nb) || nb.includes(na)) return 0.9;
-
-  const wordsA = new Set(na.split(" "));
-  const wordsB = new Set(nb.split(" "));
-  const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
-  const union = new Set([...wordsA, ...wordsB]).size;
-  return union > 0 ? intersection / union : 0;
-}
-
-const GARBLED_ARABIC_PATTERNS = [
-  /[\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}/,
-  /([^\s\u0600-\u06FF])[\u0600-\u06FF]{1,2}([^\s\u0600-\u06FF])/,
-  /[\u0600-\u06FF][\u0000-\u001F][\u0600-\u06FF]/,
-  /(.)\1{4,}/,
-];
-
-function hasGarbledArabic(text: string): boolean {
-  const arabicPortion = text.replace(/[^\u0600-\u06FF\s]/g, "").trim();
-  if (arabicPortion.length < 10) return false;
-
-  const words = arabicPortion.split(/\s+/).filter(w => w.length > 0);
-  const singleCharWords = words.filter(w => w.length === 1).length;
-  if (words.length > 5 && singleCharWords / words.length > 0.4) return true;
-
-  for (const pattern of GARBLED_ARABIC_PATTERNS) {
-    if (pattern.test(text)) {
-      const matches = text.match(new RegExp(pattern.source, "g" + (pattern.flags || "")));
-      if (matches && matches.length >= 3) return true;
-    }
-  }
-
-  return false;
-}
-
-function buildPreviousQuestionsContext(messages: Array<{ role: string; content: string }>): string {
-  const assistantMessages = messages
-    .filter(m => m.role === "assistant" || m.role === "model")
-    .map(m => extractQuestionText(m.content || ""))
-    .filter(q => q.length > 10);
-
-  if (assistantMessages.length === 0) return "";
-
-  return `\n\nQUESTIONS ALREADY ASKED IN THIS SESSION (DO NOT repeat any of these — ask something NEW and different):\n${assistantMessages.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n`;
-}
-
 function hasPatientDisclosedMedications(
   messages: Array<{ role: string; content?: string; text?: string }>,
   patientProfile: { medications?: string[]; conditions?: string[] } | null
@@ -944,13 +858,6 @@ export function registerAiRoutes(app: Express): void {
         console.error('disease match error', e);
       }
 
-      const prevQuestionsCtx = buildPreviousQuestionsContext(
-        messages.map((m: any) => ({ role: m.role, content: m.content || m.text || "" }))
-      );
-      if (prevQuestionsCtx) {
-        systemContext += prevQuestionsCtx;
-      }
-
       let imageAnalysis = "";
       let imageSeverityFlag = false;
       const lastMessage = messages[messages.length - 1];
@@ -1067,7 +974,11 @@ Be thorough and specific. Provide your analysis in the same language the user is
           if (chunk.candidates?.[0]?.content?.parts) {
             for (const part of chunk.candidates[0].content.parts) {
               if (part.thought || !part.text) continue;
-              fullResponse += part.text;
+              const chunkText = part.text;
+              fullResponse += chunkText;
+              if (!clientDisconnected) {
+                res.write(`data: ${JSON.stringify({ content: chunkText })}\n\n`);
+              }
             }
           }
 
@@ -1086,123 +997,38 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      if (!clientDisconnected && fullResponse) {
-        const originalHadAssessment = !!extractAssessmentJson(fullResponse);
-
-        if (hasGarbledArabic(fullResponse)) {
-          console.warn("[QualityCheck] Garbled Arabic detected — retrying before sending to client");
-          try {
-            const correctionResponse = await ai.models.generateContent({
-              model: MODEL_FLASH,
-              contents: [
-                ...chatMessages,
-                { role: "model", parts: [{ text: fullResponse }] },
-                { role: "user", parts: [{ text: "Your previous response contained garbled/corrupted Arabic text. Please rewrite your last message cleanly in proper Arabic. Only output the corrected message, nothing else." }] },
-              ],
-              config: {
-                systemInstruction: systemContext,
-                maxOutputTokens: 2048,
-              },
-            });
-            const correctedText = correctionResponse.text || "";
-            const correctionHasAssessment = !!extractAssessmentJson(correctedText);
-            if (correctedText && !hasGarbledArabic(correctedText) && (!originalHadAssessment || correctionHasAssessment)) {
-              fullResponse = correctedText;
-              console.log("[QualityCheck] Using corrected Arabic text");
-            } else {
-              console.warn("[QualityCheck] Correction rejected (still garbled or lost assessment JSON), keeping original");
-            }
-          } catch (corrErr) {
-            console.error("[QualityCheck] Correction retry failed:", corrErr instanceof Error ? corrErr.message : "Unknown");
-          }
-        }
-
-        if (!originalHadAssessment) {
-          const currentQuestion = extractQuestionText(fullResponse);
-          const previousQuestions = messages
-            .filter((m: any) => m.role === "assistant" || m.role === "model")
-            .map((m: any) => extractQuestionText(m.content || m.text || ""))
-            .filter((q: string) => q.length > 10);
-
-          const isDuplicate = previousQuestions.some(
-            (prev: string) => computeSimilarity(currentQuestion, prev) > 0.6
-          );
-
-          if (isDuplicate) {
-            console.warn("[DedupCheck] Duplicate question detected — regenerating once before sending");
-            try {
-              const dedupResponse = await ai.models.generateContent({
-                model: MODEL_FLASH,
-                contents: [
-                  ...chatMessages,
-                  { role: "model", parts: [{ text: fullResponse }] },
-                  { role: "user", parts: [{ text: "You just repeated a question you already asked earlier in this conversation. Ask a DIFFERENT, NEW question that gathers information you have NOT already collected. Do not repeat or rephrase any previous question." }] },
-                ],
-                config: {
-                  systemInstruction: systemContext,
-                  maxOutputTokens: 2048,
-                },
-              });
-              const newText = dedupResponse.text || "";
-              if (newText && newText.length > 10) {
-                const newQuestion = extractQuestionText(newText);
-                const stillDuplicate = previousQuestions.some(
-                  (prev: string) => computeSimilarity(newQuestion, prev) > 0.6
-                );
-                if (!stillDuplicate) {
-                  fullResponse = newText;
-                  console.log("[DedupCheck] Using deduplicated question");
-                } else {
-                  console.warn("[DedupCheck] Retry still duplicate, keeping original");
-                }
-              }
-            } catch (dedupErr) {
-              console.error("[DedupCheck] Retry failed:", dedupErr instanceof Error ? dedupErr.message : "Unknown");
-            }
-          }
-        }
-      }
-
-      if (!clientDisconnected) {
-        res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
-      }
-
       const flashAssessment = extractAssessmentJson(fullResponse);
 
       if (flashAssessment && !clientDisconnected) {
-        console.log("[ProValidation] Flash assessment detected — starting Pro validation");
-        const conversationForValidation = messages.map((m: any) => ({
+        console.log("[ProRecommendation] Flash Q&A complete — generating Pro recommendation from conversation");
+        const conversationForPro = messages.map((m: any) => ({
           role: m.role,
           content: m.content || m.text || "",
         }));
-        conversationForValidation.push({ role: "assistant", content: fullResponse });
+        conversationForPro.push({ role: "assistant", content: fullResponse });
 
-        let validatedAssessment = flashAssessment;
-
-        const proResult = await validateWithPro(
-          conversationForValidation,
-          flashAssessment,
-          patientProfile || null,
-          10000
+        const proRecommendation = await generateProRecommendation(
+          conversationForPro,
+          patientProfile || null
         );
 
-        if (proResult) {
-          validatedAssessment = proResult;
-          console.log("[ProValidation] Using Pro-validated assessment");
+        let finalAssessment: any;
+        if (proRecommendation) {
+          finalAssessment = applyDeterministicRules(
+            proRecommendation,
+            patientProfile || null
+          );
+          console.log("[ProRecommendation] Using Pro-generated recommendation — severity:", finalAssessment.assessment?.severity, "triage:", finalAssessment.triageLevel);
         } else {
-          console.log("[ProValidation] Using Flash assessment (Pro unavailable or timed out)");
+          finalAssessment = applyDeterministicRules(
+            flashAssessment,
+            patientProfile || null
+          );
+          console.log("[ProRecommendation] Pro unavailable — falling back to Flash assessment");
         }
 
-        validatedAssessment = applyDeterministicRules(
-          validatedAssessment,
-          patientProfile || null,
-          fullResponse,
-          proResult ? flashAssessment : undefined
-        );
-
         if (!clientDisconnected) {
-          res.write(`data: ${JSON.stringify({ validatedAssessment })}\n\n`);
-          console.log("[ProValidation] Sent validated assessment to client — severity:", validatedAssessment.assessment?.severity, "triage:", validatedAssessment.triageLevel);
+          res.write(`data: ${JSON.stringify({ validatedAssessment: finalAssessment })}\n\n`);
         }
       }
 
