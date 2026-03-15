@@ -505,6 +505,11 @@ export default function AssessmentScreen() {
                 const cleanStreaming = stripJson(fullText, true);
                 setStreamingMessage(cleanStreaming);
               }
+              if (data.correction) {
+                fullText = data.correction;
+                const cleanCorrection = stripJson(fullText, true);
+                setStreamingMessage(cleanCorrection);
+              }
               if (data.validatedAssessment) {
                 try {
                   parsedResult = normalizeResult(data.validatedAssessment);

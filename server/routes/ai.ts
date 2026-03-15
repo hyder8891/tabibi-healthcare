@@ -672,6 +672,7 @@ COMMUNICATION STYLE:
 - Ask ONE question at a time to avoid overwhelming the user
 - Keep responses concise and focused - no filler text, no repetitive safety warnings
 - Do NOT repeat what the user just said back to them
+- NEVER ask the same question twice. If you have already asked about a topic (e.g., medications, chronic conditions, symptom character), do NOT ask it again. Each question must gather NEW information not already covered.
 - ARABIC GENDER CONJUGATION: Check the PATIENT PROFILE for gender. If male, use masculine Arabic conjugation (أنتَ، هل عانيتَ، هل تشعر). If female, use feminine (أنتِ، هل عانيتِ، هل تشعرين). If gender is not provided, use masculine as default (standard Arabic convention). NEVER mix conjugation within a session.
 - LANGUAGE CONSISTENCY IN JSON: When the session language is Arabic, ALL text values in the JSON recommendation block MUST be in Arabic — including followUp.returnIn, medicine warnings, test reasons, differentials. Do NOT mix English words into Arabic text. Use "فوراً" not "immediately", "عاجل" not "urgent", "روتيني" not "routine", "خلال ٢٤ ساعة" not "within 24 hours". The ONLY exception is medicine activeIngredient names which stay in English.
 
@@ -726,6 +727,72 @@ Before generating a final recommendation, silently cross-check the patient sympt
 ## How To Use:
 Silently scan these rules for every patient. Do NOT tell the patient you are checking a database. If a trigger matches, ask the screening question naturally within the conversation before concluding. Never skip a trigger because you are already confident in a different diagnosis -- in Iraq, endemic co-diagnoses are common.
 `;
+
+function extractQuestionText(text: string): string {
+  const stripped = text
+    .replace(/\{[\s\S]*\}/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .trim();
+  const lines = stripped.split("\n").filter(l => l.trim().length > 0);
+  const questionLines = lines.filter(l => l.includes("?") || l.includes("؟"));
+  return questionLines.length > 0 ? questionLines.join(" ") : lines.slice(-2).join(" ");
+}
+
+function computeSimilarity(a: string, b: string): number {
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  const na = normalize(a);
+  const nb = normalize(b);
+  if (!na || !nb) return 0;
+
+  if (na === nb) return 1.0;
+  if (na.includes(nb) || nb.includes(na)) return 0.9;
+
+  const wordsA = new Set(na.split(" "));
+  const wordsB = new Set(nb.split(" "));
+  const intersection = [...wordsA].filter(w => wordsB.has(w)).length;
+  const union = new Set([...wordsA, ...wordsB]).size;
+  return union > 0 ? intersection / union : 0;
+}
+
+const GARBLED_ARABIC_PATTERNS = [
+  /[\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}[\u0020][\u0600-\u06FF]{1}/,
+  /([^\s\u0600-\u06FF])[\u0600-\u06FF]{1,2}([^\s\u0600-\u06FF])/,
+  /[\u0600-\u06FF][\u0000-\u001F][\u0600-\u06FF]/,
+  /(.)\1{4,}/,
+];
+
+function hasGarbledArabic(text: string): boolean {
+  const arabicPortion = text.replace(/[^\u0600-\u06FF\s]/g, "").trim();
+  if (arabicPortion.length < 10) return false;
+
+  const words = arabicPortion.split(/\s+/).filter(w => w.length > 0);
+  const singleCharWords = words.filter(w => w.length === 1).length;
+  if (words.length > 5 && singleCharWords / words.length > 0.4) return true;
+
+  for (const pattern of GARBLED_ARABIC_PATTERNS) {
+    if (pattern.test(text)) {
+      const matches = text.match(new RegExp(pattern.source, "g" + (pattern.flags || "")));
+      if (matches && matches.length >= 3) return true;
+    }
+  }
+
+  return false;
+}
+
+function buildPreviousQuestionsContext(messages: Array<{ role: string; content: string }>): string {
+  const assistantMessages = messages
+    .filter(m => m.role === "assistant" || m.role === "model")
+    .map(m => extractQuestionText(m.content || ""))
+    .filter(q => q.length > 10);
+
+  if (assistantMessages.length === 0) return "";
+
+  return `\n\nQUESTIONS ALREADY ASKED IN THIS SESSION (DO NOT repeat any of these — ask something NEW and different):\n${assistantMessages.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n`;
+}
 
 export function registerAiRoutes(app: Express): void {
   app.post("/api/assess", requireAuth, async (req: Request, res: Response) => {
@@ -788,6 +855,13 @@ export function registerAiRoutes(app: Express): void {
         }
       } catch (e) {
         console.error('disease match error', e);
+      }
+
+      const prevQuestionsCtx = buildPreviousQuestionsContext(
+        messages.map((m: any) => ({ role: m.role, content: m.content || m.text || "" }))
+      );
+      if (prevQuestionsCtx) {
+        systemContext += prevQuestionsCtx;
       }
 
       let imageAnalysis = "";
@@ -923,6 +997,34 @@ Be thorough and specific. Provide your analysis in the same language the user is
           console.error("Streaming timed out");
         } else {
           throw streamErr;
+        }
+      }
+
+      if (!clientDisconnected && fullResponse && hasGarbledArabic(fullResponse)) {
+        console.warn("[QualityCheck] Garbled Arabic detected in AI response — sending correction event");
+        try {
+          const correctionResponse = await ai.models.generateContent({
+            model: MODEL_FLASH,
+            contents: [
+              ...chatMessages,
+              { role: "model", parts: [{ text: fullResponse }] },
+              { role: "user", parts: [{ text: "Your previous response contained garbled/corrupted Arabic text. Please rewrite your last message cleanly in proper Arabic. Only output the corrected message, nothing else." }] },
+            ],
+            config: {
+              systemInstruction: systemContext,
+              maxOutputTokens: 2048,
+            },
+          });
+          const correctedText = correctionResponse.text || "";
+          if (correctedText && !hasGarbledArabic(correctedText)) {
+            res.write(`data: ${JSON.stringify({ correction: correctedText })}\n\n`);
+            fullResponse = correctedText;
+            console.log("[QualityCheck] Sent corrected Arabic text to client");
+          } else {
+            console.warn("[QualityCheck] Correction still garbled, keeping original");
+          }
+        } catch (corrErr) {
+          console.error("[QualityCheck] Correction retry failed:", corrErr instanceof Error ? corrErr.message : "Unknown");
         }
       }
 
