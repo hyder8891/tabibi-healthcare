@@ -134,7 +134,8 @@ Your job is to review and CORRECT the JSON if needed. Check for:
 1. SEVERITY-TRIAGE ALIGNMENT: If the conversation indicates the patient should go to the ER or seek immediate care, severity MUST be "severe" and triageLevel MUST be "immediate" or "within-hours". A "moderate" severity with ER advice is WRONG.
 2. DIFFERENTIAL PLAUSIBILITY: Are the differentials clinically reasonable given the symptoms discussed?
 3. MEDICATION APPROPRIATENESS: Are recommended medications appropriate for the diagnosed condition? Are there drug-drug interactions with the patient's current medications?
-4. CONFIDENCE CALIBRATION: Does the stated confidence match the completeness of information gathered?
+4. MEDICATION-ALLERGY CROSS-CHECK: If the patient profile lists allergies, verify NONE of the recommended medicines (by brand name, generic name, or active ingredient) match any listed allergy. Remove any that do.
+5. CONFIDENCE CALIBRATION: Does the stated confidence match the completeness of information gathered?
 
 Return ONLY the corrected JSON assessment block — no explanation, no markdown fences, no extra text. If the assessment is already correct, return it unchanged. Preserve the exact same JSON structure.`;
 
