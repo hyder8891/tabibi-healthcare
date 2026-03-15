@@ -74,6 +74,7 @@ export default function AssessmentScreen() {
   const initializedRef = useRef(false);
 
   const headerHeightRef = useRef(0);
+  const progressHeightRef = useRef(0);
   const contentSizeRef = useRef(0);
   const viewportHeightRef = useRef(0);
 
@@ -85,7 +86,7 @@ export default function AssessmentScreen() {
         const viewportH = viewportHeightRef.current;
         if (contentH > 0 && viewportH > 0) {
           const maxOffset = Math.max(0, contentH - viewportH);
-          const headerOffset = headerHeightRef.current || 0;
+          const headerOffset = (headerHeightRef.current || 0) + (progressHeightRef.current || 0);
           const targetOffset = Math.max(0, maxOffset - headerOffset);
           flatListRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
         } else {
@@ -857,7 +858,10 @@ export default function AssessmentScreen() {
         const progress = isComplete ? 1 : Math.min(questionCount / cappedTotal, 0.95);
         if (isComplete && assessmentId) return null;
         return (
-          <View style={styles.progressContainer}>
+          <View
+            style={styles.progressContainer}
+            onLayout={(e) => { progressHeightRef.current = e.nativeEvent.layout.height; }}
+          >
             <View style={styles.progressBarBg}>
               <View
                 style={[
