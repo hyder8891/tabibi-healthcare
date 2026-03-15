@@ -74,15 +74,22 @@ export default function AssessmentScreen() {
   const initializedRef = useRef(false);
 
   const headerHeightRef = useRef(0);
+  const contentSizeRef = useRef(0);
+  const viewportHeightRef = useRef(0);
 
   useEffect(() => {
     if (assessmentResult && flatListRef.current) {
       const scrollDelay = Platform.OS === "web" ? 600 : 400;
       setTimeout(() => {
-        try {
+        const contentH = contentSizeRef.current;
+        const viewportH = viewportHeightRef.current;
+        if (contentH > 0 && viewportH > 0) {
+          const maxOffset = Math.max(0, contentH - viewportH);
+          const headerOffset = headerHeightRef.current || 0;
+          const targetOffset = Math.max(0, maxOffset - headerOffset);
+          flatListRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
+        } else {
           flatListRef.current?.scrollToEnd({ animated: true });
-        } catch {
-          flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
         }
       }, scrollDelay);
     }
@@ -893,6 +900,8 @@ export default function AssessmentScreen() {
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          onContentSizeChange={(_w, h) => { contentSizeRef.current = h; }}
+          onLayout={(e) => { viewportHeightRef.current = e.nativeEvent.layout.height; }}
           ListHeaderComponent={
             isLoading && !streamingMessage ? (
               <AnimatedTypingIndicator />
