@@ -70,7 +70,6 @@ export function RecommendationCard({
   const rawSeverity = result?.assessment?.severity || "moderate";
   const severity: string = (() => {
     if (rawSeverity === "critical") return "severe";
-    if (triageLevel === "immediate") return "severe";
     const known = ["severe", "urgent", "moderate", "mild"];
     if (!known.includes(rawSeverity)) return "moderate";
     return rawSeverity;

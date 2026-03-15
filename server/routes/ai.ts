@@ -55,18 +55,6 @@ function applyDeterministicRules(
 ): any {
   if (!assessment) return assessment;
 
-  const severity = assessment.assessment?.severity?.toLowerCase();
-  const triage = assessment.triageLevel?.toLowerCase();
-
-  if (severity === "severe") {
-    if (!triage || !["immediate", "within-hours"].includes(triage)) {
-      assessment.triageLevel = "within-hours";
-    }
-  }
-  if (triage === "immediate") {
-    if (assessment.assessment) assessment.assessment.severity = "severe";
-  }
-
   const isPediatric = patientProfile?.isPediatric || (patientProfile?.age != null && patientProfile.age < 16);
   if (isPediatric && assessment.recommendations?.pathwayA?.medicines) {
     assessment.recommendations.pathwayA.medicines = assessment.recommendations.pathwayA.medicines.filter(
@@ -540,87 +528,13 @@ Prefer SDI (Samarra Drug Industries), Pioneer/Julphar, and other Iraqi/Gulf manu
 IRAQI DOSAGES: Use dosage forms and strengths commonly available in Iraqi pharmacies (e.g., 500mg tablets for paracetamol, not 325mg).
 LOCAL BRAND: Include "localBrand" field with the Iraqi/local brand name in Arabic script.
 
-RECOMMENDATION FORMAT:
-When ready to recommend, output a JSON block wrapped in \`\`\`json markers:
-\`\`\`json
-{
-  "assessment": {
-    "condition": "Most likely condition name",
-    "confidence": "high|medium|low",
-    "severity": "mild|moderate|severe",
-    "description": "Brief patient-friendly explanation"
-  },
-  "differentials": [
-    {
-      "condition": "Second most likely diagnosis",
-      "likelihood": "possible|less likely",
-      "distinguishingFeature": "What specific symptom or test result would confirm or rule this out"
-    },
-    {
-      "condition": "Third possibility to consider",
-      "likelihood": "possible|less likely",
-      "distinguishingFeature": "What differentiates this from the primary diagnosis"
-    }
-  ],
-  "triageLevel": "immediate|within-hours|within-24h|within-week|routine",
-  "pathway": "A or B",
-  "recommendations": {
-    "pathwayA": {
-      "active": true/false,
-      "medicines": [
-        {
-          "name": "Medicine name (Iraqi brand preferred)",
-          "localBrand": "الاسم التجاري المحلي بالعربي",
-          "activeIngredient": "Active ingredient",
-          "class": "Drug class",
-          "dosage": "Recommended dosage (Iraqi market strength)",
-          "frequency": "How often",
-          "duration": "How long",
-          "warnings": ["Warning 1"]
-        }
-      ]
-    },
-    "pathwayB": {
-      "active": true/false,
-      "tests": [
-        {
-          "name": "SPECIFIC test name (e.g., 'تحليل بول كامل (Urinalysis)', 'صورة أشعة سينية للبطن (KUB X-ray)', 'أشعة مقطعية للبطن (CT Abdomen)', 'تحليل دم شامل (CBC)', 'فحص وظائف الكلى (RFT)', 'تخطيط قلب (ECG)', 'سونار البطن (Abdominal Ultrasound)') - NEVER use vague terms like 'medical imaging' or 'medical evaluation'",
-          "type": "lab|imaging|referral (use 'referral' for specialist consultations like surgical, cardiology, neurology referrals — NOT 'lab' or 'imaging')",
-          "urgency": "routine|urgent|emergency",
-          "reason": "Specific clinical justification explaining what this test will reveal and why it matters for this patient",
-          "facilityType": "lab|clinic|hospital",
-          "capabilities": ["required_capability_tags"],
-          "estimatedCost": "free-MOH|low|moderate|high",
-          "availableAt": "MOH-lab|private-lab|hospital|any-pharmacy"
-        }
-      ]
-    }
-  },
-  "warnings": ["Important warning messages"],
-  "followUp": {
-    "returnIn": "Specific timeframe (e.g., '3 days', '1 week', '24 hours', 'immediately if worsening')",
-    "redFlags": [
-      "Specific new symptom that should trigger immediate medical attention",
-      "Another specific warning sign to watch for"
-    ]
-  }
-}
-\`\`\`
+ASSESSMENT COMPLETION:
+Your role is ONLY to gather clinical information through the Q&A interview. You do NOT generate recommendations, diagnoses, or treatment plans.
+When you have gathered enough information to form a clinical picture (typically after completing the relevant interview phases), output the following marker on its own line:
+[ASSESSMENT_READY]
+After outputting this marker, provide a brief summary to the patient (1-2 sentences) letting them know you are preparing their assessment. Do NOT output any JSON, recommendations, medications, or diagnoses. A separate specialist system will handle the clinical recommendation.
 
-TRIAGE LEVEL GUIDE (separate from severity — describes TIME URGENCY):
-- "immediate": Life-threatening, go to ER now (cardiac, stroke, anaphylaxis, severe bleeding)
-- "within-hours": Needs medical attention within 2-4 hours (high fever with rigors, severe dehydration, acute urinary retention)
-- "within-24h": Should see a doctor within 24 hours (moderate infections, persistent vomiting, worsening symptoms)
-- "within-week": Schedule a doctor visit within the week (chronic symptoms needing investigation, mild infections not resolving)
-- "routine": Self-care with OTC treatment, follow up only if not improving (common cold, mild allergies, minor aches)
-
-DIFFERENTIALS GUIDE:
-Always provide 2-3 differential diagnoses. For each, explain what specific feature distinguishes it from the primary diagnosis. This helps the patient understand why follow-up matters and what to watch for. Example: Primary = kidney stones → Differential 1: UTI (distinguished by: burning on urination, cloudy urine) → Differential 2: appendicitis (distinguished by: pain migrating to lower right, rebound tenderness).
-
-MEDICATION INTERACTIONS: If the user reports current medications, check for:
-- Side effects that might explain current symptoms (ADR)
-- Drug-drug interactions with any recommended OTC medicines
-- Contraindications based on existing conditions
+MEDICATION INTERACTIONS: If the user reports current medications, note them for the specialist system.
 
 MEDICAL IMAGE ANALYSIS:
 - When a user attaches a medical image (X-ray, MRI, CT scan, lab results, skin photos, ECG, ultrasound, pathology slides, prescriptions, etc.), ANALYZE it thoroughly.
@@ -997,10 +911,10 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      const flashAssessment = extractAssessmentJson(fullResponse);
+      const isQAComplete = fullResponse.includes("[ASSESSMENT_READY]") || !!extractAssessmentJson(fullResponse);
 
-      if (flashAssessment && !clientDisconnected) {
-        console.log("[ProRecommendation] Flash Q&A complete — generating Pro recommendation from conversation");
+      if (isQAComplete && !clientDisconnected) {
+        console.log("[ProRecommendation] Q&A phase complete — generating Pro recommendation from conversation");
         const conversationForPro = messages.map((m: any) => ({
           role: m.role,
           content: m.content || m.text || "",
@@ -1012,23 +926,20 @@ Be thorough and specific. Provide your analysis in the same language the user is
           patientProfile || null
         );
 
-        let finalAssessment: any;
         if (proRecommendation) {
-          finalAssessment = applyDeterministicRules(
+          const finalAssessment = applyDeterministicRules(
             proRecommendation,
             patientProfile || null
           );
           console.log("[ProRecommendation] Using Pro-generated recommendation — severity:", finalAssessment.assessment?.severity, "triage:", finalAssessment.triageLevel);
+          if (!clientDisconnected) {
+            res.write(`data: ${JSON.stringify({ validatedAssessment: finalAssessment })}\n\n`);
+          }
         } else {
-          finalAssessment = applyDeterministicRules(
-            flashAssessment,
-            patientProfile || null
-          );
-          console.log("[ProRecommendation] Pro unavailable — falling back to Flash assessment");
-        }
-
-        if (!clientDisconnected) {
-          res.write(`data: ${JSON.stringify({ validatedAssessment: finalAssessment })}\n\n`);
+          console.error("[ProRecommendation] Pro failed or timed out — sending error to client");
+          if (!clientDisconnected) {
+            res.write(`data: ${JSON.stringify({ error: "Assessment generation failed. Please try again." })}\n\n`);
+          }
         }
       }
 

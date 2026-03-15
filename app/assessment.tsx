@@ -411,7 +411,8 @@ export default function AssessmentScreen() {
           .replace(/```json[\s\S]*?```/g, "")
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
-          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/gs, "");
+          .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/gs, "")
+          .replace(/\[ASSESSMENT_READY\]/g, "");
 
         const removeBalancedJson = (str: string): string => {
           let result = "";
@@ -516,6 +517,9 @@ export default function AssessmentScreen() {
                   console.warn("Failed to apply validated assessment:", e);
                 }
               }
+              if (data.error) {
+                console.error("[Assessment] Server error:", data.error);
+              }
               if (data.done) {
                 const emergencyMatch = fullText.match(
                   /\{"emergency"\s*:\s*true[^}]*\}/,
@@ -531,58 +535,7 @@ export default function AssessmentScreen() {
                   } catch {}
                 }
 
-                if (!parsedResult) {
-                  const jsonMatch = fullText.match(
-                    /```json\s*([\s\S]*?)```/,
-                  );
-                  if (jsonMatch) {
-                    try {
-                      const raw = JSON.parse(jsonMatch[1]);
-                      parsedResult = normalizeResult(raw);
-                      setAssessmentResult(parsedResult);
-                    } catch (e) {
-                      console.warn("Failed to parse code-fenced JSON:", e);
-                    }
-                  }
-                }
-
-                if (!parsedResult) {
-                  const assessmentKeys = ["assessment", "recommendations", "pathwayA", "pathwayB", "followUp", "triageLevel", "differentials"];
-                  const findJsonBlock = (str: string): string | null => {
-                    for (let idx = 0; idx < str.length; idx++) {
-                      if (str[idx] !== "{") continue;
-                      const snippet = str.substring(idx, idx + 300);
-                      if (!assessmentKeys.some(k => snippet.includes(`"${k}"`))) continue;
-                      let depth = 0;
-                      for (let j = idx; j < str.length; j++) {
-                        if (str[j] === "{") depth++;
-                        else if (str[j] === "}") {
-                          depth--;
-                          if (depth === 0) return str.substring(idx, j + 1);
-                        }
-                      }
-                    }
-                    return null;
-                  };
-                  const rawBlock = findJsonBlock(fullText);
-                  if (rawBlock) {
-                    try {
-                      const raw = JSON.parse(rawBlock);
-                      parsedResult = normalizeResult(raw);
-                      setAssessmentResult(parsedResult);
-                    } catch (e) {
-                      console.warn("Failed to parse raw JSON:", e);
-                    }
-                  }
-                }
-
-                if (parsedEmergency && parsedResult) {
-                  if (parsedResult.assessment) {
-                    parsedResult.assessment.severity = "severe";
-                  }
-                  parsedResult.triageLevel = "immediate";
-                  setAssessmentResult({ ...parsedResult });
-                } else if (parsedEmergency && !parsedResult) {
+                if (parsedEmergency && !parsedResult) {
                   const isAr = settings.language === "ar";
                   parsedResult = {
                     assessment: {
