@@ -12,6 +12,192 @@ const ai = new GoogleGenAI({
 const MODEL_FLASH = "gemini-2.5-flash";
 const MODEL_PRO = "gemini-2.5-pro";
 
+const GATE1_REFERRAL_ONLY = new Set([
+  "cancer", "carcinoma", "malignant", "malignancy", "tumor", "tumour", "neoplasm",
+  "fracture", "stroke", "infarct", "organ failure", "cirrhosis", "aneurysm",
+  "appendicitis", "ectopic pregnancy", "pulmonary embolism", "pneumothorax",
+  "سرطان", "ورم", "كسر", "جلطة دماغية", "فشل عضوي", "تليف",
+]);
+
+const ASPIRIN_NAMES = new Set([
+  "aspirin", "acetylsalicylic acid", "أسبرين", "اسبرين", "asa",
+]);
+
+function extractAssessmentJson(text: string): any | null {
+  const codeFenced = text.match(/```json\s*([\s\S]*?)```/);
+  if (codeFenced) {
+    try { return JSON.parse(codeFenced[1]); } catch {}
+  }
+
+  const keys = ["assessment", "recommendations", "pathwayA", "pathwayB", "followUp", "triageLevel", "differentials"];
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] !== "{") continue;
+    const snippet = text.substring(i, i + 300);
+    if (!keys.some(k => snippet.includes(`"${k}"`))) continue;
+    let depth = 0;
+    for (let j = i; j < text.length; j++) {
+      if (text[j] === "{") depth++;
+      else if (text[j] === "}") {
+        depth--;
+        if (depth === 0) {
+          try { return JSON.parse(text.substring(i, j + 1)); } catch { break; }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function containsErUrgency(text: string): boolean {
+  const erPatterns = [
+    /go\s+to\s+(the\s+)?(er|emergency|hospital)/i,
+    /seek\s+immediate\s+(medical\s+)?(attention|care|help)/i,
+    /call\s+(an?\s+)?ambulance/i,
+    /emergency\s+room/i,
+    /توجه\s*(إلى|الى)?\s*(أقرب|اقرب)?\s*(طوارئ|مستشفى)/,
+    /اذهب\s*(إلى|الى)?\s*(الطوارئ|المستشفى)/,
+    /حالة\s+طوارئ/,
+    /اتصل\s+ب(الإسعاف|الاسعاف)/,
+    /فوراً.*طوارئ|طوارئ.*فوراً/,
+    /immediately.*emergency|emergency.*immediately/i,
+  ];
+  return erPatterns.some(p => p.test(text));
+}
+
+function applyDeterministicRules(
+  assessment: any,
+  patientProfile: { age?: number; allergies?: string[]; isPediatric?: boolean; medications?: string[] } | null,
+  conversationText: string
+): any {
+  if (!assessment) return assessment;
+
+  const severity = assessment.assessment?.severity?.toLowerCase();
+  const triage = assessment.triageLevel?.toLowerCase();
+
+  if (severity === "severe") {
+    if (!triage || !["immediate", "within-hours"].includes(triage)) {
+      assessment.triageLevel = "within-hours";
+    }
+  }
+  if (triage === "immediate") {
+    if (assessment.assessment) assessment.assessment.severity = "severe";
+  }
+
+  if (containsErUrgency(conversationText)) {
+    if (assessment.assessment) {
+      assessment.assessment.severity = "severe";
+    }
+    if (!assessment.triageLevel || !["immediate", "within-hours"].includes(assessment.triageLevel)) {
+      assessment.triageLevel = "immediate";
+    }
+  }
+
+  const isPediatric = patientProfile?.isPediatric || (patientProfile?.age != null && patientProfile.age < 16);
+  if (isPediatric && assessment.recommendations?.pathwayA?.medicines) {
+    assessment.recommendations.pathwayA.medicines = assessment.recommendations.pathwayA.medicines.filter(
+      (med: any) => {
+        const name = (med.name || med.genericName || "").toLowerCase();
+        return !ASPIRIN_NAMES.has(name) && !name.includes("aspirin") && !name.includes("أسبرين");
+      }
+    );
+  }
+
+  const allergies = (patientProfile?.allergies || []).map(a => a.toLowerCase());
+  if (allergies.length > 0 && assessment.recommendations?.pathwayA?.medicines) {
+    assessment.recommendations.pathwayA.medicines = assessment.recommendations.pathwayA.medicines.filter(
+      (med: any) => {
+        const ingredients = Array.isArray(med.activeIngredients) ? med.activeIngredients : [];
+        if (med.activeIngredient && !ingredients.includes(med.activeIngredient)) {
+          ingredients.push(med.activeIngredient);
+        }
+        const medNames = [med.name, med.genericName, ...ingredients]
+          .filter(Boolean).map((n: string) => n.toLowerCase());
+        return !medNames.some(n => allergies.some(a => n.includes(a) || a.includes(n)));
+      }
+    );
+  }
+
+  const condition = (assessment.assessment?.condition || "").toLowerCase();
+  const isGate1 = [...GATE1_REFERRAL_ONLY].some(term => condition.includes(term));
+  if (isGate1 && assessment.recommendations?.pathwayA) {
+    assessment.recommendations.pathwayA.active = false;
+    assessment.recommendations.pathwayA.medicines = [];
+  }
+
+  return assessment;
+}
+
+const PRO_VALIDATION_PROMPT = `You are a senior clinical reviewer validating an AI-generated medical assessment. You receive the original patient conversation and a structured JSON assessment produced by a junior AI.
+
+Your job is to review and CORRECT the JSON if needed. Check for:
+
+1. SEVERITY-TRIAGE ALIGNMENT: If the conversation indicates the patient should go to the ER or seek immediate care, severity MUST be "severe" and triageLevel MUST be "immediate" or "within-hours". A "moderate" severity with ER advice is WRONG.
+2. DIFFERENTIAL PLAUSIBILITY: Are the differentials clinically reasonable given the symptoms discussed?
+3. MEDICATION APPROPRIATENESS: Are recommended medications appropriate for the diagnosed condition? Are there drug-drug interactions with the patient's current medications?
+4. CONFIDENCE CALIBRATION: Does the stated confidence match the completeness of information gathered?
+
+Return ONLY the corrected JSON assessment block — no explanation, no markdown fences, no extra text. If the assessment is already correct, return it unchanged. Preserve the exact same JSON structure.`;
+
+async function validateWithPro(
+  conversationMessages: Array<{ role: string; content: string }>,
+  flashAssessment: any,
+  patientProfile: any,
+  timeoutMs: number = 15000
+): Promise<any | null> {
+  try {
+    let contextSummary = "PATIENT CONVERSATION:\n";
+    for (const msg of conversationMessages) {
+      contextSummary += `[${msg.role}]: ${msg.content}\n`;
+    }
+
+    if (patientProfile) {
+      contextSummary += "\nPATIENT PROFILE:\n";
+      if (patientProfile.age) contextSummary += `- Age: ${patientProfile.age}\n`;
+      if (patientProfile.gender) contextSummary += `- Gender: ${patientProfile.gender}\n`;
+      if (patientProfile.medications?.length) contextSummary += `- Medications: ${patientProfile.medications.join(", ")}\n`;
+      if (patientProfile.allergies?.length) contextSummary += `- Allergies: ${patientProfile.allergies.join(", ")}\n`;
+      if (patientProfile.conditions?.length) contextSummary += `- Conditions: ${patientProfile.conditions.join(", ")}\n`;
+      if (patientProfile.isPediatric) contextSummary += `- PEDIATRIC PATIENT\n`;
+    }
+
+    contextSummary += `\nASSESSMENT JSON TO VALIDATE:\n${JSON.stringify(flashAssessment, null, 2)}`;
+
+    const proResponse = await Promise.race([
+      ai.models.generateContent({
+        model: MODEL_PRO,
+        contents: [{ role: "user", parts: [{ text: contextSummary }] }],
+        config: {
+          systemInstruction: PRO_VALIDATION_PROMPT,
+          maxOutputTokens: 4096,
+          thinkingConfig: { thinkingBudget: 2048 },
+        },
+      }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), timeoutMs)),
+    ]);
+
+    if (!proResponse) {
+      console.log("[ProValidation] Timed out after", timeoutMs, "ms — using Flash assessment with deterministic rules only");
+      return null;
+    }
+
+    const responseText = (proResponse as any).text || "";
+    let cleaned = responseText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log("[ProValidation] Successfully validated and corrected assessment");
+      return parsed;
+    }
+
+    console.warn("[ProValidation] Could not parse Pro response — using Flash assessment");
+    return null;
+  } catch (err) {
+    console.error("[ProValidation] Error:", err instanceof Error ? err.message : "Unknown");
+    return null;
+  }
+}
+
 function sanitizeInput(text: string): string {
   const injectionPatterns = [
     /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions|prompts|rules|guidelines)/gi,
@@ -724,6 +910,44 @@ Be thorough and specific. Provide your analysis in the same language the user is
           console.error("Streaming timed out");
         } else {
           throw streamErr;
+        }
+      }
+
+      const flashAssessment = extractAssessmentJson(fullResponse);
+
+      if (flashAssessment && !clientDisconnected) {
+        console.log("[ProValidation] Flash assessment detected — starting Pro validation");
+        const conversationForValidation = messages.map((m: any) => ({
+          role: m.role,
+          content: m.content || m.text || "",
+        }));
+        conversationForValidation.push({ role: "assistant", content: fullResponse });
+
+        let validatedAssessment = flashAssessment;
+
+        const proResult = await validateWithPro(
+          conversationForValidation,
+          flashAssessment,
+          patientProfile || null,
+          15000
+        );
+
+        if (proResult) {
+          validatedAssessment = proResult;
+          console.log("[ProValidation] Using Pro-validated assessment");
+        } else {
+          console.log("[ProValidation] Using Flash assessment (Pro unavailable or timed out)");
+        }
+
+        validatedAssessment = applyDeterministicRules(
+          validatedAssessment,
+          patientProfile || null,
+          fullResponse
+        );
+
+        if (!clientDisconnected) {
+          res.write(`data: ${JSON.stringify({ validatedAssessment })}\n\n`);
+          console.log("[ProValidation] Sent validated assessment to client — severity:", validatedAssessment.assessment?.severity, "triage:", validatedAssessment.triageLevel);
         }
       }
 

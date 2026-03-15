@@ -462,21 +462,33 @@ export default function AssessmentScreen() {
         return [];
       };
 
+      let sseBuffer = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
+        sseBuffer += decoder.decode(value, { stream: true });
+        const events = sseBuffer.split("\n\n");
+        sseBuffer = events.pop() || "";
 
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
+        for (const event of events) {
+          const line = event.trim();
+          if (!line.startsWith("data: ")) continue;
+          try {
               const data = JSON.parse(line.slice(6));
               if (data.content) {
                 fullText += data.content;
                 const cleanStreaming = stripJson(fullText, true);
                 setStreamingMessage(cleanStreaming);
+              }
+              if (data.validatedAssessment) {
+                try {
+                  parsedResult = normalizeResult(data.validatedAssessment);
+                  setAssessmentResult(parsedResult);
+                  console.log("[ProValidation] Using Pro-validated assessment — severity:", parsedResult.assessment?.severity);
+                } catch (e) {
+                  console.warn("Failed to apply validated assessment:", e);
+                }
               }
               if (data.done) {
                 const emergencyMatch = fullText.match(
@@ -493,16 +505,18 @@ export default function AssessmentScreen() {
                   } catch {}
                 }
 
-                const jsonMatch = fullText.match(
-                  /```json\s*([\s\S]*?)```/,
-                );
-                if (jsonMatch) {
-                  try {
-                    const raw = JSON.parse(jsonMatch[1]);
-                    parsedResult = normalizeResult(raw);
-                    setAssessmentResult(parsedResult);
-                  } catch (e) {
-                    console.warn("Failed to parse code-fenced JSON:", e);
+                if (!parsedResult) {
+                  const jsonMatch = fullText.match(
+                    /```json\s*([\s\S]*?)```/,
+                  );
+                  if (jsonMatch) {
+                    try {
+                      const raw = JSON.parse(jsonMatch[1]);
+                      parsedResult = normalizeResult(raw);
+                      setAssessmentResult(parsedResult);
+                    } catch (e) {
+                      console.warn("Failed to parse code-fenced JSON:", e);
+                    }
                   }
                 }
 
@@ -582,7 +596,6 @@ export default function AssessmentScreen() {
                 }
               }
             } catch {}
-          }
         }
       }
 
