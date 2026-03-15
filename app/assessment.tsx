@@ -517,8 +517,14 @@ export default function AssessmentScreen() {
                   console.warn("Failed to apply validated assessment:", e);
                 }
               }
-              if (data.error) {
+              if (data.error && !data.done) {
                 console.error("[Assessment] Server error:", data.error);
+                const errorText = t(
+                  "I was unable to generate your assessment. Please try sending your last message again.",
+                  "لم أتمكن من إعداد التقييم الخاص بك. يرجى إعادة إرسال رسالتك الأخيرة.",
+                );
+                fullText += "\n\n" + errorText;
+                setStreamingMessage(stripJson(fullText, true));
               }
               if (data.done) {
                 const emergencyMatch = fullText.match(
