@@ -87,7 +87,7 @@ function applyDeterministicRules(
     if (assessment.assessment) {
       assessment.assessment.severity = "severe";
     }
-    if (!assessment.triageLevel || !["immediate", "within-hours"].includes(assessment.triageLevel)) {
+    if (!assessment.triageLevel || !["immediate", "within-hours"].includes(assessment.triageLevel?.toLowerCase())) {
       assessment.triageLevel = "immediate";
     }
   }
