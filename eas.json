@@ -10,6 +10,13 @@
       "android": {
         "buildType": "apk"
       },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyAJ38OEy_QYBsUXJuJOUz9Z-eO3R29oNuQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "mydoctor-40043.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "mydoctor-40043",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "238884248738-qp43962v0of6vreq5383nmavob924tmc.apps.googleusercontent.com",
+        "EXPO_PUBLIC_DOMAIN": "https://app.tabibi.clinic"
+      },
       "channel": "development"
     },
     "preview": {
