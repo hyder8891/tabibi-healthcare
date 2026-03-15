@@ -69,8 +69,17 @@ export default function AssessmentScreen() {
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
+  const lockedTotalRef = useRef<number | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const initializedRef = useRef(false);
+
+  useEffect(() => {
+    if (assessmentResult && flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 300);
+    }
+  }, [assessmentResult]);
 
   useEffect(() => {
     if (initializedRef.current) return;
@@ -821,8 +830,11 @@ export default function AssessmentScreen() {
         const questionCount = messages.filter(
           (m) => m.role === "assistant" && m.id !== "welcome" && m.id !== "streaming"
         ).length;
-        const estimatedTotal = questionCount <= 3 ? 10 : questionCount <= 8 ? 12 : 16;
-        const cappedTotal = Math.min(estimatedTotal, 20);
+        const rawEstimate = questionCount <= 3 ? 10 : questionCount <= 8 ? 12 : 16;
+        if (questionCount > 0 && lockedTotalRef.current === null) {
+          lockedTotalRef.current = Math.min(rawEstimate, 20);
+        }
+        const cappedTotal = lockedTotalRef.current || Math.min(rawEstimate, 20);
         const progress = isComplete ? 1 : Math.min(questionCount / cappedTotal, 0.95);
         if (isComplete && assessmentId) return null;
         return (
@@ -1158,6 +1170,7 @@ const styles = StyleSheet.create({
   },
   inlineResultCard: {
     marginBottom: 8,
+    paddingTop: 8,
   },
   modalOverlay: {
     flex: 1,
