@@ -901,7 +901,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      const isQAComplete = fullResponse.includes("[ASSESSMENT_READY]") || !!extractAssessmentJson(fullResponse);
+      const isQAComplete = fullResponse.includes("[ASSESSMENT_READY]");
 
       if (isQAComplete && !clientDisconnected) {
         console.log("[ProRecommendation] Q&A phase complete — generating Pro recommendation from conversation");
