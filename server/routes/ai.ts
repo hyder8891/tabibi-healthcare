@@ -981,7 +981,6 @@ Be thorough and specific. Provide your analysis in the same language the user is
             for (const part of chunk.candidates[0].content.parts) {
               if (part.thought || !part.text) continue;
               fullResponse += part.text;
-              res.write(`data: ${JSON.stringify({ content: part.text })}\n\n`);
             }
           }
 
@@ -1000,80 +999,85 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      const originalHadAssessment = !!extractAssessmentJson(fullResponse);
-      if (!clientDisconnected && fullResponse && hasGarbledArabic(fullResponse)) {
-        console.warn("[QualityCheck] Garbled Arabic detected in AI response — sending correction event");
-        try {
-          const correctionResponse = await ai.models.generateContent({
-            model: MODEL_FLASH,
-            contents: [
-              ...chatMessages,
-              { role: "model", parts: [{ text: fullResponse }] },
-              { role: "user", parts: [{ text: "Your previous response contained garbled/corrupted Arabic text. Please rewrite your last message cleanly in proper Arabic. Only output the corrected message, nothing else." }] },
-            ],
-            config: {
-              systemInstruction: systemContext,
-              maxOutputTokens: 2048,
-            },
-          });
-          const correctedText = correctionResponse.text || "";
-          const correctionHasAssessment = !!extractAssessmentJson(correctedText);
-          if (correctedText && !hasGarbledArabic(correctedText) && (!originalHadAssessment || correctionHasAssessment)) {
-            res.write(`data: ${JSON.stringify({ correction: correctedText })}\n\n`);
-            fullResponse = correctedText;
-            console.log("[QualityCheck] Sent corrected Arabic text to client");
-          } else {
-            console.warn("[QualityCheck] Correction rejected (still garbled or lost assessment JSON), keeping original");
-          }
-        } catch (corrErr) {
-          console.error("[QualityCheck] Correction retry failed:", corrErr instanceof Error ? corrErr.message : "Unknown");
-        }
-      }
+      if (!clientDisconnected && fullResponse) {
+        const originalHadAssessment = !!extractAssessmentJson(fullResponse);
 
-      if (!clientDisconnected && fullResponse && !extractAssessmentJson(fullResponse)) {
-        const currentQuestion = extractQuestionText(fullResponse);
-        const previousQuestions = messages
-          .filter((m: any) => m.role === "assistant" || m.role === "model")
-          .map((m: any) => extractQuestionText(m.content || m.text || ""))
-          .filter((q: string) => q.length > 10);
-
-        const isDuplicate = previousQuestions.some(
-          (prev: string) => computeSimilarity(currentQuestion, prev) > 0.6
-        );
-
-        if (isDuplicate) {
-          console.warn("[DedupCheck] Duplicate question detected — regenerating once");
+        if (hasGarbledArabic(fullResponse)) {
+          console.warn("[QualityCheck] Garbled Arabic detected — retrying before sending to client");
           try {
-            const dedupResponse = await ai.models.generateContent({
+            const correctionResponse = await ai.models.generateContent({
               model: MODEL_FLASH,
               contents: [
                 ...chatMessages,
                 { role: "model", parts: [{ text: fullResponse }] },
-                { role: "user", parts: [{ text: "You just repeated a question you already asked earlier in this conversation. Ask a DIFFERENT, NEW question that gathers information you have NOT already collected. Do not repeat or rephrase any previous question." }] },
+                { role: "user", parts: [{ text: "Your previous response contained garbled/corrupted Arabic text. Please rewrite your last message cleanly in proper Arabic. Only output the corrected message, nothing else." }] },
               ],
               config: {
                 systemInstruction: systemContext,
                 maxOutputTokens: 2048,
               },
             });
-            const newText = dedupResponse.text || "";
-            if (newText && newText.length > 10) {
-              const newQuestion = extractQuestionText(newText);
-              const stillDuplicate = previousQuestions.some(
-                (prev: string) => computeSimilarity(newQuestion, prev) > 0.6
-              );
-              if (!stillDuplicate) {
-                res.write(`data: ${JSON.stringify({ correction: newText })}\n\n`);
-                fullResponse = newText;
-                console.log("[DedupCheck] Sent deduplicated question to client");
-              } else {
-                console.warn("[DedupCheck] Retry still duplicate, keeping original");
-              }
+            const correctedText = correctionResponse.text || "";
+            const correctionHasAssessment = !!extractAssessmentJson(correctedText);
+            if (correctedText && !hasGarbledArabic(correctedText) && (!originalHadAssessment || correctionHasAssessment)) {
+              fullResponse = correctedText;
+              console.log("[QualityCheck] Using corrected Arabic text");
+            } else {
+              console.warn("[QualityCheck] Correction rejected (still garbled or lost assessment JSON), keeping original");
             }
-          } catch (dedupErr) {
-            console.error("[DedupCheck] Retry failed:", dedupErr instanceof Error ? dedupErr.message : "Unknown");
+          } catch (corrErr) {
+            console.error("[QualityCheck] Correction retry failed:", corrErr instanceof Error ? corrErr.message : "Unknown");
           }
         }
+
+        if (!originalHadAssessment) {
+          const currentQuestion = extractQuestionText(fullResponse);
+          const previousQuestions = messages
+            .filter((m: any) => m.role === "assistant" || m.role === "model")
+            .map((m: any) => extractQuestionText(m.content || m.text || ""))
+            .filter((q: string) => q.length > 10);
+
+          const isDuplicate = previousQuestions.some(
+            (prev: string) => computeSimilarity(currentQuestion, prev) > 0.6
+          );
+
+          if (isDuplicate) {
+            console.warn("[DedupCheck] Duplicate question detected — regenerating once before sending");
+            try {
+              const dedupResponse = await ai.models.generateContent({
+                model: MODEL_FLASH,
+                contents: [
+                  ...chatMessages,
+                  { role: "model", parts: [{ text: fullResponse }] },
+                  { role: "user", parts: [{ text: "You just repeated a question you already asked earlier in this conversation. Ask a DIFFERENT, NEW question that gathers information you have NOT already collected. Do not repeat or rephrase any previous question." }] },
+                ],
+                config: {
+                  systemInstruction: systemContext,
+                  maxOutputTokens: 2048,
+                },
+              });
+              const newText = dedupResponse.text || "";
+              if (newText && newText.length > 10) {
+                const newQuestion = extractQuestionText(newText);
+                const stillDuplicate = previousQuestions.some(
+                  (prev: string) => computeSimilarity(newQuestion, prev) > 0.6
+                );
+                if (!stillDuplicate) {
+                  fullResponse = newText;
+                  console.log("[DedupCheck] Using deduplicated question");
+                } else {
+                  console.warn("[DedupCheck] Retry still duplicate, keeping original");
+                }
+              }
+            } catch (dedupErr) {
+              console.error("[DedupCheck] Retry failed:", dedupErr instanceof Error ? dedupErr.message : "Unknown");
+            }
+          }
+        }
+      }
+
+      if (!clientDisconnected) {
+        res.write(`data: ${JSON.stringify({ content: fullResponse })}\n\n`);
       }
 
       const flashAssessment = extractAssessmentJson(fullResponse);
