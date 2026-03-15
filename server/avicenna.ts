@@ -362,12 +362,13 @@ export class AvicennaService {
     try {
       const profile = await this.getHealthProfile(userId);
       if (profile) {
-        context += "\n\nAVICENNA PATIENT INTELLIGENCE:\n";
+        context += "\n\nAVICENNA PATIENT RECORDS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n";
+        context += "NOTE: These records are from the patient's stored health profile. They may be outdated or no longer accurate. You MUST ask the patient to confirm any medications, conditions, or history before referencing them in your assessment, differentials, or recommendations. If the patient denies a stored item, treat it as inactive and do NOT use it.\n";
 
         const conditions = decryptHealthData(profile.chronicConditions);
         if (conditions && conditions.length > 0) {
           const safeConditions = conditions.map((c: string) => sanitizeContextString(String(c)));
-          context += `- Known conditions history: ${safeConditions.join(", ")}\n`;
+          context += `- Conditions on file (UNCONFIRMED): ${safeConditions.join(", ")}\n`;
         }
 
         const medHistory = decryptHealthData(profile.medicationHistory);
@@ -376,13 +377,13 @@ export class AvicennaService {
           const medSummary = recentMeds.map((m: any) =>
             `${sanitizeContextString(String(m.name || ""))}${m.localBrand ? ` (${sanitizeContextString(String(m.localBrand))})` : ""} [${m.date}]`
           ).join("; ");
-          context += `- Recent medication history: ${medSummary}\n`;
+          context += `- Medication history on file (UNCONFIRMED): ${medSummary}\n`;
         }
 
         const allergies = decryptHealthData(profile.allergyDetails);
         if (allergies && allergies.length > 0) {
           const safeAllergies = allergies.map((a: string) => sanitizeContextString(String(a)));
-          context += `- Known allergies: ${safeAllergies.join(", ")}\n`;
+          context += `- Allergies on file (SAFETY-CRITICAL — always enforce even if unconfirmed): ${safeAllergies.join(", ")}\n`;
         }
 
         const familyHx = decryptHealthData(profile.familyHistory);

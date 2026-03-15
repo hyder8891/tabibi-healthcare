@@ -155,9 +155,9 @@ async function validateWithPro(
       contextSummary += "\nPATIENT PROFILE:\n";
       if (patientProfile.age) contextSummary += `- Age: ${patientProfile.age}\n`;
       if (patientProfile.gender) contextSummary += `- Gender: ${patientProfile.gender}\n`;
-      if (patientProfile.medications?.length) contextSummary += `- Medications: ${patientProfile.medications.join(", ")}\n`;
-      if (patientProfile.allergies?.length) contextSummary += `- Allergies: ${patientProfile.allergies.join(", ")}\n`;
-      if (patientProfile.conditions?.length) contextSummary += `- Conditions: ${patientProfile.conditions.join(", ")}\n`;
+      if (patientProfile.medications?.length) contextSummary += `- Medications on file (check conversation for patient confirmation/denial): ${patientProfile.medications.join(", ")}\n`;
+      if (patientProfile.allergies?.length) contextSummary += `- Allergies (always enforce): ${patientProfile.allergies.join(", ")}\n`;
+      if (patientProfile.conditions?.length) contextSummary += `- Conditions on file (check conversation for patient confirmation/denial): ${patientProfile.conditions.join(", ")}\n`;
       if (patientProfile.isPediatric) contextSummary += `- PEDIATRIC PATIENT\n`;
     }
 
@@ -292,9 +292,16 @@ CRITICAL SAFETY RULES:
 ADAPTIVE ASSESSMENT FLOW — PHASED CLINICAL INTERVIEW:
 You are conducting an adaptive clinical interview, NOT a rigid questionnaire. Ask ONE question per message. NEVER combine multiple questions in one message. Progress through the phases below, but EXIT to your assessment the moment you have enough clinical confidence to narrow the differential to 1-2 conditions. Do NOT mechanically run through every phase if the picture is already clear.
 
+STORED RECORDS CONFIRMATION PROTOCOL:
+If the patient profile includes UNCONFIRMED medications or conditions on file, you MUST verify them with the patient EARLY in the interview (during Phase 0 or at the start of Phase 1). Ask a single, natural confirmation question — for example: "سجلاتك تُظهر أنك تتناول [medication names] — هل لا تزال تتناولها؟" / "Your records show you take [medication names] — are you still taking these?"
+- If the patient CONFIRMS the medications/conditions: treat them as active and factor them into your differential diagnosis, drug interaction checks, and recommendations.
+- If the patient DENIES them (e.g., "I don't have chronic diseases", "I stopped taking those"): immediately discard those items. Do NOT silently reference denied medications in your reasoning, differential diagnosis, or recommendation JSON. Treat denied items as if they do not exist.
+- Allergies labeled as SAFETY-CRITICAL are the ONE exception: always enforce allergy-based medication filtering regardless of patient confirmation.
+
 PHASE 0 — RED FLAG SCREENING (2-3 questions, mandatory for ALL presentations):
 - First question: Acknowledge the symptom warmly, then screen for the most dangerous possibility related to it (e.g., for headache: "Is it the worst headache of your life? Any neck stiffness or vision changes?")
 - Second question: Ask when it started and whether it was sudden or gradual
+- If the patient has stored medications/conditions on file, include a confirmation question in Phase 0 or early Phase 1 (can be combined with another question if natural)
 - After Phase 0, if no red flags found, send a SECTION HEADER transition: "جيد — لا توجد علامات طوارئ. دعني أسألك بعض الأسئلة لفهم حالتك بشكل أفضل." (or English equivalent: "Good — no emergency signs. Let me ask a few more questions to understand your symptoms better.")
 - GATE: You must have screened for dangerous differentials and know the onset before proceeding.
 
@@ -731,7 +738,7 @@ export function registerAiRoutes(app: Express): void {
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
-        systemContext += `\n\nPATIENT PROFILE:\n`;
+        systemContext += `\n\nPATIENT PROFILE (CONFIRMED — use directly):\n`;
         if (patientProfile.name) systemContext += `- Name: ${sanitizeInput(patientProfile.name)}\n`;
         if (patientProfile.age) systemContext += `- Age: ${patientProfile.age}\n`;
         if (patientProfile.gender) systemContext += `- Gender: ${sanitizeInput(patientProfile.gender)}\n`;
@@ -740,14 +747,19 @@ export function registerAiRoutes(app: Express): void {
         if (patientProfile.bloodType) systemContext += `- Blood Type: ${sanitizeInput(patientProfile.bloodType)}\n`;
         if (patientProfile.isPediatric) systemContext += `- PEDIATRIC PATIENT: Use age/weight-appropriate dosing\n`;
         if (patientProfile.medications && patientProfile.medications.length > 0) {
-          systemContext += `- Current Medications: ${patientProfile.medications.map(m => sanitizeInput(m)).join(", ")}\n`;
-          systemContext += `- IMPORTANT: Check for drug interactions and ADRs with any recommendations\n`;
+          systemContext += `\nMEDICATIONS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n`;
+          systemContext += `- Stored medications: ${patientProfile.medications.map(m => sanitizeInput(m)).join(", ")}\n`;
+          systemContext += `- ACTION REQUIRED: Early in the interview, ask the patient to confirm whether they still take these medications. Example: "سجلاتك تُظهر أنك تتناول [medications] — هل لا تزال تتناولها؟" / "Your records show you take [medications] — are you still taking these?"\n`;
+          systemContext += `- If the patient CONFIRMS: treat as active medications and check for drug interactions/ADRs with any recommendations.\n`;
+          systemContext += `- If the patient DENIES or says they stopped: do NOT reference these medications in your reasoning, differentials, or recommendation JSON. Treat them as inactive.\n`;
         }
         if (patientProfile.conditions && patientProfile.conditions.length > 0) {
-          systemContext += `- Known Conditions: ${patientProfile.conditions.map(c => sanitizeInput(c)).join(", ")}\n`;
+          systemContext += `\nCONDITIONS ON FILE (UNCONFIRMED — verify with patient before using in clinical reasoning):\n`;
+          systemContext += `- Stored conditions: ${patientProfile.conditions.map(c => sanitizeInput(c)).join(", ")}\n`;
+          systemContext += `- ACTION REQUIRED: Ask the patient to confirm these conditions. If the patient denies having a condition, do NOT use it in your differential diagnosis or recommendations.\n`;
         }
         if (patientProfile.allergies && patientProfile.allergies.length > 0) {
-          systemContext += `- Allergies: ${patientProfile.allergies.map(a => sanitizeInput(a)).join(", ")}\n`;
+          systemContext += `- Allergies (SAFETY-CRITICAL — always enforce even if unconfirmed): ${patientProfile.allergies.map(a => sanitizeInput(a)).join(", ")}\n`;
           systemContext += `- CRITICAL: Do NOT recommend any medications the patient is allergic to\n`;
         }
       }
