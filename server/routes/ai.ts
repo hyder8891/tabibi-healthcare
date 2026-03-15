@@ -133,7 +133,7 @@ Return ONLY a valid JSON block (no markdown fences, no explanation, no extra tex
   "followUp": {"returnIn": "...", "redFlags": ["..."]}
 }`;
 
-const PRO_RECOMMENDATION_TIMEOUT_MS = 15000;
+const PRO_RECOMMENDATION_TIMEOUT_MS = 45000;
 
 async function generateProRecommendation(
   conversationMessages: Array<{ role: string; content: string }>,
@@ -164,7 +164,7 @@ async function generateProRecommendation(
         config: {
           systemInstruction: PRO_RECOMMENDATION_PROMPT,
           maxOutputTokens: 4096,
-          thinkingConfig: { thinkingBudget: 4096 },
+          thinkingConfig: { thinkingBudget: 2048 },
         },
       }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), PRO_RECOMMENDATION_TIMEOUT_MS)),
@@ -321,7 +321,7 @@ PHASE 3 — CONTEXT & RISK FACTORS (2-3 questions, only for moderate-to-complex 
 
 QUESTION BUDGET BY CASE COMPLEXITY:
 - Emergency (TIER 1 red flags): 0-3 questions → immediate [ASSESSMENT_READY]
-- Obviously simple (classic cold, minor cut, mild muscle ache): 6-8 questions total
+- Obviously simple (classic cold, minor cut, mild muscle ache): 8-10 questions total
 - Moderate (UTI, back pain, persistent fever, infection): 10-14 questions total
 - Complex/serious (chest pain, neurological symptoms, multi-system): 15-20 questions total
 - HARD CAP: NEVER exceed 20 questions for ANY presentation. If you reach 20 questions, you MUST output [ASSESSMENT_READY] regardless.
@@ -329,6 +329,8 @@ QUESTION BUDGET BY CASE COMPLEXITY:
 
 WHEN TO SIGNAL COMPLETION:
 When you have gathered enough clinical information to form a working diagnosis (or reached the question budget), output [ASSESSMENT_READY] on its own line. A separate specialist system will generate the clinical recommendation with medicines, tests, and follow-up guidance. Do NOT generate any recommendation JSON yourself.
+
+MINIMUM QUESTION RULE: For non-emergency cases (anything except TIER 1 red flags), you MUST ask at least 8 questions before outputting [ASSESSMENT_READY]. Even if the presentation seems straightforward, 8 questions is the absolute minimum to gather sufficient clinical context. Emergency TIER 1 cases may signal earlier (0-3 questions).
 
 SEVERITY-BASED MEDICATION GATE — CONTEXT FOR INTERVIEW:
 These rules guide the specialist system's recommendations. During the interview, gather enough information to enable correct gate application:
@@ -901,10 +903,22 @@ Be thorough and specific. Provide your analysis in the same language the user is
         }
       }
 
-      const isQAComplete = fullResponse.includes("[ASSESSMENT_READY]");
+      let isQAComplete = fullResponse.includes("[ASSESSMENT_READY]");
+
+      if (isQAComplete && !clientDisconnected) {
+        const assistantMsgCount = messages.filter((m: any) => m.role === "assistant").length + 1;
+        const hasEmergencyMarker = fullResponse.includes('"emergency"') && fullResponse.includes('true');
+        if (assistantMsgCount < 8 && !hasEmergencyMarker) {
+          console.log(`[MinQuestionGuard] Only ${assistantMsgCount} assistant messages — below minimum 8. Ignoring [ASSESSMENT_READY] marker.`);
+          isQAComplete = false;
+        }
+      }
 
       if (isQAComplete && !clientDisconnected) {
         console.log("[ProRecommendation] Q&A phase complete — generating Pro recommendation from conversation");
+        if (!clientDisconnected) {
+          res.write(`data: ${JSON.stringify({ generatingRecommendation: true })}\n\n`);
+        }
         const conversationForPro = messages.map((m: any) => ({
           role: m.role,
           content: m.content || m.text || "",

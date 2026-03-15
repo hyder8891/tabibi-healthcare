@@ -45,6 +45,7 @@ export interface ChatMessage {
   imageUri?: string;
   imageData?: string;
   mimeType?: string;
+  isError?: boolean;
 }
 
 export interface MedicineRecommendation {

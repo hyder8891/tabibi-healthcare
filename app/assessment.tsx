@@ -67,6 +67,7 @@ export default function AssessmentScreen() {
   const [existingAssessmentId, setExistingAssessmentId] = useState<string | null>(null);
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
+  const [isGeneratingRecommendation, setIsGeneratingRecommendation] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const lockedTotalRef = useRef<number | null>(null);
@@ -294,6 +295,7 @@ export default function AssessmentScreen() {
       let fullText = "";
       let parsedResult: AssessmentResult | null = null;
       let parsedEmergency: EmergencyAlert | null = null;
+      let hasError = false;
 
       const normalizeArabicValues = (result: AssessmentResult): AssessmentResult => {
         if (settings.language !== "ar") return result;
@@ -512,13 +514,19 @@ export default function AssessmentScreen() {
                 try {
                   parsedResult = normalizeResult(data.validatedAssessment);
                   setAssessmentResult(parsedResult);
+                  setIsGeneratingRecommendation(false);
                   console.log("[ProRecommendation] Using Pro-generated assessment — severity:", parsedResult.assessment?.severity);
                 } catch (e) {
                   console.warn("Failed to apply validated assessment:", e);
                 }
               }
+              if (data.generatingRecommendation) {
+                setIsGeneratingRecommendation(true);
+              }
               if (data.error && !data.done) {
                 console.error("[Assessment] Server error:", data.error);
+                setIsGeneratingRecommendation(false);
+                hasError = true;
                 const errorText = t(
                   "I was unable to generate your assessment. Please try sending your last message again.",
                   "لم أتمكن من إعداد التقييم الخاص بك. يرجى إعادة إرسال رسالتك الأخيرة.",
@@ -604,10 +612,12 @@ export default function AssessmentScreen() {
         role: "assistant",
         content: finalContent,
         timestamp: Date.now(),
+        ...(hasError ? { isError: true } : {}),
       };
 
       setMessages((prev) => [...prev, aiMessage]);
       setStreamingMessage("");
+      setIsGeneratingRecommendation(false);
 
       const allMsgs = [...updatedMessages, aiMessage];
       
@@ -646,9 +656,11 @@ export default function AssessmentScreen() {
           "\u0623\u0648\u0627\u062c\u0647 \u0645\u0634\u0643\u0644\u0629 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
         ),
         timestamp: Date.now(),
+        isError: true,
       };
       setMessages((prev) => [...prev, errorMessage]);
       setStreamingMessage("");
+      setIsGeneratingRecommendation(false);
     } finally {
       setIsLoading(false);
     }
@@ -809,14 +821,15 @@ export default function AssessmentScreen() {
       {(() => {
         const isComplete = !!assessmentResult;
         const questionCount = messages.filter(
-          (m) => m.role === "assistant" && m.id !== "welcome" && m.id !== "streaming"
+          (m) => m.role === "assistant" && m.id !== "welcome" && m.id !== "streaming" && !m.isError
         ).length;
         const rawEstimate = questionCount <= 3 ? 10 : questionCount <= 8 ? 12 : 16;
         if (questionCount > 0 && lockedTotalRef.current === null) {
           lockedTotalRef.current = Math.min(rawEstimate, 20);
         }
         const cappedTotal = lockedTotalRef.current || Math.min(rawEstimate, 20);
-        const progress = isComplete ? 1 : Math.min(questionCount / cappedTotal, 0.95);
+        const generating = isGeneratingRecommendation;
+        const progress = isComplete ? 1 : generating ? 0.98 : Math.min(questionCount / cappedTotal, 0.95);
         if (isComplete && assessmentId) return null;
         return (
           <View
@@ -829,12 +842,15 @@ export default function AssessmentScreen() {
                   styles.progressBarFill,
                   { width: `${Math.round(progress * 100)}%` as any },
                   isComplete && styles.progressBarComplete,
+                  generating && { opacity: 0.7 },
                 ]}
               />
             </View>
             <Text style={styles.progressLabel}>
               {isComplete
                 ? t("Complete", "\u0645\u0643\u062a\u0645\u0644")
+                : generating
+                ? t("Generating your recommendation...", "\u062c\u0627\u0631\u064a \u0625\u0639\u062f\u0627\u062f \u0627\u0644\u062a\u0648\u0635\u064a\u0629...")
                 : questionCount > 0
                 ? t(
                     `Step ${questionCount} of ~${cappedTotal}`,
