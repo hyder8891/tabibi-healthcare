@@ -143,7 +143,7 @@ async function validateWithPro(
   conversationMessages: Array<{ role: string; content: string }>,
   flashAssessment: any,
   patientProfile: any,
-  timeoutMs: number = 15000
+  timeoutMs: number = 10000
 ): Promise<any | null> {
   try {
     let contextSummary = "PATIENT CONVERSATION:\n";
@@ -930,7 +930,7 @@ Be thorough and specific. Provide your analysis in the same language the user is
           conversationForValidation,
           flashAssessment,
           patientProfile || null,
-          15000
+          10000
         );
 
         if (proResult) {
