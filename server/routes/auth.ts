@@ -1,15 +1,13 @@
 import type { Express, Request, Response } from "express";
+import { randomInt } from "crypto";
 import { storage } from "../storage";
 import { verifyFirebaseToken } from "../firebase-auth";
 import { requireAuth } from "./middleware";
-import { adminAuth, getAdminAccessToken } from "../firebase-admin";
+import { adminAuth } from "../firebase-admin";
+import { sendSMSViaTwilio } from "../twilio";
 
 const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY || "";
 const IDENTITY_TOOLKIT_URL = "https://identitytoolkit.googleapis.com/v1";
-
-const ANDROID_PACKAGE_NAME = "com.tabibi.health";
-const ANDROID_CERT_SHA1 = (process.env.FIREBASE_ANDROID_SHA1 || "FC:57:E6:A6:D4:30:AB:D0:46:E7:87:D8:17:42:C4:89:92:4B:B7:30").replace(/:/g, "").toUpperCase();
-const IOS_BUNDLE_ID = "com.tabibi.health";
 
 function mapFirebaseErrorToFriendly(rawCode: string): string {
   const upper = rawCode.toUpperCase();
@@ -53,83 +51,22 @@ const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const OTP_MAX_ATTEMPTS = 5;
 
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  return randomInt(100000, 1000000).toString();
 }
 
-async function sendSMSViaIdentityToolkit(phoneNumber: string): Promise<{ sessionInfo: string } | null> {
-  if (!FIREBASE_API_KEY) {
-    console.warn("Firebase API key not configured, cannot send SMS");
-    return null;
+async function sendOTPViaTwilio(phoneNumber: string): Promise<boolean> {
+  const otp = generateOTP();
+  otpStore.set(phoneNumber, {
+    code: otp,
+    expiresAt: Date.now() + OTP_EXPIRY_MS,
+    attempts: 0,
+  });
+
+  const sent = await sendSMSViaTwilio(phoneNumber, otp);
+  if (!sent) {
+    otpStore.delete(phoneNumber);
   }
-
-  const strategies = [
-    {
-      name: "Android client headers",
-      headers: {
-        "Content-Type": "application/json",
-        "x-android-package": ANDROID_PACKAGE_NAME,
-        "x-android-cert": ANDROID_CERT_SHA1,
-      },
-      body: { phoneNumber },
-    },
-    {
-      name: "iOS client header",
-      headers: {
-        "Content-Type": "application/json",
-        "x-ios-bundle-identifier": IOS_BUNDLE_ID,
-      },
-      body: { phoneNumber },
-    },
-    {
-      name: "Admin bearer token",
-      useBearer: true,
-      headers: {
-        "Content-Type": "application/json",
-        "x-android-package": ANDROID_PACKAGE_NAME,
-        "x-android-cert": ANDROID_CERT_SHA1,
-      },
-      body: { phoneNumber },
-    },
-  ];
-
-  for (const strategy of strategies) {
-    try {
-      const headers: Record<string, string> = { ...strategy.headers };
-
-      if (strategy.useBearer) {
-        const accessToken = await getAdminAccessToken();
-        if (!accessToken) continue;
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      }
-
-      const response = await fetch(
-        `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
-        {
-          method: "POST",
-          headers,
-          body: JSON.stringify(strategy.body),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`Identity Toolkit SMS sent successfully via: ${strategy.name}`);
-        return { sessionInfo: data.sessionInfo };
-      }
-
-      const errData = await response.json().catch(() => null);
-      const errMsg = errData?.error?.message || response.status;
-      console.warn(`Identity Toolkit SMS (${strategy.name}) failed:`, errMsg);
-
-      if (String(errMsg).includes("TOO_MANY_ATTEMPTS") || String(errMsg).includes("QUOTA_EXCEEDED")) {
-        return null;
-      }
-    } catch (err: unknown) {
-      console.warn(`Identity Toolkit SMS (${strategy.name}) error:`, err instanceof Error ? err.message : "Unknown");
-    }
-  }
-
-  return null;
+  return sent;
 }
 
 export function registerAuthRoutes(app: Express): void {
@@ -171,7 +108,7 @@ export function registerAuthRoutes(app: Express): void {
             });
           } catch (createErr: unknown) {
             const errMsg = createErr instanceof Error ? createErr.message : "";
-            if (errMsg.includes("unique") && firebaseUser.email) {
+            if (errMsg.includes("users_email_unique") && firebaseUser.email) {
               user = await storage.getUserByEmail(firebaseUser.email);
               if (user) {
                 user = await storage.updateUser(user.id, {
@@ -242,48 +179,46 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(429).json({ message: "Too many requests. Please wait before trying again." });
       }
 
-      if (recaptchaToken) {
-        if (!FIREBASE_API_KEY) {
-          return res.status(500).json({ message: "Firebase API key not configured" });
-        }
-        const response = await fetch(
-          `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ phoneNumber, recaptchaToken }),
+      if (recaptchaToken && FIREBASE_API_KEY) {
+        try {
+          const response = await fetch(
+            `${IDENTITY_TOOLKIT_URL}/accounts:sendVerificationCode?key=${FIREBASE_API_KEY}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ phoneNumber, recaptchaToken }),
+            }
+          );
+          const data = await response.json();
+          if (response.ok) {
+            return res.json({ sessionInfo: data.sessionInfo });
           }
-        );
-        const data = await response.json();
-        if (!response.ok) {
           const rawCode = data?.error?.message || "UNKNOWN_ERROR";
-          console.error("Firebase sendVerificationCode error:", rawCode);
-          return res.status(response.status).json({ message: mapFirebaseErrorToFriendly(rawCode) });
+          console.warn("Firebase sendVerificationCode failed, falling back to Twilio:", rawCode);
+        } catch (err: unknown) {
+          console.warn("Firebase reCAPTCHA path error, falling back to Twilio:", err instanceof Error ? err.message : "Unknown");
         }
-        return res.json({ sessionInfo: data.sessionInfo });
       }
 
-      const smsResult = await sendSMSViaIdentityToolkit(phoneNumber);
-      if (smsResult) {
-        return res.json({ sessionInfo: smsResult.sessionInfo, method: "firebase" });
+      const sent = await sendOTPViaTwilio(phoneNumber);
+      if (sent) {
+        return res.json({ method: "otp", message: "Verification code sent" });
       }
 
       const isDev = process.env.NODE_ENV === "development";
-      if (!isDev) {
-        console.error("No SMS provider configured for production. Phone auth unavailable.");
-        return res.status(503).json({ message: "SMS service not available. Please try again later." });
+      if (isDev) {
+        const otp = generateOTP();
+        otpStore.set(phoneNumber, {
+          code: otp,
+          expiresAt: Date.now() + OTP_EXPIRY_MS,
+          attempts: 0,
+        });
+        console.log(`[DEV OTP] Code for ${phoneNumber}: ${otp}`);
+        return res.json({ method: "otp", message: "Verification code sent" });
       }
 
-      const otp = generateOTP();
-      otpStore.set(phoneNumber, {
-        code: otp,
-        expiresAt: Date.now() + OTP_EXPIRY_MS,
-        attempts: 0,
-      });
-
-      console.log(`[DEV OTP] Code for ${phoneNumber}: ${otp}`);
-
-      return res.json({ method: "otp", message: "Verification code sent" });
+      console.error("SMS delivery failed. Twilio and all fallbacks exhausted.");
+      return res.status(503).json({ message: "SMS service not available. Please try again later." });
     } catch (error: unknown) {
       console.error("Phone send code error:", error instanceof Error ? error.message : "Unknown");
       return res.status(500).json({ message: "Failed to send verification code" });
