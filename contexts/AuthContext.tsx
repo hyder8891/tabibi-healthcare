@@ -47,6 +47,15 @@ if (Platform.OS !== "web") {
   }
 }
 
+let nativeFirebaseAuth: any = null;
+if (Platform.OS !== "web") {
+  try {
+    const rnfbAuth = require("@react-native-firebase/auth");
+    nativeFirebaseAuth = rnfbAuth.default || rnfbAuth;
+  } catch (e) {
+  }
+}
+
 const AUTH_USER_KEY = "tabibi_auth_user";
 
 interface AuthUser {
@@ -89,10 +98,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const clearAuthError = useCallback(() => setAuthError(null), []);
   const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+  const nativeConfirmationRef = useRef<any>(null);
   const recaptchaVerifierRef = useRef<any>(null);
   const firebaseUserRef = useRef<FirebaseUser | null>(null);
   const phoneSessionInfoRef = useRef<string | null>(null);
   const pendingPhoneRef = useRef<string>("");
+  const nativeAuthHandledRef = useRef(false);
 
   const [_googleRequest, _googleResponse, googlePromptAsync] = useIdTokenAuthRequest({
     clientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "",
@@ -128,19 +139,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fbUser = auth.currentUser;
         if (fbUser) firebaseUserRef.current = fbUser;
       }
-      if (!fbUser) return null;
-      try {
-        return await fbUser.getIdToken(true);
-      } catch {
+      if (fbUser) {
         try {
-          const refreshed = auth.currentUser;
-          if (refreshed) {
-            firebaseUserRef.current = refreshed;
-            return await refreshed.getIdToken(true);
+          return await fbUser.getIdToken(true);
+        } catch {
+          try {
+            const refreshed = auth.currentUser;
+            if (refreshed) {
+              firebaseUserRef.current = refreshed;
+              return await refreshed.getIdToken(true);
+            }
+          } catch {}
+        }
+      }
+      if (nativeFirebaseAuth) {
+        try {
+          const nativeUser = nativeFirebaseAuth().currentUser;
+          if (nativeUser) {
+            return await nativeUser.getIdToken(true);
           }
         } catch {}
-        return null;
       }
+      return null;
     });
     return () => setAuthTokenGetter(async () => null);
   }, []);
@@ -216,6 +236,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mounted) setIsLoading(false);
     });
 
+    let nativeUnsubscribe: (() => void) | null = null;
+    if (nativeFirebaseAuth) {
+      try {
+        nativeUnsubscribe = nativeFirebaseAuth().onAuthStateChanged(async (nativeUser: any) => {
+          if (!mounted) return;
+          if (nativeAuthHandledRef.current) {
+            nativeAuthHandledRef.current = false;
+            return;
+          }
+          if (nativeUser && !auth.currentUser) {
+            try {
+              const backendUser = await syncWithBackend();
+              if (mounted) {
+                setUser(backendUser);
+                await persistUser(backendUser);
+              }
+            } catch (err) {
+              console.error("Backend sync from native auth failed:", err);
+            }
+          }
+          if (mounted) setIsLoading(false);
+        });
+      } catch {}
+    }
+
     const timeout = setTimeout(() => {
       if (mounted) setIsLoading(false);
     }, 5000);
@@ -223,6 +268,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       unsubscribe();
+      if (nativeUnsubscribe) nativeUnsubscribe();
       clearTimeout(timeout);
     };
   }, []);
@@ -333,6 +379,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         recaptchaVerifierRef.current = null;
         throw err;
       }
+    } else if (nativeFirebaseAuth) {
+      const confirmation = await nativeFirebaseAuth().signInWithPhoneNumber(phoneNumber);
+      nativeConfirmationRef.current = confirmation;
     } else {
       const baseUrl = getApiUrl();
       const url = new URL("/api/auth/phone/send-code", baseUrl);
@@ -367,6 +416,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(backendUser);
       await persistUser(backendUser);
       confirmationResultRef.current = null;
+    } else if (nativeFirebaseAuth && nativeConfirmationRef.current) {
+      nativeAuthHandledRef.current = true;
+      const confirmation = nativeConfirmationRef.current;
+      await confirmation.confirm(code);
+      const nativeUser = nativeFirebaseAuth().currentUser;
+      if (!nativeUser) {
+        nativeAuthHandledRef.current = false;
+        throw new Error("Phone verification succeeded but no user found");
+      }
+      if (displayName) {
+        await nativeUser.updateProfile({ displayName });
+      }
+      const backendUser = await syncWithBackend();
+      setUser(backendUser);
+      await persistUser(backendUser);
+      nativeConfirmationRef.current = null;
+      pendingPhoneRef.current = "";
     } else {
       const baseUrl = getApiUrl();
       const url = new URL("/api/auth/phone/verify-code", baseUrl);
@@ -466,6 +532,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         recaptchaVerifierRef.current = null;
         throw err;
       }
+    } else if (nativeFirebaseAuth) {
+      pendingPhoneRef.current = phoneNumber;
+      const confirmation = await nativeFirebaseAuth().signInWithPhoneNumber(phoneNumber);
+      nativeConfirmationRef.current = confirmation;
     } else {
       pendingPhoneRef.current = phoneNumber;
       const baseUrl = getApiUrl();
@@ -491,12 +561,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await firebaseSignOut(auth);
     } catch {}
+    if (nativeFirebaseAuth) {
+      try {
+        await nativeFirebaseAuth().signOut();
+      } catch {}
+    }
     firebaseUserRef.current = null;
     setUser(null);
     setIsEmailVerified(true);
     setNeedsEmailVerification(false);
     await persistUser(null);
     confirmationResultRef.current = null;
+    nativeConfirmationRef.current = null;
   }, []);
 
   const value = useMemo(

@@ -24,6 +24,8 @@
     "@neondatabase/serverless": "^1.0.2",
     "@octokit/rest": "^22.0.1",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-firebase/app": "^23.8.8",
+    "@react-native-firebase/auth": "^23.8.8",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@replit/connectors-sdk": "^0.2.0",
     "@stardazed/streams-text-encoding": "^1.0.2",
