@@ -738,7 +738,7 @@ export function registerAiRoutes(app: Express): void {
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       if (patientProfile) {
-        systemContext += `\n\nPATIENT PROFILE (CONFIRMED — use directly):\n`;
+        systemContext += `\n\nPATIENT PROFILE:\n`;
         if (patientProfile.name) systemContext += `- Name: ${sanitizeInput(patientProfile.name)}\n`;
         if (patientProfile.age) systemContext += `- Age: ${patientProfile.age}\n`;
         if (patientProfile.gender) systemContext += `- Gender: ${sanitizeInput(patientProfile.gender)}\n`;
