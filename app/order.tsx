@@ -491,10 +491,22 @@ export default function OrderScreen() {
     return true;
   };
 
+  const ORDERING_ENABLED = false;
+
   const handleNext = () => {
     if (step === "pharmacy") setStep("details");
     else if (step === "details") setStep("confirm");
-    else submitOrder();
+    else if (ORDERING_ENABLED) submitOrder();
+    else {
+      Alert.alert(
+        t("Available Very Soon!", "متاح قريباً جداً!"),
+        t(
+          "Online ordering will be available very soon. For now, use WhatsApp or Call to contact the pharmacy directly.",
+          "الطلب عبر الإنترنت سيكون متاحاً قريباً جداً. حالياً، استخدم واتساب أو الاتصال للتواصل مع الصيدلية مباشرة."
+        ),
+        [{ text: t("OK", "حسناً") }]
+      );
+    }
   };
 
   const handleBack = () => {
@@ -546,30 +558,44 @@ export default function OrderScreen() {
       </ScrollView>
 
       {step !== "success" && <View style={[styles.footer, { paddingBottom: Math.max(bottomInset, 16) }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.nextBtn,
-            !canProceed() && styles.nextBtnDisabled,
-            pressed && canProceed() && { opacity: 0.85 },
-          ]}
-          onPress={handleNext}
-          disabled={!canProceed() || submitting}
-        >
-          {submitting ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.nextBtnText}>
-                {step === "confirm"
-                  ? t("Place Order", "تقديم الطلب")
-                  : t("Continue", "متابعة")}
-              </Text>
-              {step !== "confirm" && (
+        {step === "confirm" && !ORDERING_ENABLED ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.nextBtn,
+              styles.placeOrderDisabled,
+              pressed && { opacity: 0.85 },
+            ]}
+            onPress={handleNext}
+          >
+            <Text style={styles.placeOrderDisabledText}>
+              {t("Place Order", "تقديم الطلب")}
+            </Text>
+            <View style={styles.comingSoonBadge}>
+              <Text style={styles.comingSoonText}>{t("Very Soon", "قريباً")}</Text>
+            </View>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.nextBtn,
+              !canProceed() && styles.nextBtnDisabled,
+              pressed && canProceed() && { opacity: 0.85 },
+            ]}
+            onPress={handleNext}
+            disabled={!canProceed() || submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.nextBtnText}>
+                  {t("Continue", "متابعة")}
+                </Text>
                 <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color="#fff" />
-              )}
-            </>
-          )}
-        </Pressable>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>}
     </View>
   );
@@ -891,5 +917,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "DMSans_700Bold",
     color: "#fff",
+  },
+  placeOrderDisabled: {
+    backgroundColor: Colors.light.background,
+    borderWidth: 2,
+    borderColor: Colors.light.borderLight,
+    borderStyle: "dashed" as const,
+  },
+  placeOrderDisabledText: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: Colors.light.textTertiary,
+  },
+  comingSoonBadge: {
+    backgroundColor: "#FFF7ED",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  comingSoonText: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#F59E0B",
+    textTransform: "uppercase" as const,
   },
 });

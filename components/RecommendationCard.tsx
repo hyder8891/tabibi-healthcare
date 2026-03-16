@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Pressable, Alert, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import type { AssessmentResult, MedicineRecommendation, StructuredFollowUp } from "@/lib/types";
@@ -33,8 +33,6 @@ const AVAILABLE_LABELS: Record<string, { en: string; ar: string }> = {
   hospital: { en: "Hospital", ar: "مستشفى" },
   "any-pharmacy": { en: "Any Pharmacy", ar: "أي صيدلية" },
 };
-
-const ORDERING_ENABLED = false;
 
 export function RecommendationCard({
   result,
@@ -179,7 +177,7 @@ export function RecommendationCard({
             </View>
             {medicines.map((med, i) => (
               <View key={i} style={[styles.medCard, !selectedMeds[i] && styles.medCardDeselected]}>
-                {ORDERING_ENABLED && onOrderMedicines && medicines.length > 1 && (
+                {onOrderMedicines && medicines.length > 1 && (
                   <Pressable
                     style={[styles.checkboxRow, isRTL && { flexDirection: "row-reverse" }]}
                     onPress={() => toggleMed(i)}
@@ -268,7 +266,7 @@ export function RecommendationCard({
               </View>
             ))}
 
-            {ORDERING_ENABLED && onOrderMedicines ? (
+            {onOrderMedicines && (
               <Pressable
                 style={({ pressed }) => [
                   styles.orderAllBtn,
@@ -289,33 +287,6 @@ export function RecommendationCard({
                         ? t(`Order ${selectedCount} Selected`, `اطلب ${selectedCount} أدوية محددة`)
                         : t("Select medicines to order", "اختر الأدوية للطلب")}
                 </Text>
-              </Pressable>
-            ) : (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.orderAllBtn,
-                  styles.orderComingSoon,
-                  isRTL && { flexDirection: "row-reverse" },
-                  pressed && { opacity: 0.8 },
-                ]}
-                onPress={() => {
-                  Alert.alert(
-                    t("Coming Very Soon!", "قريباً جداً!"),
-                    t(
-                      "Medicine delivery ordering will be available very soon. For now, use 'Find Nearest Pharmacy' to contact a pharmacy directly.",
-                      "خدمة طلب توصيل الأدوية ستكون متاحة قريباً جداً. حالياً، استخدم 'ابحث عن أقرب صيدلية' للتواصل مع الصيدلية مباشرة."
-                    ),
-                    [{ text: t("OK", "حسناً") }]
-                  );
-                }}
-              >
-                <MaterialCommunityIcons name="truck-delivery-outline" size={18} color={Colors.light.textTertiary} />
-                <Text style={[styles.orderAllBtnText, { color: Colors.light.textTertiary }]}>
-                  {t("Order for Delivery", "اطلب للتوصيل")}
-                </Text>
-                <View style={styles.comingSoonBadge}>
-                  <Text style={styles.comingSoonText}>{t("Coming Soon", "قريباً")}</Text>
-                </View>
               </Pressable>
             )}
 
@@ -797,24 +768,6 @@ const styles = StyleSheet.create({
   orderAllBtnDisabled: {
     backgroundColor: Colors.light.background,
     borderColor: Colors.light.borderLight,
-  },
-  orderComingSoon: {
-    backgroundColor: Colors.light.background,
-    borderColor: Colors.light.borderLight,
-    borderStyle: "dashed" as const,
-  },
-  comingSoonBadge: {
-    backgroundColor: "#FFF7ED",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 4,
-  },
-  comingSoonText: {
-    fontSize: 10,
-    fontWeight: "700" as const,
-    color: "#F59E0B",
-    textTransform: "uppercase" as const,
   },
   orderAllBtnText: {
     fontSize: 14,
