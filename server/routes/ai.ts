@@ -769,17 +769,25 @@ export function registerAiRoutes(app: Express): void {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.imageData && lastMessage.role === "user") {
         try {
-          const imagePrompt = `You are a medical imaging expert. Thoroughly analyze this medical image. Describe:
-1. The imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
-2. The anatomical region shown
-3. All visible findings - normal and abnormal
-4. Any pathology, lesions, masses, fractures, signal abnormalities, or other notable observations
-5. Clinical significance of the findings
+          const imagePrompt = `You are a board-certified radiologist and medical imaging expert performing a clinical analysis. This is a professional medical context — accuracy and completeness are paramount.
 
-If this is a lab result, read all values and flag abnormal ones.
-If this is a skin/wound photo, describe morphology and differential diagnoses.
+CRITICAL INSTRUCTIONS:
+- You MUST identify ALL pathology visible in the image, including serious conditions such as cancer, carcinoma, malignancy, tumors, metastases, fractures, hemorrhage, infarction, and any other life-threatening findings.
+- Do NOT downplay, omit, or soften findings. If you see a suspicious mass, say so directly. If findings are consistent with malignancy, state it clearly.
+- Use precise medical terminology. Be specific about location, size estimates, morphology, and characteristics.
+- Provide differential diagnoses ranked by likelihood.
+
+Analyze:
+1. Imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
+2. Anatomical region shown
+3. ALL visible findings — normal and abnormal, with specific descriptions
+4. Any pathology: masses, lesions, nodules, fractures, effusions, consolidations, calcifications, signal abnormalities
+5. Clinical significance and differential diagnoses
+
+If this is a lab result, read all values and flag abnormal ones with clinical context.
+If this is a skin/wound photo, describe morphology, borders, color, symmetry, and differential diagnoses including malignant possibilities.
 If this is a prescription or medication label, extract the medication information.
-Be thorough and specific. Provide your analysis in the same language the user is using.`;
+Provide your analysis in the same language the user is using.`;
 
           const imageResponse = await ai.models.generateContent({
             model: MODEL_PRO,
@@ -790,7 +798,15 @@ Be thorough and specific. Provide your analysis in the same language the user is
                 { text: imagePrompt },
               ],
             }],
-            config: { maxOutputTokens: 2048 },
+            config: {
+              maxOutputTokens: 2048,
+              safetySettings: [
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "OFF" },
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "OFF" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "OFF" },
+              ],
+            },
           });
           imageAnalysis = sanitizeInput(imageResponse.text || "");
 
@@ -1133,24 +1149,33 @@ Respond ONLY with JSON:
         ? "Provide your analysis entirely in Arabic."
         : "Provide your analysis in English.";
 
-      const imagePrompt = `You are a medical imaging expert. Thoroughly analyze this medical image. Describe:
-1. The imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
-2. The anatomical region shown
-3. All visible findings - normal and abnormal
-4. Any pathology, lesions, masses, fractures, signal abnormalities, or other notable observations
-5. Clinical significance of the findings
+      const imagePrompt = `You are a board-certified radiologist and medical imaging expert performing a clinical analysis. This is a professional medical context — accuracy and completeness are paramount.
 
-If this is a lab result, read all values and flag abnormal ones.
-If this is a skin/wound photo, describe morphology and differential diagnoses.
+CRITICAL INSTRUCTIONS:
+- You MUST identify ALL pathology visible in the image, including serious conditions such as cancer, carcinoma, malignancy, tumors, metastases, fractures, hemorrhage, infarction, and any other life-threatening findings.
+- Do NOT downplay, omit, or soften findings. If you see a suspicious mass, say so directly. If findings are consistent with malignancy, state it clearly.
+- Use precise medical terminology. Be specific about location, size estimates, morphology, and characteristics.
+- If the image quality is poor, still provide your best clinical assessment of what is visible.
+
+Analyze systematically:
+1. Imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
+2. Anatomical region shown
+3. ALL visible findings — both normal and abnormal. For each abnormal finding, describe its location, size, shape, density/signal characteristics, and margins.
+4. Any pathology: masses, lesions, nodules, fractures, effusions, consolidations, calcifications, signal abnormalities, architectural distortion, or other notable observations
+5. Clinical significance — include differential diagnoses ranked by likelihood
+6. Severity assessment based on the findings
+
+If this is a lab result, read all values and flag abnormal ones with clinical context.
+If this is a skin/wound photo, describe morphology, borders, color, symmetry, and provide differential diagnoses including malignant possibilities.
 If this is a prescription or medication label, extract the medication information.
-Be thorough and specific. ${langInstruction}
+${langInstruction}
 
 IMPORTANT: Structure your response as valid JSON with this exact format:
 {
   "modality": "string - the imaging modality identified",
   "anatomicalRegion": "string - the anatomical region shown",
-  "findings": ["string array - each distinct finding as a separate item"],
-  "clinicalSignificance": "string - overall clinical significance",
+  "findings": ["string array - each distinct finding as a separate item, be specific and thorough"],
+  "clinicalSignificance": "string - overall clinical significance including differential diagnoses",
   "recommendations": ["string array - recommended follow-up actions"],
   "severityLevel": "normal | mild | moderate | severe | critical"
 }`;
@@ -1167,6 +1192,12 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
         config: {
           maxOutputTokens: 4096,
           responseMimeType: "application/json",
+          safetySettings: [
+            { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "OFF" },
+            { category: "HARM_CATEGORY_HARASSMENT", threshold: "OFF" },
+            { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "OFF" },
+            { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "OFF" },
+          ],
         },
       });
 
