@@ -46,7 +46,7 @@ export default function AuthScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : Math.max(insets.bottom, 16);
 
   const [mode, setMode] = useState<AuthMode>("login");
-  const [identifierType, setIdentifierType] = useState<IdentifierType>("email");
+  const [identifierType, setIdentifierType] = useState<IdentifierType>("phone");
   const [activeView, setActiveView] = useState<ActiveView>("form");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -907,19 +907,6 @@ export default function AuthScreen() {
 
             <View style={styles.identifierToggle}>
               <Pressable
-                style={[styles.identifierTab, identifierType === "email" && styles.identifierTabActive]}
-                onPress={() => toggleIdentifierType("email")}
-              >
-                <Ionicons
-                  name="mail-outline"
-                  size={16}
-                  color={identifierType === "email" ? Colors.light.primary : Colors.light.textTertiary}
-                />
-                <Text style={[styles.identifierTabText, identifierType === "email" && styles.identifierTabTextActive]}>
-                  {t("Email", "\u0628\u0631\u064a\u062f")}
-                </Text>
-              </Pressable>
-              <Pressable
                 style={[styles.identifierTab, identifierType === "phone" && styles.identifierTabActive]}
                 onPress={() => toggleIdentifierType("phone")}
                 testID="phone-tab"
@@ -931,6 +918,19 @@ export default function AuthScreen() {
                 />
                 <Text style={[styles.identifierTabText, identifierType === "phone" && styles.identifierTabTextActive]}>
                   {t("Phone", "\u0647\u0627\u062a\u0641")}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.identifierTab, identifierType === "email" && styles.identifierTabActive]}
+                onPress={() => toggleIdentifierType("email")}
+              >
+                <Ionicons
+                  name="mail-outline"
+                  size={16}
+                  color={identifierType === "email" ? Colors.light.primary : Colors.light.textTertiary}
+                />
+                <Text style={[styles.identifierTabText, identifierType === "email" && styles.identifierTabTextActive]}>
+                  {t("Email", "\u0628\u0631\u064a\u062f")}
                 </Text>
               </Pressable>
             </View>
