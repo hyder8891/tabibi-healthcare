@@ -1170,10 +1170,11 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
         },
       });
 
-      const rawText = sanitizeInput(imageResponse.text || "");
+      const originalText = (imageResponse.text || "").trim();
+      const sanitizedText = sanitizeInput(originalText);
 
       const severityKeywords = /\b(cancer|carcinoma|malignant|malignancy|tumor|tumou?r|neoplasm|metastas[ie]s|mass|lesion|nodule|fracture|hemorrhage|haemorrhage|bleeding|stroke|infarct|thrombosis|embolism|aneurysm|organ failure|cirrhosis|fibrosis|pneumothorax|pleural effusion|سرطان|ورم|كتلة|كسر|نزيف|جلطة|انسداد)\b/i;
-      const severityFlag = severityKeywords.test(rawText);
+      const severityFlag = severityKeywords.test(originalText);
 
       interface ImageAnalysisResult {
         modality?: string;
@@ -1184,18 +1185,39 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
         severityLevel?: string;
       }
 
+      function extractBalancedJson(text: string): string | null {
+        const start = text.indexOf("{");
+        if (start === -1) return null;
+        let depth = 0;
+        for (let i = start; i < text.length; i++) {
+          if (text[i] === "{") depth++;
+          else if (text[i] === "}") {
+            depth--;
+            if (depth === 0) return text.substring(start, i + 1);
+          }
+        }
+        return null;
+      }
+
       let parsed: ImageAnalysisResult | null = null;
       try {
-        parsed = JSON.parse(rawText) as ImageAnalysisResult;
+        parsed = JSON.parse(originalText) as ImageAnalysisResult;
       } catch {
         try {
-          const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/) || rawText.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            const jsonStr = jsonMatch[1] || jsonMatch[0];
-            parsed = JSON.parse(jsonStr) as ImageAnalysisResult;
+          const fenced = originalText.match(/```json\s*([\s\S]*?)```/);
+          if (fenced && fenced[1]) {
+            parsed = JSON.parse(fenced[1].trim()) as ImageAnalysisResult;
           }
-        } catch {
-          parsed = null;
+        } catch { /* continue to balanced extraction */ }
+        if (!parsed) {
+          try {
+            const balanced = extractBalancedJson(originalText);
+            if (balanced) {
+              parsed = JSON.parse(balanced) as ImageAnalysisResult;
+            }
+          } catch {
+            parsed = null;
+          }
         }
       }
 
@@ -1219,7 +1241,7 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
           recommendations: [],
           severityLevel: null,
           severityFlag,
-          rawAnalysis: rawText,
+          rawAnalysis: sanitizedText,
         });
       }
     } catch (error) {
