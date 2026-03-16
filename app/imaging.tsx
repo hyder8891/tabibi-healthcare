@@ -64,6 +64,10 @@ export default function ImagingScreen() {
     try {
       let pickerResult: ImagePicker.ImagePickerResult;
       if (source === "camera") {
+        if (Platform.OS === "web") {
+          Alert.alert(t("Not Available", "غير متاح"), t("Camera is not available in the browser. Please choose from gallery instead.", "الكاميرا غير متاحة في المتصفح. يرجى الاختيار من المعرض بدلاً من ذلك."));
+          return;
+        }
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== "granted") {
           Alert.alert(t("Permission Required", "إذن مطلوب"), t("Camera access is needed to take photos.", "يلزم الوصول إلى الكاميرا لالتقاط الصور."));
@@ -75,10 +79,12 @@ export default function ImagingScreen() {
           base64: false,
         });
       } else {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== "granted") {
-          Alert.alert(t("Permission Required", "إذن مطلوب"), t("Gallery access is needed to select photos.", "يلزم الوصول إلى المعرض لاختيار الصور."));
-          return;
+        if (Platform.OS !== "web") {
+          const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          if (status !== "granted") {
+            Alert.alert(t("Permission Required", "إذن مطلوب"), t("Gallery access is needed to select photos.", "يلزم الوصول إلى المعرض لاختيار الصور."));
+            return;
+          }
         }
         pickerResult = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ["images"],
@@ -91,13 +97,21 @@ export default function ImagingScreen() {
         setResult(null);
         setError(null);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Image picker error:", err);
+      Alert.alert(
+        t("Error", "خطأ"),
+        t("Could not select image. Please try again.", "تعذر اختيار الصورة. حاول مرة أخرى.")
+      );
     }
   };
 
   const showImageSourcePicker = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (Platform.OS === "web") {
+      pickImage("gallery");
+      return;
+    }
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
