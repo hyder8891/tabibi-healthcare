@@ -1114,4 +1114,110 @@ Respond ONLY with JSON:
       res.status(500).json({ error: "Failed to check interactions" });
     }
   });
+
+  const analyzeImageSchema = z.object({
+    imageData: z.string().min(1, "Image data is required"),
+    mimeType: z.string().optional().default("image/jpeg"),
+    language: z.enum(["en", "ar"]).optional().default("en"),
+  });
+
+  app.post("/api/analyze-image", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const validation = analyzeImageSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({ error: "Invalid request data", details: validation.error.issues.map(i => i.message) });
+      }
+      const { imageData, mimeType, language } = validation.data;
+
+      const langInstruction = language === "ar"
+        ? "Provide your analysis entirely in Arabic."
+        : "Provide your analysis in English.";
+
+      const imagePrompt = `You are a medical imaging expert. Thoroughly analyze this medical image. Describe:
+1. The imaging modality (X-ray, MRI, CT, ultrasound, lab results, skin photo, ECG, etc.)
+2. The anatomical region shown
+3. All visible findings - normal and abnormal
+4. Any pathology, lesions, masses, fractures, signal abnormalities, or other notable observations
+5. Clinical significance of the findings
+
+If this is a lab result, read all values and flag abnormal ones.
+If this is a skin/wound photo, describe morphology and differential diagnoses.
+If this is a prescription or medication label, extract the medication information.
+Be thorough and specific. ${langInstruction}
+
+IMPORTANT: Structure your response as valid JSON with this exact format:
+{
+  "modality": "string - the imaging modality identified",
+  "anatomicalRegion": "string - the anatomical region shown",
+  "findings": ["string array - each distinct finding as a separate item"],
+  "clinicalSignificance": "string - overall clinical significance",
+  "recommendations": ["string array - recommended follow-up actions"],
+  "severityLevel": "normal | mild | moderate | severe | critical"
+}`;
+
+      const imageResponse = await ai.models.generateContent({
+        model: MODEL_PRO,
+        contents: [{
+          role: "user",
+          parts: [
+            { inlineData: { data: imageData, mimeType } },
+            { text: imagePrompt },
+          ],
+        }],
+        config: { maxOutputTokens: 2048 },
+      });
+
+      const rawText = sanitizeInput(imageResponse.text || "");
+
+      const severityKeywords = /\b(cancer|carcinoma|malignant|malignancy|tumor|tumou?r|neoplasm|metastas[ie]s|mass|lesion|nodule|fracture|hemorrhage|haemorrhage|bleeding|stroke|infarct|thrombosis|embolism|aneurysm|organ failure|cirrhosis|fibrosis|pneumothorax|pleural effusion|سرطان|ورم|كتلة|كسر|نزيف|جلطة|انسداد)\b/i;
+      const severityFlag = severityKeywords.test(rawText);
+
+      interface ImageAnalysisResult {
+        modality?: string;
+        anatomicalRegion?: string;
+        findings?: string[];
+        clinicalSignificance?: string;
+        recommendations?: string[];
+        severityLevel?: string;
+      }
+
+      let parsed: ImageAnalysisResult | null = null;
+      try {
+        const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/) || rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const jsonStr = jsonMatch[1] || jsonMatch[0];
+          parsed = JSON.parse(jsonStr) as ImageAnalysisResult;
+        }
+      } catch {
+        parsed = null;
+      }
+
+      if (parsed) {
+        res.json({
+          modality: parsed.modality || null,
+          anatomicalRegion: parsed.anatomicalRegion || null,
+          findings: parsed.findings || [],
+          clinicalSignificance: parsed.clinicalSignificance || null,
+          recommendations: parsed.recommendations || [],
+          severityLevel: parsed.severityLevel || null,
+          severityFlag,
+          rawAnalysis: null,
+        });
+      } else {
+        res.json({
+          modality: null,
+          anatomicalRegion: null,
+          findings: [],
+          clinicalSignificance: null,
+          recommendations: [],
+          severityLevel: null,
+          severityFlag,
+          rawAnalysis: rawText,
+        });
+      }
+    } catch (error) {
+      console.error("Image analysis error:", error instanceof Error ? error.message : "Unknown error");
+      res.status(500).json({ error: "Failed to analyze image" });
+    }
+  });
 }

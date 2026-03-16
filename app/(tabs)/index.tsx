@@ -472,7 +472,7 @@ export default function HomeScreen() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/routing?type=pharmacy");
+                router.push("/routing");
               }}
             >
               <View style={[styles.actionIcon, { backgroundColor: Colors.light.primarySurface }]}>
@@ -482,9 +482,9 @@ export default function HomeScreen() {
                   color={Colors.light.primary}
                 />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Pharmacy", "ابحث عن صيدلية")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find a Pharmacy/Clinic/Hospital", "ابحث عن صيدلية/عيادة/مستشفى")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Nearest open pharmacies", "أقرب الصيدليات المفتوحة")}
+                {t("Nearby pharmacies, clinics & hospitals", "صيدليات وعيادات ومستشفيات قريبة")}
               </Text>
             </Pressable>
 
@@ -495,15 +495,15 @@ export default function HomeScreen() {
               ]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                router.push("/routing");
+                router.push("/imaging");
               }}
             >
               <View style={[styles.actionIcon, { backgroundColor: "#F3E8FF" }]}>
-                <Ionicons name="medkit" size={28} color="#7C3AED" />
+                <MaterialCommunityIcons name="image-search" size={28} color="#7C3AED" />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find Care", "ابحث عن رعاية")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Medical Imaging Analysis", "تحليل الصور الطبية")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
-                {t("Clinics, labs & hospitals", "عيادات ومختبرات ومستشفيات")}
+                {t("AI-powered image & report analysis", "تحليل الصور والتقارير بالذكاء الاصطناعي")}
               </Text>
             </Pressable>
           </View>

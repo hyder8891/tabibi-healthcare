@@ -126,6 +126,14 @@ function RootLayoutNav() {
         }}
       />
       <Stack.Screen
+        name="imaging"
+        options={{
+          headerShown: false,
+          presentation: "fullScreenModal",
+          animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
         name="order"
         options={{
           headerShown: false,
