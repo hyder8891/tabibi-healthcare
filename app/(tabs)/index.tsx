@@ -482,7 +482,7 @@ export default function HomeScreen() {
                   color={Colors.light.primary}
                 />
               </View>
-              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find a Pharmacy/Clinic/Hospital", "ابحث عن صيدلية/عيادة/مستشفى")}</Text>
+              <Text style={[styles.actionTitle, isRTL && { textAlign: "right" }]}>{t("Find a Pharmacy | Clinic | Hospital", "ابحث عن\n صيدلية | عيادة | مستشفى")}</Text>
               <Text style={[styles.actionDesc, isRTL && { textAlign: "right" }]}>
                 {t("Nearby pharmacies, clinics & hospitals", "صيدليات وعيادات ومستشفيات قريبة")}
               </Text>
