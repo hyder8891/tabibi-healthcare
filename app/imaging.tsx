@@ -271,7 +271,7 @@ export default function ImagingScreen() {
             )}
 
             {result.severityFlag && (
-              <View style={styles.warningBanner}>
+              <View style={[styles.warningBanner, isRTL && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="warning" size={20} color="#DC2626" />
                 <Text style={[styles.warningText, isRTL && { textAlign: "right", flex: 1 }]}>
                   {t(
@@ -288,7 +288,21 @@ export default function ImagingScreen() {
                   {t("Analysis Report", "تقرير التحليل")}
                 </Text>
                 <Text style={[styles.rawAnalysisText, isRTL && { textAlign: "right" }]}>
-                  {result.rawAnalysis}
+                  {result.rawAnalysis
+                    .replace(/```json\s*/g, "")
+                    .replace(/```\s*/g, "")
+                    .replace(/^\s*\{[\s\S]*\}\s*$/g, (match) => {
+                      try {
+                        const obj = JSON.parse(match);
+                        return Object.entries(obj)
+                          .map(([key, val]) => {
+                            if (Array.isArray(val)) return `${key}:\n${val.map((v: string) => `  - ${v}`).join("\n")}`;
+                            return `${key}: ${val}`;
+                          })
+                          .join("\n\n");
+                      } catch { return match; }
+                    })
+                    .trim()}
                 </Text>
               </View>
             ) : (
@@ -304,7 +318,7 @@ export default function ImagingScreen() {
 
                 {result.modality && (
                   <View style={styles.resultCard}>
-                    <View style={styles.resultCardHeader}>
+                    <View style={[styles.resultCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="scan" size={18} color={Colors.light.primary} />
                       <Text style={[styles.resultCardTitle, isRTL && { textAlign: "right" }]}>
                         {t("Modality", "نوع التصوير")}
@@ -318,7 +332,7 @@ export default function ImagingScreen() {
 
                 {result.anatomicalRegion && (
                   <View style={styles.resultCard}>
-                    <View style={styles.resultCardHeader}>
+                    <View style={[styles.resultCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="body" size={18} color={Colors.light.primary} />
                       <Text style={[styles.resultCardTitle, isRTL && { textAlign: "right" }]}>
                         {t("Anatomical Region", "المنطقة التشريحية")}
@@ -332,14 +346,14 @@ export default function ImagingScreen() {
 
                 {result.findings && result.findings.length > 0 && (
                   <View style={styles.resultCard}>
-                    <View style={styles.resultCardHeader}>
+                    <View style={[styles.resultCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="list" size={18} color={Colors.light.primary} />
                       <Text style={[styles.resultCardTitle, isRTL && { textAlign: "right" }]}>
                         {t("Findings", "النتائج")}
                       </Text>
                     </View>
                     {result.findings.map((finding, index) => (
-                      <View key={index} style={styles.findingRow}>
+                      <View key={index} style={[styles.findingRow, isRTL && { flexDirection: "row-reverse" }]}>
                         <View style={styles.findingBullet} />
                         <Text style={[styles.findingText, isRTL && { textAlign: "right" }]}>{finding}</Text>
                       </View>
@@ -349,7 +363,7 @@ export default function ImagingScreen() {
 
                 {result.clinicalSignificance && (
                   <View style={styles.resultCard}>
-                    <View style={styles.resultCardHeader}>
+                    <View style={[styles.resultCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="medkit" size={18} color={Colors.light.primary} />
                       <Text style={[styles.resultCardTitle, isRTL && { textAlign: "right" }]}>
                         {t("Clinical Significance", "الأهمية السريرية")}
@@ -363,14 +377,14 @@ export default function ImagingScreen() {
 
                 {result.recommendations && result.recommendations.length > 0 && (
                   <View style={styles.resultCard}>
-                    <View style={styles.resultCardHeader}>
+                    <View style={[styles.resultCardHeader, isRTL && { flexDirection: "row-reverse" }]}>
                       <Ionicons name="checkmark-circle" size={18} color={Colors.light.primary} />
                       <Text style={[styles.resultCardTitle, isRTL && { textAlign: "right" }]}>
                         {t("Recommendations", "التوصيات")}
                       </Text>
                     </View>
                     {result.recommendations.map((rec, index) => (
-                      <View key={index} style={styles.findingRow}>
+                      <View key={index} style={[styles.findingRow, isRTL && { flexDirection: "row-reverse" }]}>
                         <View style={[styles.findingBullet, { backgroundColor: Colors.light.primary }]} />
                         <Text style={[styles.findingText, isRTL && { textAlign: "right" }]}>{rec}</Text>
                       </View>
@@ -380,7 +394,7 @@ export default function ImagingScreen() {
               </>
             )}
 
-            <View style={styles.disclaimer}>
+            <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
               <Ionicons name="information-circle" size={16} color="#6B7280" />
               <Text style={[styles.disclaimerText, isRTL && { textAlign: "right", flex: 1 }]}>
                 {t(

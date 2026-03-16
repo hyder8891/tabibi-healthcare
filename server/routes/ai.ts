@@ -1164,7 +1164,10 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
             { text: imagePrompt },
           ],
         }],
-        config: { maxOutputTokens: 2048 },
+        config: {
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+        },
       });
 
       const rawText = sanitizeInput(imageResponse.text || "");
@@ -1183,13 +1186,17 @@ IMPORTANT: Structure your response as valid JSON with this exact format:
 
       let parsed: ImageAnalysisResult | null = null;
       try {
-        const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/) || rawText.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const jsonStr = jsonMatch[1] || jsonMatch[0];
-          parsed = JSON.parse(jsonStr) as ImageAnalysisResult;
-        }
+        parsed = JSON.parse(rawText) as ImageAnalysisResult;
       } catch {
-        parsed = null;
+        try {
+          const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/) || rawText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const jsonStr = jsonMatch[1] || jsonMatch[0];
+            parsed = JSON.parse(jsonStr) as ImageAnalysisResult;
+          }
+        } catch {
+          parsed = null;
+        }
       }
 
       if (parsed) {
