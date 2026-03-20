@@ -135,6 +135,7 @@ export default function AssessmentScreen() {
       chiefComplaintRef.current = assessment.chiefComplaint;
       if (assessment.result) setAssessmentResult(assessment.result);
       if (assessment.emergency) setEmergency(assessment.emergency);
+      if (assessment.forWhom) setForWhom(assessment.forWhom);
       
       const continueMsg: ChatMessage = {
         id: Crypto.randomUUID(),
@@ -230,7 +231,7 @@ export default function AssessmentScreen() {
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) return;
+    if ((!text && !imageAttachment) || isLoading) return;
 
     isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -654,6 +655,7 @@ export default function AssessmentScreen() {
             ...cachedProfile,
             isPediatric: settings.pediatricMode,
           },
+          ...(forWhom ? { forWhom } : {}),
         };
         await saveAssessment(assessment);
         setExistingAssessmentId(newId);
