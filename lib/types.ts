@@ -111,6 +111,12 @@ export interface EmergencyAlert {
   action: string;
 }
 
+export interface ForWhom {
+  name: string;
+  relationship: string;
+  age?: number;
+}
+
 export interface Assessment {
   id: string;
   date: number;
@@ -120,6 +126,7 @@ export interface Assessment {
   emergency?: EmergencyAlert;
   medications: ScannedMedication[];
   patientProfile: PatientProfile;
+  forWhom?: ForWhom;
 }
 
 export interface MedicineOrder {

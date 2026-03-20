@@ -47,7 +47,7 @@ import { RecommendationCard } from "@/components/RecommendationCard";
 import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { saveAssessment, getProfile, getAssessment, updateAssessment } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
-import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment } from "@/lib/types";
+import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment, ForWhom } from "@/lib/types";
 
 function AnimatedTypingIndicator() {
   return <TypingIndicator />;
@@ -68,9 +68,16 @@ export default function AssessmentScreen() {
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [isGeneratingRecommendation, setIsGeneratingRecommendation] = useState(false);
+  const [forWhom, setForWhom] = useState<ForWhom | null>(null);
+  const [showForWhomModal, setShowForWhomModal] = useState(false);
+  const [forWhomName, setForWhomName] = useState("");
+  const [forWhomAge, setForWhomAge] = useState("");
+  const [forWhomRelationship, setForWhomRelationship] = useState("");
+  const [forWhomStep, setForWhomStep] = useState<"choose" | "details">("choose");
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const lockedTotalRef = useRef<number | null>(null);
+  const isSubmittingRef = useRef(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const initializedRef = useRef(false);
 
@@ -106,6 +113,8 @@ export default function AssessmentScreen() {
     if (assessmentId) {
       loadExistingAssessment(assessmentId);
     } else {
+      setShowForWhomModal(true);
+      setForWhomStep("choose");
       setMessages([
         {
           id: "welcome",
@@ -221,8 +230,9 @@ export default function AssessmentScreen() {
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading) return;
+    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) return;
 
+    isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (!chiefComplaintRef.current && text) {
@@ -269,6 +279,7 @@ export default function AssessmentScreen() {
           ...profile,
           isPediatric: settings.pediatricMode,
         },
+        ...(forWhom ? { forWhom } : {}),
       });
 
       let response = await fetch(url.toString(), {
@@ -663,8 +674,9 @@ export default function AssessmentScreen() {
       setIsGeneratingRecommendation(false);
     } finally {
       setIsLoading(false);
+      isSubmittingRef.current = false;
     }
-  }, [inputText, messages, isLoading, settings, pendingImage, existingAssessmentId]);
+  }, [inputText, messages, isLoading, settings, pendingImage, existingAssessmentId, forWhom]);
 
   const finishAssessment = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -701,6 +713,7 @@ export default function AssessmentScreen() {
         ...profile,
         isPediatric: settings.pediatricMode,
       },
+      ...(forWhom ? { forWhom } : {}),
     };
     await saveAssessment(assessment);
 
@@ -717,11 +730,13 @@ export default function AssessmentScreen() {
   const quickReplyRef = useRef<string | null>(null);
 
   const handleQuickReply = useCallback((reply: string) => {
+    if (isSubmittingRef.current || isLoading) return;
+    isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     quickReplyRef.current = reply;
     setInputText(reply);
     setQuickReplies([]);
-  }, []);
+  }, [isLoading]);
 
   useEffect(() => {
     if (quickReplyRef.current && inputText === quickReplyRef.current && !isLoading) {
@@ -788,6 +803,136 @@ export default function AssessmentScreen() {
         </Pressable>
       </Modal>
 
+      <Modal
+        visible={showForWhomModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowForWhomModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => { setShowForWhomModal(false); }}>
+          <Pressable style={styles.forWhomModalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHandle} />
+            {forWhomStep === "choose" ? (
+              <>
+                <Text style={styles.modalTitle}>
+                  {t("Who is this assessment for?", "\u0644\u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u062a\u0642\u064a\u064a\u0645\u061f")}
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [styles.forWhomOption, pressed && { backgroundColor: Colors.light.primarySurface }]}
+                  onPress={() => {
+                    setForWhom(null);
+                    setShowForWhomModal(false);
+                  }}
+                >
+                  <View style={styles.forWhomIconCircle}>
+                    <Ionicons name="person" size={22} color={Colors.light.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.forWhomOptionTitle}>{t("Myself", "\u0644\u0646\u0641\u0633\u064a")}</Text>
+                    <Text style={styles.forWhomOptionDesc}>{t("I'm the patient", "\u0623\u0646\u0627 \u0627\u0644\u0645\u0631\u064a\u0636")}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.light.textTertiary} />
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [styles.forWhomOption, pressed && { backgroundColor: Colors.light.primarySurface }]}
+                  onPress={() => setForWhomStep("details")}
+                >
+                  <View style={styles.forWhomIconCircle}>
+                    <Ionicons name="people" size={22} color={Colors.light.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.forWhomOptionTitle}>{t("Someone else", "\u0634\u062e\u0635 \u0622\u062e\u0631")}</Text>
+                    <Text style={styles.forWhomOptionDesc}>{t("Family member or dependent", "\u0641\u0631\u062f \u0645\u0646 \u0627\u0644\u0639\u0627\u0626\u0644\u0629")}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color={Colors.light.textTertiary} />
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.forWhomDetailsHeader}>
+                  <Pressable onPress={() => setForWhomStep("choose")} hitSlop={12}>
+                    <Ionicons name="arrow-back" size={22} color={Colors.light.text} />
+                  </Pressable>
+                  <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>
+                    {t("Patient Details", "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0631\u064a\u0636")}
+                  </Text>
+                  <View style={{ width: 22 }} />
+                </View>
+                <View style={styles.forWhomForm}>
+                  <Text style={styles.forWhomLabel}>{t("Name", "\u0627\u0644\u0627\u0633\u0645")}</Text>
+                  <TextInput
+                    style={[styles.forWhomInput, isRTL && { textAlign: "right" }]}
+                    value={forWhomName}
+                    onChangeText={setForWhomName}
+                    placeholder={t("Patient's name", "\u0627\u0633\u0645 \u0627\u0644\u0645\u0631\u064a\u0636")}
+                    placeholderTextColor={Colors.light.textTertiary}
+                  />
+                  <Text style={styles.forWhomLabel}>{t("Relationship", "\u0635\u0644\u0629 \u0627\u0644\u0642\u0631\u0627\u0628\u0629")}</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.forWhomChipsScroll}>
+                    <View style={styles.forWhomChips}>
+                      {[
+                        { en: "Parent", ar: "\u0623\u062d\u062f \u0627\u0644\u0648\u0627\u0644\u062f\u064a\u0646" },
+                        { en: "Child", ar: "\u0637\u0641\u0644" },
+                        { en: "Spouse", ar: "\u0632\u0648\u062c/\u0629" },
+                        { en: "Sibling", ar: "\u0623\u062e/\u0623\u062e\u062a" },
+                        { en: "Grandparent", ar: "\u062c\u062f/\u062c\u062f\u0629" },
+                        { en: "Other", ar: "\u0622\u062e\u0631" },
+                      ].map((rel) => (
+                        <Pressable
+                          key={rel.en}
+                          style={[
+                            styles.forWhomChip,
+                            forWhomRelationship === rel.en && styles.forWhomChipActive,
+                          ]}
+                          onPress={() => setForWhomRelationship(rel.en)}
+                        >
+                          <Text
+                            style={[
+                              styles.forWhomChipText,
+                              forWhomRelationship === rel.en && styles.forWhomChipTextActive,
+                            ]}
+                          >
+                            {t(rel.en, rel.ar)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </ScrollView>
+                  <Text style={styles.forWhomLabel}>{t("Age (optional)", "\u0627\u0644\u0639\u0645\u0631 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)")}</Text>
+                  <TextInput
+                    style={[styles.forWhomInput, isRTL && { textAlign: "right" }, { width: 100 }]}
+                    value={forWhomAge}
+                    onChangeText={setForWhomAge}
+                    placeholder="—"
+                    placeholderTextColor={Colors.light.textTertiary}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                  />
+                </View>
+                <Pressable
+                  style={[
+                    styles.forWhomSubmitBtn,
+                    (!forWhomName.trim() || !forWhomRelationship) && styles.forWhomSubmitBtnDisabled,
+                  ]}
+                  disabled={!forWhomName.trim() || !forWhomRelationship}
+                  onPress={() => {
+                    const ageNum = parseInt(forWhomAge, 10);
+                    setForWhom({
+                      name: forWhomName.trim(),
+                      relationship: forWhomRelationship,
+                      ...(ageNum > 0 ? { age: ageNum } : {}),
+                    });
+                    setShowForWhomModal(false);
+                  }}
+                >
+                  <Text style={styles.forWhomSubmitText}>{t("Continue", "\u0645\u062a\u0627\u0628\u0639\u0629")}</Text>
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <View
         style={styles.header}
         onLayout={(e) => {
@@ -817,6 +962,22 @@ export default function AssessmentScreen() {
           <View style={styles.headerButton} />
         )}
       </View>
+
+      {forWhom && (
+        <Pressable
+          style={styles.forWhomBanner}
+          onPress={() => { setShowForWhomModal(true); setForWhomStep("choose"); }}
+        >
+          <Ionicons name="people" size={16} color={Colors.light.primary} />
+          <Text style={styles.forWhomBannerText} numberOfLines={1}>
+            {t("For", "\u0644\u0640")} {forWhom.name}
+            {forWhom.age ? ` (${forWhom.age})` : ""}
+            {" · "}
+            {t(forWhom.relationship, forWhom.relationship)}
+          </Text>
+          <Ionicons name="pencil" size={14} color={Colors.light.textTertiary} />
+        </Pressable>
+      )}
 
       {(() => {
         const isComplete = !!assessmentResult;
@@ -951,10 +1112,12 @@ export default function AssessmentScreen() {
                   style={({ pressed }) => [
                     styles.quickReplyPill,
                     pressed && styles.quickReplyPillPressed,
+                    isSubmittingRef.current && styles.quickReplyPillDisabled,
                   ]}
                   onPress={() => handleQuickReply(reply)}
+                  disabled={isSubmittingRef.current}
                 >
-                  <Text style={styles.quickReplyText}>{reply}</Text>
+                  <Text style={[styles.quickReplyText, isSubmittingRef.current && styles.quickReplyTextDisabled]}>{reply}</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -1257,10 +1420,138 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primarySurface,
     borderColor: Colors.light.primary,
   },
+  quickReplyPillDisabled: {
+    opacity: 0.4,
+  },
   quickReplyText: {
     fontSize: 13,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.primary,
     lineHeight: 18,
+  },
+  quickReplyTextDisabled: {
+    color: Colors.light.textTertiary,
+  },
+  forWhomModalContent: {
+    backgroundColor: Colors.light.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    paddingBottom: 34,
+    paddingHorizontal: 20,
+  },
+  forWhomOption: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+    marginBottom: 8,
+    backgroundColor: Colors.light.background,
+  },
+  forWhomIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.light.primarySurface,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  forWhomOptionTitle: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.text,
+  },
+  forWhomOptionDesc: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    marginTop: 2,
+  },
+  forWhomDetailsHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 12,
+    marginBottom: 16,
+  },
+  forWhomForm: {
+    gap: 8,
+  },
+  forWhomLabel: {
+    fontSize: 13,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.textSecondary,
+    marginTop: 8,
+  },
+  forWhomInput: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.text,
+    borderWidth: 1,
+    borderColor: Colors.light.borderLight,
+  },
+  forWhomChipsScroll: {
+    flexGrow: 0,
+  },
+  forWhomChips: {
+    flexDirection: "row" as const,
+    gap: 8,
+    paddingVertical: 4,
+  },
+  forWhomChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: Colors.light.background,
+    borderWidth: 1.5,
+    borderColor: Colors.light.borderLight,
+  },
+  forWhomChipActive: {
+    backgroundColor: Colors.light.primarySurface,
+    borderColor: Colors.light.primary,
+  },
+  forWhomChipText: {
+    fontSize: 13,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
+  },
+  forWhomChipTextActive: {
+    color: Colors.light.primary,
+  },
+  forWhomSubmitBtn: {
+    backgroundColor: Colors.light.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: "center" as const,
+    marginTop: 20,
+  },
+  forWhomSubmitBtnDisabled: {
+    opacity: 0.4,
+  },
+  forWhomSubmitText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#fff",
+  },
+  forWhomBanner: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.light.primarySurface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.primary + "20",
+  },
+  forWhomBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.primary,
   },
 });

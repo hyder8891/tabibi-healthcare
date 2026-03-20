@@ -236,9 +236,16 @@ const patientProfileSchema = z.object({
   allergies: z.array(z.string().max(200)).optional(),
 }).optional();
 
+const forWhomSchema = z.object({
+  name: z.string().max(200),
+  relationship: z.string().max(100),
+  age: z.number().min(0).max(120).optional(),
+}).optional();
+
 const assessmentSchema = z.object({
   messages: z.array(messageSchema).min(1).max(50),
   patientProfile: patientProfileSchema,
+  forWhom: forWhomSchema,
 });
 
 const medicationAnalysisSchema = z.object({
@@ -708,10 +715,20 @@ export function registerAiRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid request data", details: validation.error.issues.map(i => i.message) });
       }
-      const { messages, patientProfile } = validation.data;
+      const { messages, patientProfile, forWhom } = validation.data;
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       let medsDisclosed = false;
+
+      if (forWhom) {
+        systemContext += `\n\nIMPORTANT — PROXY ASSESSMENT:\n`;
+        systemContext += `This assessment is NOT for the logged-in user. It is for someone else.\n`;
+        systemContext += `- Patient name: ${sanitizeInput(forWhom.name)}\n`;
+        systemContext += `- Relationship to user: ${sanitizeInput(forWhom.relationship)}\n`;
+        if (forWhom.age) systemContext += `- Patient age: ${forWhom.age}\n`;
+        systemContext += `Address the patient by their name. The user is describing symptoms on behalf of this person.\n`;
+      }
+
       if (patientProfile) {
         systemContext += `\n\nPATIENT PROFILE:\n`;
         if (patientProfile.name) systemContext += `- Name: ${sanitizeInput(patientProfile.name)}\n`;
