@@ -231,7 +231,8 @@ export default function AssessmentScreen() {
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) {
+    if ((!text && !imageAttachment) || isLoading) {
+      isSubmittingRef.current = false;
       return;
     }
 
@@ -735,6 +736,7 @@ export default function AssessmentScreen() {
 
   const handleQuickReply = useCallback((reply: string) => {
     if (isSubmittingRef.current || isLoading) return;
+    isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     quickReplyRef.current = reply;
     setInputText(reply);
