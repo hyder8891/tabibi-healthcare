@@ -642,6 +642,7 @@ export default function AssessmentScreen() {
           existingAssessment.messages = allMsgs;
           existingAssessment.result = parsedResult || existingAssessment.result;
           existingAssessment.emergency = parsedEmergency || existingAssessment.emergency;
+          if (forWhom) existingAssessment.forWhom = forWhom;
           await updateAssessment(existingAssessment);
         }
       } else {
@@ -693,6 +694,7 @@ export default function AssessmentScreen() {
         existing.messages = messages;
         existing.result = assessmentResult || existing.result;
         existing.emergency = emergency || existing.emergency;
+        if (forWhom) existing.forWhom = forWhom;
         await updateAssessment(existing);
         if (assessmentResult) {
           router.replace({
