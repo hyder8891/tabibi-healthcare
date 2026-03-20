@@ -231,7 +231,9 @@ export default function AssessmentScreen() {
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading) return;
+    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) {
+      return;
+    }
 
     isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -733,7 +735,6 @@ export default function AssessmentScreen() {
 
   const handleQuickReply = useCallback((reply: string) => {
     if (isSubmittingRef.current || isLoading) return;
-    isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     quickReplyRef.current = reply;
     setInputText(reply);
@@ -1114,12 +1115,12 @@ export default function AssessmentScreen() {
                   style={({ pressed }) => [
                     styles.quickReplyPill,
                     pressed && styles.quickReplyPillPressed,
-                    isSubmittingRef.current && styles.quickReplyPillDisabled,
+                    (isSubmittingRef.current || isLoading) && styles.quickReplyPillDisabled,
                   ]}
                   onPress={() => handleQuickReply(reply)}
-                  disabled={isSubmittingRef.current}
+                  disabled={isSubmittingRef.current || isLoading}
                 >
-                  <Text style={[styles.quickReplyText, isSubmittingRef.current && styles.quickReplyTextDisabled]}>{reply}</Text>
+                  <Text style={[styles.quickReplyText, (isSubmittingRef.current || isLoading) && styles.quickReplyTextDisabled]}>{reply}</Text>
                 </Pressable>
               ))}
             </ScrollView>
