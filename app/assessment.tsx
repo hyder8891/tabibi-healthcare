@@ -231,8 +231,7 @@ export default function AssessmentScreen() {
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading) {
-      isSubmittingRef.current = false;
+    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) {
       return;
     }
 
@@ -642,7 +641,7 @@ export default function AssessmentScreen() {
           existingAssessment.messages = allMsgs;
           existingAssessment.result = parsedResult || existingAssessment.result;
           existingAssessment.emergency = parsedEmergency || existingAssessment.emergency;
-          if (forWhom) existingAssessment.forWhom = forWhom;
+          existingAssessment.forWhom = forWhom || undefined;
           await updateAssessment(existingAssessment);
         }
       } else {
@@ -694,7 +693,7 @@ export default function AssessmentScreen() {
         existing.messages = messages;
         existing.result = assessmentResult || existing.result;
         existing.emergency = emergency || existing.emergency;
-        if (forWhom) existing.forWhom = forWhom;
+        existing.forWhom = forWhom || undefined;
         await updateAssessment(existing);
         if (assessmentResult) {
           router.replace({
@@ -748,6 +747,7 @@ export default function AssessmentScreen() {
   useEffect(() => {
     if (quickReplyRef.current && inputText === quickReplyRef.current && !isLoading) {
       quickReplyRef.current = null;
+      isSubmittingRef.current = false;
       sendMessage();
     }
   }, [inputText]);
