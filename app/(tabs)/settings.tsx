@@ -22,6 +22,7 @@ import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, saveProfile } from "@/lib/storage";
 import type { PatientProfile, EmergencyContact } from "@/lib/types";
+import CollapsibleSection from "@/components/CollapsibleSection";
 
 const BLOOD_TYPES = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 const RELATIONSHIPS = [
@@ -243,9 +244,13 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-          {t("Personal Information", "\u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062e\u0635\u064a\u0629")}
-        </Text>
+        <CollapsibleSection
+          title={t("Personal Information", "\u0627\u0644\u0645\u0639\u0644\u0648\u0645\u0627\u062a \u0627\u0644\u0634\u062e\u0635\u064a\u0629")}
+          icon={<Ionicons name="person-circle-outline" size={20} color={Colors.light.primary} />}
+          summary={profile.name || t("Not set", "\u063a\u064a\u0631 \u0645\u062d\u062f\u062f")}
+          isRTL={isRTL}
+          testID="section-personal-info"
+        >
         <View style={styles.card}>
           <View style={[styles.fieldRow, isRTL && { flexDirection: "row-reverse" }]}>
             <View style={styles.fieldIconWrap}>
@@ -332,10 +337,22 @@ export default function SettingsScreen() {
             </ScrollView>
           </View>
         </View>
+        </CollapsibleSection>
 
-        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-          {t("Body Measurements", "\u0627\u0644\u0642\u064a\u0627\u0633\u0627\u062a \u0627\u0644\u062c\u0633\u062f\u064a\u0629")}
-        </Text>
+        <CollapsibleSection
+          title={t("Body Measurements", "\u0627\u0644\u0642\u064a\u0627\u0633\u0627\u062a \u0627\u0644\u062c\u0633\u062f\u064a\u0629")}
+          icon={<MaterialCommunityIcons name="human-male-height" size={20} color={Colors.light.primary} />}
+          summary={
+            profile.weight || profile.height
+              ? [
+                  profile.weight ? `${profile.weight} ${t("kg", "\u0643\u063a")}` : "",
+                  profile.height ? `${profile.height} ${t("cm", "\u0633\u0645")}` : "",
+                ].filter(Boolean).join(" / ")
+              : t("Not set", "\u063a\u064a\u0631 \u0645\u062d\u062f\u062f")
+          }
+          isRTL={isRTL}
+          testID="section-body-measurements"
+        >
         <View style={styles.card}>
           <View style={[styles.measureRow, isRTL && { flexDirection: "row-reverse" }]}>
             <View style={[styles.measureItem, isRTL && { flexDirection: "row-reverse" }]}>
@@ -381,10 +398,25 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
+        </CollapsibleSection>
 
-        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-          {t("Medical History", "\u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0637\u0628\u064a")}
-        </Text>
+        <CollapsibleSection
+          title={t("Medical History", "\u0627\u0644\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0637\u0628\u064a")}
+          icon={<Ionicons name="medkit-outline" size={20} color={Colors.light.primary} />}
+          summary={
+            (() => {
+              const cCount = (profile.conditions || []).length;
+              const aCount = (profile.allergies || []).length;
+              if (cCount === 0 && aCount === 0) return t("None added", "\u0644\u0627 \u064a\u0648\u062c\u062f");
+              const parts: string[] = [];
+              if (cCount > 0) parts.push(`${cCount} ${cCount === 1 ? t("condition", "\u062d\u0627\u0644\u0629") : t("conditions", "\u062d\u0627\u0644\u0627\u062a")}`);
+              if (aCount > 0) parts.push(`${aCount} ${aCount === 1 ? t("allergy", "\u062d\u0633\u0627\u0633\u064a\u0629") : t("allergies", "\u062d\u0633\u0627\u0633\u064a\u0627\u062a")}`);
+              return parts.join(", ");
+            })()
+          }
+          isRTL={isRTL}
+          testID="section-medical-history"
+        >
         <View style={styles.card}>
           <Text style={[styles.subSectionLabel, isRTL && { textAlign: "right" }]}>
             {t("Conditions", "\u0627\u0644\u062d\u0627\u0644\u0627\u062a \u0627\u0644\u0637\u0628\u064a\u0629")}
@@ -466,10 +498,15 @@ export default function SettingsScreen() {
             </Pressable>
           </View>
         </View>
+        </CollapsibleSection>
 
-        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-          {t("Emergency Contact", "\u062c\u0647\u0629 \u0627\u062a\u0635\u0627\u0644 \u0627\u0644\u0637\u0648\u0627\u0631\u0626")}
-        </Text>
+        <CollapsibleSection
+          title={t("Emergency Contact", "\u062c\u0647\u0629 \u0627\u062a\u0635\u0627\u0644 \u0627\u0644\u0637\u0648\u0627\u0631\u0626")}
+          icon={<Ionicons name="call-outline" size={20} color={Colors.light.emergency} />}
+          summary={profile.emergencyContact?.name || t("Not set", "\u063a\u064a\u0631 \u0645\u062d\u062f\u062f")}
+          isRTL={isRTL}
+          testID="section-emergency-contact"
+        >
         <View style={styles.card}>
           <View style={[styles.fieldRow, isRTL && { flexDirection: "row-reverse" }]}>
             <View style={[styles.fieldIconWrap, { backgroundColor: Colors.light.emergencyLight }]}>
@@ -535,12 +572,16 @@ export default function SettingsScreen() {
             </ScrollView>
           </View>
         </View>
+        </CollapsibleSection>
 
         {user && (
-          <>
-            <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-              {t("Account & Security", "\u0627\u0644\u062d\u0633\u0627\u0628 \u0648\u0627\u0644\u0623\u0645\u0627\u0646")}
-            </Text>
+          <CollapsibleSection
+            title={t("Account & Security", "\u0627\u0644\u062d\u0633\u0627\u0628 \u0648\u0627\u0644\u0623\u0645\u0627\u0646")}
+            icon={<Ionicons name="shield-checkmark-outline" size={20} color={Colors.light.primary} />}
+            summary={user.email || user.phone || user.name || ""}
+            isRTL={isRTL}
+            testID="section-account-security"
+          >
             <View style={styles.card}>
               <View style={[styles.prefRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
@@ -724,12 +765,16 @@ export default function SettingsScreen() {
                 </>
               )}
             </View>
-          </>
+          </CollapsibleSection>
         )}
 
-        <Text style={[styles.sectionLabel, isRTL && { textAlign: "right" }]}>
-          {t("App Preferences", "\u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u062a\u0637\u0628\u064a\u0642")}
-        </Text>
+        <CollapsibleSection
+          title={t("App Preferences", "\u062a\u0641\u0636\u064a\u0644\u0627\u062a \u0627\u0644\u062a\u0637\u0628\u064a\u0642")}
+          icon={<Ionicons name="settings-outline" size={20} color={Colors.light.primary} />}
+          summary={settings.language === "en" ? "English" : "\u0627\u0644\u0639\u0631\u0628\u064a\u0629"}
+          isRTL={isRTL}
+          testID="section-app-preferences"
+        >
         <View style={styles.card}>
           <View style={[styles.prefRow, isRTL && { flexDirection: "row-reverse" }]}>
             <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
@@ -781,10 +826,16 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
+        </CollapsibleSection>
 
-        <Text style={[styles.sectionLabel, { color: Colors.light.emergency }, isRTL && { textAlign: "right" }]}>
-          {t("Danger Zone", "\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062e\u0637\u0631")}
-        </Text>
+        <CollapsibleSection
+          title={t("Danger Zone", "\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062e\u0637\u0631")}
+          icon={<Ionicons name="warning-outline" size={20} color={Colors.light.emergency} />}
+          summary={t("Log out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
+          isRTL={isRTL}
+          titleColor={Colors.light.emergency}
+          testID="section-danger-zone"
+        >
         <Pressable
           style={({ pressed }) => [
             styles.logoutButton,
@@ -799,6 +850,7 @@ export default function SettingsScreen() {
           <Ionicons name="log-out-outline" size={18} color={Colors.light.emergency} />
           <Text style={styles.logoutText}>{t("Log Out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}</Text>
         </Pressable>
+        </CollapsibleSection>
 
         <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="information-circle" size={15} color={Colors.light.textTertiary} />
