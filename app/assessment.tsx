@@ -344,6 +344,7 @@ export default function AssessmentScreen() {
       let parsedResult: AssessmentResult | null = null;
       let parsedEmergency: EmergencyAlert | null = null;
       let hasError = false;
+      let mentalHealthResultsDetected = false;
 
       const normalizeArabicValues = (result: AssessmentResult): AssessmentResult => {
         if (settings.language !== "ar") return result;
@@ -454,6 +455,26 @@ export default function AssessmentScreen() {
           }));
         }
         return normalizeArabicValues(result);
+      };
+
+      const cleanPlainText = (text: string): string => {
+        return text
+          .replace(/<[^>]*>/g, "")
+          .replace(/&ndash;/g, " — ")
+          .replace(/&mdash;/g, " — ")
+          .replace(/&amp;/g, "&")
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/\*\*(.+?)\*\*/g, "$1")
+          .replace(/\*(.+?)\*/g, "$1")
+          .replace(/__(.+?)__/g, "$1")
+          .replace(/_(.+?)_/g, "$1")
+          .replace(/#{1,6}\s*/g, "")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/[ \t]{2,}/g, " ")
+          .trim();
       };
 
       const stripJson = (text: string, isStreaming = false) => {
@@ -653,6 +674,7 @@ export default function AssessmentScreen() {
                   const gad7CompleteMatch = fullText.match(/\{"gad7_complete"\s*:\s*true\s*,\s*"totalScore"\s*:\s*(\d+).*?\}/s);
 
                   if (phq9CompleteMatch) {
+                    mentalHealthResultsDetected = true;
                     const score = parseInt(phq9CompleteMatch[1], 10);
                     let severityLevel: string;
                     let severityColor: string;
@@ -668,7 +690,7 @@ export default function AssessmentScreen() {
                       totalScore: score,
                       severityLevel,
                       severityColor,
-                      evidenceSummary: stripJson(fullText),
+                      evidenceSummary: cleanPlainText(stripJson(fullText)),
                       recommendation: score >= 10
                         ? t("We recommend consulting a mental health specialist", "ننصح بمراجعة متخصص في الصحة النفسية")
                         : t("Continue monitoring your mental health", "استمر في مراقبة حالتك النفسية"),
@@ -676,6 +698,7 @@ export default function AssessmentScreen() {
                   }
 
                   if (gad7CompleteMatch) {
+                    mentalHealthResultsDetected = true;
                     const score = parseInt(gad7CompleteMatch[1], 10);
                     let severityLevel: string;
                     let severityColor: string;
@@ -690,7 +713,7 @@ export default function AssessmentScreen() {
                       totalScore: score,
                       severityLevel,
                       severityColor,
-                      evidenceSummary: stripJson(fullText),
+                      evidenceSummary: cleanPlainText(stripJson(fullText)),
                       recommendation: score >= 10
                         ? t("We recommend consulting a mental health specialist", "ننصح بمراجعة متخصص في الصحة النفسية")
                         : t("Continue monitoring your mental health", "استمر في مراقبة حالتك النفسية"),
@@ -730,11 +753,15 @@ export default function AssessmentScreen() {
         ...(hasError ? { isError: true } : {}),
       };
 
-      setMessages((prev) => [...prev, aiMessage]);
+      if (!mentalHealthResultsDetected) {
+        setMessages((prev) => [...prev, aiMessage]);
+      }
       setStreamingMessage("");
       setIsGeneratingRecommendation(false);
 
-      const allMsgs = [...updatedMessages, aiMessage];
+      const allMsgs = mentalHealthResultsDetected
+        ? [...updatedMessages]
+        : [...updatedMessages, aiMessage];
       
       if (existingAssessmentId) {
         const existingAssessment = await getAssessment(existingAssessmentId);
