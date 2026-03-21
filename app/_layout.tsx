@@ -71,6 +71,7 @@ function RootLayoutNav() {
       }
       return;
     }
+    if (checkedOnboarding) return;
     getProfile().then((profile) => {
       if (!profile.onboardingComplete) {
         router.replace("/onboarding");
