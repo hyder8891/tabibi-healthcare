@@ -42,16 +42,23 @@ function RootLayoutNav() {
       setConsentAccepted(val === "true");
       setConsentChecked(true);
     });
-  }, [segments]);
+  }, []);
+
+  const firstSegment = segments[0] as string | undefined;
 
   useEffect(() => {
     if (isLoading || !consentChecked) return;
-    const firstSegment = segments[0] as string | undefined;
     if (firstSegment && PUBLIC_ROUTES.includes(firstSegment)) {
       return;
     }
     if (!consentAccepted) {
-      router.replace("/consent");
+      AsyncStorage.getItem("consent_accepted").then((val) => {
+        if (val === "true") {
+          setConsentAccepted(true);
+        } else {
+          router.replace("/consent");
+        }
+      });
       return;
     }
     if (!user) {
@@ -203,7 +210,7 @@ export default function RootLayout() {
         <SettingsProvider>
           <AuthProvider>
             <AvicennaProvider>
-              <GestureHandlerRootView>
+              <GestureHandlerRootView style={{ flex: 1 }}>
                 <KeyboardProvider>
                   <StatusBar style="dark" />
                   <RootLayoutNav />
