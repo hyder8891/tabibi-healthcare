@@ -975,6 +975,7 @@ export default function HeartRateScreen() {
       const greenValues: number[] = [];
       const timestamps: number[] = [];
 
+      const fingerProcessingStart = Date.now();
       try {
         if (!measureActiveRef.current) {
           return;
@@ -1028,6 +1029,10 @@ export default function HeartRateScreen() {
       fingerTimestampsRef.current = timestamps;
 
       if (redValues.length < MIN_SAMPLES) {
+        const earlyElapsed = Date.now() - fingerProcessingStart;
+        if (earlyElapsed < 500) {
+          await new Promise((r) => setTimeout(r, 500 - earlyElapsed));
+        }
         setError(t(
           "Not enough data collected. Press your finger firmly over the camera and flash.",
           "لم يتم جمع بيانات كافية. اضغط إصبعك بقوة على الكاميرا والفلاش."
@@ -1038,6 +1043,10 @@ export default function HeartRateScreen() {
       }
 
       const data = processFingerSignals(redValues, greenValues, timestamps);
+      const fingerProcessingElapsed = Date.now() - fingerProcessingStart;
+      if (fingerProcessingElapsed < 500) {
+        await new Promise((r) => setTimeout(r, 500 - fingerProcessingElapsed));
+      }
       setResult(data);
       setState("result");
       setTorchOn(false);
@@ -1107,11 +1116,14 @@ export default function HeartRateScreen() {
     }, 1000);
   }, [captureFrameFace]);
 
-  const processFaceResult = useCallback(() => {
+  const processFaceResult = useCallback(async () => {
+    const processingStart = Date.now();
     setState("processing");
     try {
       const signals = signalsRef.current;
       if (signals.length < MIN_SAMPLES) {
+        const elapsed = Date.now() - processingStart;
+        if (elapsed < 500) await new Promise((r) => setTimeout(r, 500 - elapsed));
         setError(t(
           "Not enough data collected. Try again with better lighting.",
           "لم يتم جمع بيانات كافية. حاول مرة أخرى في إضاءة أفضل."
@@ -1127,6 +1139,8 @@ export default function HeartRateScreen() {
       }
       const rgbSignals = signals.map(s => ({ r: s.r, g: s.g, b: s.b }));
       const data = processFaceSignals(rgbSignals, fps);
+      const elapsed = Date.now() - processingStart;
+      if (elapsed < 500) await new Promise((r) => setTimeout(r, 500 - elapsed));
       setResult(data);
       setState("result");
       if (data.validReading) {
@@ -1140,6 +1154,8 @@ export default function HeartRateScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       }
     } catch {
+      const elapsed = Date.now() - processingStart;
+      if (elapsed < 500) await new Promise((r) => setTimeout(r, 500 - elapsed));
       setError(t("Failed to process data.", "فشل في المعالجة."));
       setState("idle");
     }
@@ -1285,8 +1301,11 @@ export default function HeartRateScreen() {
                       width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
                     }]} />
                   </View>
-                  <Text style={styles.fingerSampleText}>
-                    {t("Recording...", "جاري التسجيل...")}
+                  <Text style={styles.fingerMeasurePercent}>
+                    {t(
+                      `Measuring... ${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}%`,
+                      `جارٍ القياس... ٪${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}`
+                    )}
                   </Text>
                 </View>
               )}
@@ -1342,6 +1361,12 @@ export default function HeartRateScreen() {
                       width: `${((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100}%`,
                     }]} />
                   </View>
+                  <Text style={styles.measurePercentText}>
+                    {t(
+                      `Measuring... ${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}%`,
+                      `جارٍ القياس... ٪${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}`
+                    )}
+                  </Text>
                   <Text style={styles.sampleCountText}>
                     {sampleCount} {t("frames", "إطار")}
                   </Text>
@@ -1432,9 +1457,10 @@ export default function HeartRateScreen() {
                 <View style={styles.measuringRow}>
                   <View style={[styles.pulsingDot, { backgroundColor: Colors.light.success }]} />
                   <Text style={styles.measuringText}>
-                    {IS_MOBILE
-                      ? t("Recording...", "جاري التسجيل...")
-                      : t("Measuring...", "جاري القياس...")}
+                    {t(
+                      `Measuring... ${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}%`,
+                      `جارٍ القياس... ٪${Math.round(((MEASUREMENT_DURATION - countdown) / MEASUREMENT_DURATION) * 100)}`
+                    )}
                   </Text>
                 </View>
                 <Text style={[styles.instructionText, isRTL && { textAlign: "right" }]}>
@@ -1751,6 +1777,13 @@ const styles = StyleSheet.create({
     color: Colors.light.textTertiary,
     marginTop: 4,
   },
+  fingerMeasurePercent: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.primary,
+    marginTop: 6,
+    textAlign: "center",
+  },
   manualStartContainer: {
     alignItems: "center" as const,
     marginTop: 16,
@@ -1870,6 +1903,16 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: Colors.light.primaryLight,
+  },
+  measurePercentText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#fff",
+    marginTop: 6,
+    textAlign: "center",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   sampleCountText: {
     fontSize: 11,

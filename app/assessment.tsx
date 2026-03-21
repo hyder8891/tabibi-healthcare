@@ -86,6 +86,7 @@ export default function AssessmentScreen() {
   const chiefComplaintRef = useRef<string>("");
   const lockedTotalRef = useRef<number | null>(null);
   const isSubmittingRef = useRef(false);
+  const loadingStartRef = useRef<number>(0);
   const pendingMentalHealthStartRef = useRef<'phq9' | 'gad7' | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const initializedRef = useRef(false);
@@ -293,6 +294,7 @@ export default function AssessmentScreen() {
       setPendingImage(null);
     }
 
+    loadingStartRef.current = Date.now();
     setIsLoading(true);
     setStreamingMessage("");
     setQuickReplies([]);
@@ -794,6 +796,10 @@ export default function AssessmentScreen() {
       setStreamingMessage("");
       setIsGeneratingRecommendation(false);
     } finally {
+      const elapsed = Date.now() - loadingStartRef.current;
+      if (elapsed < 500) {
+        await new Promise((r) => setTimeout(r, 500 - elapsed));
+      }
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
@@ -1222,6 +1228,14 @@ export default function AssessmentScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
+        {isLoading && !streamingMessage && (
+          <View style={styles.analysisOverlay} accessibilityRole="progressbar" accessibilityLabel="جارٍ التحليل">
+            <ActivityIndicator size="large" color={Colors.light.primary} />
+            <Text style={styles.analysisOverlayText}>
+              {t("Analyzing...", "جارٍ التحليل...")}
+            </Text>
+          </View>
+        )}
         <FlatList
           ref={flatListRef}
           data={reversedMessages}
@@ -1243,9 +1257,7 @@ export default function AssessmentScreen() {
           onContentSizeChange={(_w, h) => { contentSizeRef.current = h; }}
           onLayout={(e) => { viewportHeightRef.current = e.nativeEvent.layout.height; }}
           ListHeaderComponent={
-            isLoading && !streamingMessage ? (
-              <AnimatedTypingIndicator />
-            ) : mentalHealthResults ? (
+            mentalHealthResults ? (
               <MentalHealthResultsCard
                 results={mentalHealthResults}
                 onStartNew={() => {
@@ -1484,6 +1496,24 @@ const styles = StyleSheet.create({
   },
   chatArea: {
     flex: 1,
+  },
+  analysisOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(248, 250, 251, 0.85)",
+    gap: 12,
+  },
+  analysisOverlayText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: Colors.light.primary,
+    textAlign: "center",
   },
   messagesList: {
     paddingVertical: 16,

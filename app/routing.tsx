@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -14,8 +14,10 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { FacilityCard } from "@/components/FacilityCard";
+import { SkeletonFacilityCard } from "@/components/SkeletonCard";
 import { useSettings } from "@/contexts/SettingsContext";
 import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
+import { withMinDelay } from "@/hooks/useMinLoading";
 import type { NearbyFacility } from "@/lib/types";
 
 export default function RoutingScreen() {
@@ -28,11 +30,14 @@ export default function RoutingScreen() {
   const [facilities, setFacilities] = useState<NearbyFacility[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [selectedType, setSelectedType] = useState(type);
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [filterOpenNow, setFilterOpenNow] = useState(false);
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [filterHighRated, setFilterHighRated] = useState(false);
   const [sortBy, setSortBy] = useState<"distance" | "rating">("distance");
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -44,6 +49,10 @@ export default function RoutingScreen() {
 
   useEffect(() => {
     loadFacilities();
+    return () => {
+      if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+      if (abortControllerRef.current) abortControllerRef.current.abort();
+    };
   }, [selectedType]);
 
   const getLocation = async (): Promise<{ lat: number; lng: number }> => {
@@ -121,12 +130,27 @@ export default function RoutingScreen() {
   };
 
   const loadFacilities = async () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     setLoading(true);
+    setLoadingTimedOut(false);
     setLocationError(null);
     setNextPageToken(null);
 
+    if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+    loadingTimeoutRef.current = setTimeout(() => {
+      if (!controller.signal.aborted) {
+        controller.abort();
+        setLoadingTimedOut(true);
+        setLoading(false);
+      }
+    }, 10000);
+
     try {
       const loc = await getLocation();
+      if (controller.signal.aborted) return;
       const apiUrl = getApiUrl();
       const url = new URL("/api/nearby-facilities", apiUrl);
       url.searchParams.set("latitude", loc.lat.toString());
@@ -134,8 +158,14 @@ export default function RoutingScreen() {
       url.searchParams.set("type", selectedType);
 
       const authHeaders = await getAuthHeaders();
-      const response = await fetch(url.toString(), { headers: authHeaders });
-      const data = await response.json();
+      const fetchPromise = (async () => {
+        const response = await fetch(url.toString(), { headers: authHeaders, signal: controller.signal });
+        return response.json();
+      })();
+      const data = await withMinDelay(fetchPromise);
+
+      if (controller.signal.aborted) return;
+      if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
 
       if (data.error) {
         setLocationError(data.error);
@@ -147,6 +177,8 @@ export default function RoutingScreen() {
         enrichWithPhoneNumbers(loadedFacilities, apiUrl);
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
+      if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
       setLocationError(
         t(
           "Could not fetch facilities. Please try again.",
@@ -155,7 +187,7 @@ export default function RoutingScreen() {
       );
       setFacilities([]);
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   };
 
@@ -339,11 +371,35 @@ export default function RoutingScreen() {
       )}
 
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.light.primary} />
-          <Text style={[styles.loadingText, isRTL && { textAlign: "right" as const }]}>
-            {t("Finding nearby facilities...", "\u062c\u0627\u0631\u064a \u0627\u0644\u0628\u062d\u062b \u0639\u0646 \u0627\u0644\u0645\u0631\u0627\u0641\u0642 \u0627\u0644\u0642\u0631\u064a\u0628\u0629...")}
+        <View style={styles.skeletonContainer} accessibilityRole="progressbar" accessibilityLabel="جارٍ تحميل المرافق">
+          <View style={styles.skeletonHeader}>
+            <ActivityIndicator size="small" color={Colors.light.primary} />
+            <Text style={[styles.loadingText, isRTL && { textAlign: "right" as const }]}>
+              {t("Finding nearby facilities...", "جارٍ البحث عن المرافق القريبة...")}
+            </Text>
+          </View>
+          <SkeletonFacilityCard />
+          <SkeletonFacilityCard />
+          <SkeletonFacilityCard />
+          <SkeletonFacilityCard />
+        </View>
+      ) : loadingTimedOut && facilities.length === 0 ? (
+        <View style={styles.emptyState}>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="location-outline" size={48} color={Colors.light.primary} />
+          </View>
+          <Text style={styles.emptyText}>
+            {t("No nearby facilities found at this time.", "لا توجد مرافق قريبة حالياً")}
           </Text>
+          <Pressable
+            style={({ pressed }) => [styles.retryButton, pressed && { opacity: 0.8 }]}
+            onPress={loadFacilities}
+          >
+            <Ionicons name="refresh" size={18} color="#fff" />
+            <Text style={styles.retryButtonText}>
+              {t("Try Again", "حاول مرة أخرى")}
+            </Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -512,16 +568,36 @@ const styles = StyleSheet.create({
     fontFamily: "DMSans_400Regular",
     color: Colors.light.accent,
   },
-  loadingContainer: {
+  skeletonContainer: {
     flex: 1,
-    justifyContent: "center",
+    padding: 16,
+  },
+  skeletonHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 16,
   },
   loadingText: {
     fontSize: 15,
     fontFamily: "DMSans_400Regular",
     color: Colors.light.textSecondary,
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: Colors.light.primary,
+    marginTop: 8,
+  },
+  retryButtonText: {
+    fontSize: 14,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#fff",
   },
   list: {
     padding: 16,
