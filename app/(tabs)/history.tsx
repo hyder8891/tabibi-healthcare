@@ -7,10 +7,11 @@ import {
   RefreshControl,
   Platform,
   Alert,
+  Image,
+  TouchableOpacity,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { AssessmentCard } from "@/components/AssessmentCard";
 import { getAssessments, deleteAssessment } from "@/lib/storage";
@@ -105,14 +106,27 @@ export default function HistoryScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="document-text-outline" size={48} color={Colors.light.primary} />
+              <Image
+                source={require("@/assets/images/logo-nobg.png")}
+                style={styles.emptyLogo}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={[styles.emptyTitle, { textAlign: isRTL ? "right" : "left" }]}>
-              {t("No Assessments Yet", "لا توجد تقييمات بعد")}
+            <Text style={styles.emptyText}>
+              {t(
+                "No assessments yet. Start your first health check",
+                "لا توجد تقييمات بعد. ابدأ فحصك الصحي الأول"
+              )}
             </Text>
-            <Text style={[styles.emptyText, { textAlign: isRTL ? "right" : "left" }]}>
-              {t("Start your first health assessment from the home screen to see your history here.", "ابدأ تقييمك الصحي الأول من الشاشة الرئيسية لرؤية سجلك هنا.")}
-            </Text>
+            <TouchableOpacity
+              style={styles.ctaButton}
+              onPress={() => router.push("/assessment")}
+              testID="start-assessment-button"
+            >
+              <Text style={styles.ctaButtonText}>
+                {t("Start Assessment", "ابدأ التقييم")}
+              </Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -167,19 +181,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
+    overflow: "hidden",
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.text,
-    marginBottom: 8,
+  emptyLogo: {
+    width: 64,
+    height: 64,
   },
   emptyText: {
-    fontSize: 15,
-    fontFamily: "DMSans_400Regular",
-    color: Colors.light.textTertiary,
+    fontSize: 16,
+    fontFamily: "DMSans_500Medium",
+    color: Colors.light.textSecondary,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 24,
     maxWidth: 280,
+    marginBottom: 24,
+  },
+  ctaButton: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  ctaButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_600SemiBold",
+    color: "#FFFFFF",
   },
 });
