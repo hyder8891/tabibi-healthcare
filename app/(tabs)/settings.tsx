@@ -945,15 +945,6 @@ export default function SettingsScreen() {
           <Text style={styles.logoutText}>{t("Log Out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}</Text>
         </Pressable>
 
-        <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
-          <Ionicons name="information-circle" size={15} color={Colors.light.textTertiary} />
-          <Text style={[styles.disclaimerText, isRTL && { textAlign: "right" }]}>
-            {t(
-              "Tabibi is not a replacement for professional medical advice. Always consult a healthcare provider for serious conditions.",
-              "\u0637\u0628\u064a\u0628\u064a \u0644\u064a\u0633 \u0628\u062f\u064a\u0644\u0627\u064b \u0639\u0646 \u0627\u0644\u0627\u0633\u062a\u0634\u0627\u0631\u0629 \u0627\u0644\u0637\u0628\u064a\u0629 \u0627\u0644\u0645\u062a\u062e\u0635\u0635\u0629.",
-            )}
-          </Text>
-        </View>
       </ScrollView>
 
       <Modal
