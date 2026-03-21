@@ -1,12 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
-import type { Assessment, PatientProfile, ScannedMedication } from "./types";
+import type { Assessment, PatientProfile, ScannedMedication, FamilyMember } from "./types";
 
 const ASSESSMENTS_KEY = "@tabibi_assessments";
 const PROFILE_KEY = "@tabibi_profile";
 const MEDICATIONS_KEY = "@tabibi_medications";
 const SETTINGS_KEY = "@tabibi_settings";
+const FAMILY_MEMBERS_KEY = "@tabibi_family_members";
 const SECURE_KEY_ALIAS = "tabibi_storage_key";
 const KEY_BACKUP_ALIAS = "@tabibi_encryption_key_backup";
 
@@ -199,4 +200,32 @@ export async function getSettings(): Promise<AppSettings> {
   return data
     ? JSON.parse(data)
     : { language: "ar", pediatricMode: false };
+}
+
+export async function saveFamilyMember(member: FamilyMember): Promise<void> {
+  const members = await getFamilyMembers();
+  const index = members.findIndex((m) => m.id === member.id);
+  if (index >= 0) {
+    members[index] = member;
+  } else {
+    members.push(member);
+  }
+  await AsyncStorage.setItem(FAMILY_MEMBERS_KEY, JSON.stringify(members));
+}
+
+export async function getFamilyMembers(): Promise<FamilyMember[]> {
+  try {
+    const data = await AsyncStorage.getItem(FAMILY_MEMBERS_KEY);
+    if (!data) return [];
+    const parsed = JSON.parse(data);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function deleteFamilyMember(id: string): Promise<void> {
+  const members = await getFamilyMembers();
+  const filtered = members.filter((m) => m.id !== id);
+  await AsyncStorage.setItem(FAMILY_MEMBERS_KEY, JSON.stringify(filtered));
 }

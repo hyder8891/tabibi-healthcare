@@ -117,6 +117,13 @@ export interface ForWhom {
   age?: number;
 }
 
+export interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: string;
+  age?: number;
+}
+
 export interface MentalHealthResults {
   type: 'phq9' | 'gad7';
   totalScore: number;

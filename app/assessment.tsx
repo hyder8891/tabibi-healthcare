@@ -47,9 +47,9 @@ import { MentalHealthCrisisOverlay } from "@/components/MentalHealthCrisisOverla
 import { MentalHealthResultsCard } from "@/components/MentalHealthResultsCard";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
-import { saveAssessment, getProfile, getAssessment, updateAssessment } from "@/lib/storage";
+import { saveAssessment, getProfile, getAssessment, updateAssessment, getFamilyMembers, saveFamilyMember } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
-import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment, ForWhom, MentalHealthResults } from "@/lib/types";
+import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment, ForWhom, FamilyMember, MentalHealthResults } from "@/lib/types";
 
 function AnimatedTypingIndicator() {
   return <TypingIndicator />;
@@ -79,6 +79,9 @@ export default function AssessmentScreen() {
   const [forWhomAge, setForWhomAge] = useState("");
   const [forWhomRelationship, setForWhomRelationship] = useState("");
   const [forWhomStep, setForWhomStep] = useState<"choose" | "details">("choose");
+  const [savedFamilyMembers, setSavedFamilyMembers] = useState<FamilyMember[]>([]);
+  const [saveProfileChecked, setSaveProfileChecked] = useState(false);
+  const [selectedFamilyMemberId, setSelectedFamilyMemberId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const chiefComplaintRef = useRef<string>("");
   const lockedTotalRef = useRef<number | null>(null);
@@ -133,6 +136,9 @@ export default function AssessmentScreen() {
       chiefComplaintRef.current = "فحص الصحة النفسية";
       pendingMentalHealthStartRef.current = 'phq9';
     } else {
+      getFamilyMembers().then(setSavedFamilyMembers);
+      setSaveProfileChecked(false);
+      setSelectedFamilyMemberId(null);
       setShowForWhomModal(true);
       setForWhomStep("choose");
       setMessages([
@@ -941,7 +947,7 @@ export default function AssessmentScreen() {
                     <Text style={styles.forWhomOptionTitle}>{t("Myself", "\u0644\u0646\u0641\u0633\u064a")}</Text>
                     <Text style={styles.forWhomOptionDesc}>{t("I'm the patient", "\u0623\u0646\u0627 \u0627\u0644\u0645\u0631\u064a\u0636")}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={Colors.light.textTertiary} />
+                  <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.light.textTertiary} />
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [styles.forWhomOption, pressed && { backgroundColor: Colors.light.primarySurface }]}
@@ -954,14 +960,14 @@ export default function AssessmentScreen() {
                     <Text style={styles.forWhomOptionTitle}>{t("Someone else", "\u0634\u062e\u0635 \u0622\u062e\u0631")}</Text>
                     <Text style={styles.forWhomOptionDesc}>{t("Family member or dependent", "\u0641\u0631\u062f \u0645\u0646 \u0627\u0644\u0639\u0627\u0626\u0644\u0629")}</Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={Colors.light.textTertiary} />
+                  <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.light.textTertiary} />
                 </Pressable>
               </>
             ) : (
               <>
                 <View style={styles.forWhomDetailsHeader}>
                   <Pressable onPress={() => setForWhomStep("choose")} hitSlop={12}>
-                    <Ionicons name="arrow-back" size={22} color={Colors.light.text} />
+                    <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.light.text} />
                   </Pressable>
                   <Text style={[styles.modalTitle, { flex: 1, marginBottom: 0 }]}>
                     {t("Patient Details", "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0631\u064a\u0636")}
@@ -969,11 +975,42 @@ export default function AssessmentScreen() {
                   <View style={{ width: 22 }} />
                 </View>
                 <View style={styles.forWhomForm}>
+                  {savedFamilyMembers.length > 0 && (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                      <View style={styles.forWhomChips}>
+                        {savedFamilyMembers.map((member) => (
+                          <Pressable
+                            key={member.id}
+                            style={[
+                              styles.forWhomChip,
+                              selectedFamilyMemberId === member.id && styles.forWhomChipActive,
+                            ]}
+                            onPress={() => {
+                              setSelectedFamilyMemberId(member.id);
+                              setForWhomName(member.name);
+                              setForWhomRelationship(member.relationship);
+                              setForWhomAge(member.age ? String(member.age) : "");
+                              setSaveProfileChecked(false);
+                            }}
+                          >
+                            <Text
+                              style={[
+                                styles.forWhomChipText,
+                                selectedFamilyMemberId === member.id && styles.forWhomChipTextActive,
+                              ]}
+                            >
+                              {member.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  )}
                   <Text style={styles.forWhomLabel}>{t("Name", "\u0627\u0644\u0627\u0633\u0645")}</Text>
                   <TextInput
                     style={[styles.forWhomInput, isRTL && { textAlign: "right" }]}
                     value={forWhomName}
-                    onChangeText={setForWhomName}
+                    onChangeText={(text) => { setForWhomName(text); setSelectedFamilyMemberId(null); }}
                     placeholder={t("Patient's name", "\u0627\u0633\u0645 \u0627\u0644\u0645\u0631\u064a\u0636")}
                     placeholderTextColor={Colors.light.textTertiary}
                   />
@@ -994,7 +1031,7 @@ export default function AssessmentScreen() {
                             styles.forWhomChip,
                             forWhomRelationship === rel.en && styles.forWhomChipActive,
                           ]}
-                          onPress={() => setForWhomRelationship(rel.en)}
+                          onPress={() => { setForWhomRelationship(rel.en); setSelectedFamilyMemberId(null); }}
                         >
                           <Text
                             style={[
@@ -1012,12 +1049,25 @@ export default function AssessmentScreen() {
                   <TextInput
                     style={[styles.forWhomInput, isRTL && { textAlign: "right" }, { width: 100 }]}
                     value={forWhomAge}
-                    onChangeText={setForWhomAge}
+                    onChangeText={(text) => { setForWhomAge(text); setSelectedFamilyMemberId(null); }}
                     placeholder="—"
                     placeholderTextColor={Colors.light.textTertiary}
                     keyboardType="number-pad"
                     maxLength={3}
                   />
+                  {!selectedFamilyMemberId && (
+                    <Pressable
+                      style={styles.saveProfileRow}
+                      onPress={() => setSaveProfileChecked(!saveProfileChecked)}
+                    >
+                      <View style={[styles.saveProfileCheckbox, saveProfileChecked && styles.saveProfileCheckboxActive]}>
+                        {saveProfileChecked && <Ionicons name="checkmark" size={14} color="#fff" />}
+                      </View>
+                      <Text style={styles.saveProfileText}>
+                        {t("Save this profile for next time", "\u0627\u062d\u0641\u0638 \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0644\u0644\u0645\u0631\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629")}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
                 <Pressable
                   style={[
@@ -1027,11 +1077,21 @@ export default function AssessmentScreen() {
                   disabled={!forWhomName.trim() || !forWhomRelationship}
                   onPress={() => {
                     const ageNum = parseInt(forWhomAge, 10);
+                    const trimmedName = forWhomName.trim();
                     setForWhom({
-                      name: forWhomName.trim(),
+                      name: trimmedName,
                       relationship: forWhomRelationship,
                       ...(ageNum > 0 ? { age: ageNum } : {}),
                     });
+                    if (saveProfileChecked && !selectedFamilyMemberId) {
+                      const memberId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                      saveFamilyMember({
+                        id: memberId,
+                        name: trimmedName,
+                        relationship: forWhomRelationship,
+                        ...(ageNum > 0 ? { age: ageNum } : {}),
+                      });
+                    }
                     setShowForWhomModal(false);
                   }}
                 >
@@ -1076,7 +1136,7 @@ export default function AssessmentScreen() {
       {forWhom && (
         <Pressable
           style={styles.forWhomBanner}
-          onPress={() => { setShowForWhomModal(true); setForWhomStep("choose"); }}
+          onPress={() => { getFamilyMembers().then(setSavedFamilyMembers); setSaveProfileChecked(false); setSelectedFamilyMemberId(null); setShowForWhomModal(true); setForWhomStep("choose"); }}
         >
           <Ionicons name="people" size={16} color={Colors.light.primary} />
           <Text style={styles.forWhomBannerText} numberOfLines={1}>
@@ -1692,5 +1752,30 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "DMSans_500Medium",
     color: Colors.light.primary,
+  },
+  saveProfileRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    marginTop: 16,
+  },
+  saveProfileCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: Colors.light.textTertiary,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+  },
+  saveProfileCheckboxActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  saveProfileText: {
+    fontSize: 13,
+    fontFamily: "DMSans_400Regular",
+    color: Colors.light.textSecondary,
+    flex: 1,
   },
 });

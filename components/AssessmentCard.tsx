@@ -70,6 +70,13 @@ export function AssessmentCard({
           <Text style={styles.dateText}>
             {formattedDate} {t("at", "في")} {formattedTime}
           </Text>
+          {assessment.forWhom?.name ? (
+            <View style={styles.forWhomBadge}>
+              <Text style={styles.forWhomBadgeText}>
+                {t(`For: ${assessment.forWhom.name}`, `لـ: ${assessment.forWhom.name}`)}
+              </Text>
+            </View>
+          ) : null}
         </View>
         {onDelete && (
           <Pressable
@@ -279,5 +286,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600" as const,
     color: Colors.light.primary,
+  },
+  forWhomBadge: {
+    backgroundColor: "#006B5F",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    alignSelf: "flex-start" as const,
+    marginTop: 4,
+  },
+  forWhomBadgeText: {
+    fontSize: 11,
+    fontWeight: "600" as const,
+    color: "#fff",
   },
 });
