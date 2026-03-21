@@ -28,7 +28,7 @@ export function MessageBubble({ message, isStreaming, onRetry }: MessageBubblePr
           <Image source={require("@/assets/images/logo.png")} style={styles.avatarImage} />
         </View>
       )}
-      <View>
+      <View style={styles.bubbleWrapper}>
         <View
           style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble,
             isRTL && isUser && { borderBottomRightRadius: 22, borderBottomLeftRadius: 8 },
@@ -122,8 +122,11 @@ const styles = StyleSheet.create({
     height: 28,
     resizeMode: "contain" as const,
   },
-  bubble: {
+  bubbleWrapper: {
+    flexShrink: 1,
     maxWidth: "78%",
+  },
+  bubble: {
     borderRadius: 22,
     paddingHorizontal: 16,
     paddingVertical: 10,
