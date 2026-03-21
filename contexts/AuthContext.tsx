@@ -4,6 +4,8 @@ import * as WebBrowser from "expo-web-browser";
 import { useIdTokenAuthRequest } from "expo-auth-session/providers/google";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { setAuthTokenGetter } from "@/lib/query-client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { saveProfile as saveLocalProfile } from "@/lib/storage";
 import {
   auth,
   onAuthStateChanged,
@@ -132,6 +134,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as AuthUser;
   };
 
+  const restoreProfileFromServer = async () => {
+    try {
+      const existing = await AsyncStorage.getItem("@tabibi_profile");
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing);
+          const hasData = parsed.name || parsed.age || parsed.gender || parsed.weight ||
+            parsed.height || parsed.onboardingComplete ||
+            (Array.isArray(parsed.conditions) && parsed.conditions.length > 0) ||
+            (Array.isArray(parsed.allergies) && parsed.allergies.length > 0) ||
+            (Array.isArray(parsed.medications) && parsed.medications.length > 0);
+          if (hasData) return;
+        } catch (_e) {}
+      }
+      const res = await apiRequest("GET", "/api/profile");
+      const serverProfile = await res.json();
+      if (serverProfile) {
+        await saveLocalProfile({
+          name: serverProfile.name,
+          age: serverProfile.age,
+          gender: serverProfile.gender,
+          weight: serverProfile.weight,
+          height: serverProfile.height,
+          conditions: serverProfile.conditions || [],
+          allergies: serverProfile.allergies || [],
+          medications: serverProfile.medications || [],
+          onboardingComplete: serverProfile.onboardingComplete,
+        }, true);
+      }
+    } catch (_e) {}
+  };
+
   useEffect(() => {
     setAuthTokenGetter(async () => {
       let fbUser = firebaseUserRef.current;
@@ -188,6 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (mounted) {
                 setUser(backendUser);
                 await persistUser(backendUser);
+                restoreProfileFromServer();
               }
             } catch (err) {
               console.error("Backend sync after redirect failed:", err);
@@ -220,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (mounted) {
             setUser(backendUser);
             await persistUser(backendUser);
+            restoreProfileFromServer();
           }
         } catch (err) {
           console.error("Backend sync failed:", err);
@@ -251,6 +287,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (mounted) {
                 setUser(backendUser);
                 await persistUser(backendUser);
+                restoreProfileFromServer();
               }
             } catch (err) {
               console.error("Backend sync from native auth failed:", err);
@@ -283,6 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const backendUser = await syncWithBackend(cred.user);
     setUser(backendUser);
     await persistUser(backendUser);
+    restoreProfileFromServer();
   }, []);
 
   const signupWithEmail = useCallback(async (email: string, password: string) => {
@@ -304,6 +342,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const backendUser = await syncWithBackend(cred.user);
       setUser(backendUser);
       await persistUser(backendUser);
+      restoreProfileFromServer();
       return;
     }
     if (Platform.OS === "web") {
@@ -318,6 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const backendUser = await syncWithBackend(cred.user);
         setUser(backendUser);
         await persistUser(backendUser);
+        restoreProfileFromServer();
       } catch (popupErr: unknown) {
         const code = popupErr && typeof popupErr === "object" && "code" in popupErr ? (popupErr as { code: string }).code : "";
         if (code === "auth/unauthorized-domain" || code === "auth/popup-blocked") {
@@ -340,6 +380,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const backendUser = await syncWithBackend(cred.user);
         setUser(backendUser);
         await persistUser(backendUser);
+        restoreProfileFromServer();
       } else {
         const result = await googlePromptAsync();
         if (result.type === "success" && result.params?.id_token) {
@@ -349,6 +390,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const backendUser = await syncWithBackend(cred.user);
           setUser(backendUser);
           await persistUser(backendUser);
+          restoreProfileFromServer();
         } else if (result.type === "error") {
           throw new Error(result.error?.message || "Google Sign-In failed");
         } else if (result.type === "dismiss" || result.type === "cancel") {
@@ -415,6 +457,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const backendUser = await syncWithBackend(cred.user);
       setUser(backendUser);
       await persistUser(backendUser);
+      restoreProfileFromServer();
       confirmationResultRef.current = null;
     } else if (nativeFirebaseAuth && nativeConfirmationRef.current) {
       nativeAuthHandledRef.current = true;
@@ -431,6 +474,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const backendUser = await syncWithBackend();
       setUser(backendUser);
       await persistUser(backendUser);
+      restoreProfileFromServer();
       nativeConfirmationRef.current = null;
       pendingPhoneRef.current = "";
     } else {
@@ -463,6 +507,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const backendUser = await syncWithBackend(cred.user);
       setUser(backendUser);
       await persistUser(backendUser);
+      restoreProfileFromServer();
 
       phoneSessionInfoRef.current = null;
       pendingPhoneRef.current = "";
@@ -571,6 +616,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsEmailVerified(true);
     setNeedsEmailVerification(false);
     await persistUser(null);
+    try {
+      await AsyncStorage.removeItem("@tabibi_profile");
+    } catch (_e) {}
     confirmationResultRef.current = null;
     nativeConfirmationRef.current = null;
   }, []);

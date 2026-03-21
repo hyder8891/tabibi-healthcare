@@ -6,6 +6,7 @@ import { registerRppgRoutes } from "./routes/rppg";
 import { registerGeoRoutes } from "./routes/geo";
 import { registerOrderRoutes } from "./routes/orders";
 import { registerAvicennaRoutes } from "./routes/avicenna";
+import { registerProfileRoutes } from "./routes/profile";
 import { seedIraqiKnowledge } from "./seed-iraqi-knowledge";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -15,6 +16,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerGeoRoutes(app);
   registerOrderRoutes(app);
   registerAvicennaRoutes(app);
+  registerProfileRoutes(app);
 
   seedIraqiKnowledge().catch(err =>
     console.error("Knowledge seed error:", err instanceof Error ? err.message : "Unknown")

@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import * as Crypto from "expo-crypto";
 import type { Assessment, PatientProfile, ScannedMedication, FamilyMember } from "./types";
+import { apiRequest } from "@/lib/query-client";
 
 const ASSESSMENTS_KEY = "@tabibi_assessments";
 const PROFILE_KEY = "@tabibi_profile";
@@ -160,8 +161,22 @@ export async function updateAssessment(assessment: Assessment): Promise<void> {
   await setEncryptedItem(ASSESSMENTS_KEY, JSON.stringify(assessments));
 }
 
-export async function saveProfile(profile: PatientProfile): Promise<void> {
+export async function saveProfile(profile: PatientProfile, skipServerSync = false): Promise<void> {
   await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+  if (skipServerSync) return;
+  try {
+    await apiRequest("POST", "/api/profile", {
+      name: profile.name,
+      age: profile.age,
+      gender: profile.gender,
+      weight: profile.weight,
+      height: profile.height,
+      conditions: profile.conditions,
+      allergies: profile.allergies,
+      medications: profile.medications,
+      onboardingComplete: profile.onboardingComplete,
+    });
+  } catch (_e) {}
 }
 
 export async function getProfile(): Promise<PatientProfile> {
@@ -179,6 +194,21 @@ export async function saveMedications(
   meds: ScannedMedication[],
 ): Promise<void> {
   await setEncryptedItem(MEDICATIONS_KEY, JSON.stringify(meds));
+  try {
+    const profile = await getProfile();
+    const medNames = meds.map(m => m.name).filter(Boolean);
+    await apiRequest("POST", "/api/profile", {
+      name: profile.name,
+      age: profile.age,
+      gender: profile.gender,
+      weight: profile.weight,
+      height: profile.height,
+      conditions: profile.conditions,
+      allergies: profile.allergies,
+      medications: medNames,
+      onboardingComplete: profile.onboardingComplete,
+    });
+  } catch (_e) {}
 }
 
 export async function getMedications(): Promise<ScannedMedication[]> {

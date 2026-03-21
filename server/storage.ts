@@ -1,4 +1,4 @@
-import { type User, type InsertUser, users, type Order, type InsertOrder, orders, auditLogs } from "@shared/schema";
+import { type User, type InsertUser, users, type Order, type InsertOrder, orders, auditLogs, patientProfiles, type InsertPatientProfile, type PatientProfileRow } from "@shared/schema";
 import { eq, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool } from "@neondatabase/serverless";
@@ -74,6 +74,8 @@ export interface IStorage {
   getOrder(id: string): Promise<Order | undefined>;
   getUserOrders(userId: string): Promise<Order[]>;
   updateOrder(id: string, data: Partial<InsertOrder>): Promise<Order>;
+  getPatientProfile(userId: string): Promise<PatientProfileRow | undefined>;
+  upsertPatientProfile(userId: string, data: Partial<InsertPatientProfile>): Promise<PatientProfileRow>;
   logAuditEvent(event: { userId?: string; action: string; resourceType: string; resourceId?: string; metadata?: string; ipAddress?: string }): Promise<void>;
 }
 
@@ -128,6 +130,37 @@ export class DatabaseStorage implements IStorage {
     const encryptedData = encryptOrder(data as InsertOrder) as Partial<InsertOrder>;
     const [order] = await db.update(orders).set({ ...encryptedData, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
     return decryptOrder(order);
+  }
+
+  async getPatientProfile(userId: string): Promise<PatientProfileRow | undefined> {
+    const [profile] = await db.select().from(patientProfiles).where(eq(patientProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertPatientProfile(userId: string, data: Partial<InsertPatientProfile>): Promise<PatientProfileRow> {
+    const existing = await this.getPatientProfile(userId);
+    if (existing) {
+      const [updated] = await db.update(patientProfiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(patientProfiles.userId, userId))
+        .returning();
+      return updated;
+    }
+    try {
+      const [created] = await db.insert(patientProfiles)
+        .values({ ...data, userId })
+        .returning();
+      return created;
+    } catch (err: unknown) {
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "23505") {
+        const [updated] = await db.update(patientProfiles)
+          .set({ ...data, updatedAt: new Date() })
+          .where(eq(patientProfiles.userId, userId))
+          .returning();
+        return updated;
+      }
+      throw err;
+    }
   }
 
   async logAuditEvent(event: { userId?: string; action: string; resourceType: string; resourceId?: string; metadata?: string; ipAddress?: string }): Promise<void> {

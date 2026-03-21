@@ -82,6 +82,26 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const patientProfiles = pgTable("patient_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id).unique(),
+  name: text("name"),
+  age: integer("age"),
+  gender: text("gender"),
+  weight: real("weight"),
+  height: real("height"),
+  conditions: text("conditions"),
+  allergies: text("allergies"),
+  medications: text("medications"),
+  onboardingComplete: boolean("onboarding_complete").default(false),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertPatientProfileSchema = createInsertSchema(patientProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPatientProfile = z.infer<typeof insertPatientProfileSchema>;
+export type PatientProfileRow = typeof patientProfiles.$inferSelect;
+
 export const healthProfiles = pgTable("health_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id).unique(),
