@@ -134,7 +134,7 @@ export default function AssessmentScreen() {
           timestamp: Date.now(),
         },
       ]);
-      chiefComplaintRef.current = "فحص الصحة النفسية";
+      chiefComplaintRef.current = t("Mental health screening", "فحص الصحة النفسية");
       pendingMentalHealthStartRef.current = 'phq9';
     } else {
       getFamilyMembers().then(setSavedFamilyMembers);
@@ -665,11 +665,12 @@ export default function AssessmentScreen() {
                     const score = parseInt(phq9CompleteMatch[1], 10);
                     let severityLevel: string;
                     let severityColor: string;
-                    if (score <= 4) { severityLevel = "الحد الأدنى"; severityColor = "#22C55E"; }
-                    else if (score <= 9) { severityLevel = "خفيف"; severityColor = "#EAB308"; }
-                    else if (score <= 14) { severityLevel = "متوسط"; severityColor = "#F97316"; }
-                    else if (score <= 19) { severityLevel = "متوسط الشدة"; severityColor = "#EF4444"; }
-                    else { severityLevel = "شديد"; severityColor = "#DC2626"; }
+                    const isAr = settings.language === "ar";
+                    if (score <= 4) { severityLevel = isAr ? "الحد الأدنى" : "Minimal"; severityColor = "#22C55E"; }
+                    else if (score <= 9) { severityLevel = isAr ? "خفيف" : "Mild"; severityColor = "#EAB308"; }
+                    else if (score <= 14) { severityLevel = isAr ? "متوسط" : "Moderate"; severityColor = "#F97316"; }
+                    else if (score <= 19) { severityLevel = isAr ? "متوسط الشدة" : "Moderately Severe"; severityColor = "#EF4444"; }
+                    else { severityLevel = isAr ? "شديد" : "Severe"; severityColor = "#DC2626"; }
 
                     setMentalHealthResults({
                       type: 'phq9',
@@ -678,8 +679,8 @@ export default function AssessmentScreen() {
                       severityColor,
                       evidenceSummary: stripJson(fullText),
                       recommendation: score >= 10
-                        ? "ننصح بمراجعة متخصص في الصحة النفسية"
-                        : "استمر في مراقبة حالتك النفسية",
+                        ? t("We recommend consulting a mental health specialist", "ننصح بمراجعة متخصص في الصحة النفسية")
+                        : t("Continue monitoring your mental health", "استمر في مراقبة حالتك النفسية"),
                     });
                   }
 
@@ -687,10 +688,11 @@ export default function AssessmentScreen() {
                     const score = parseInt(gad7CompleteMatch[1], 10);
                     let severityLevel: string;
                     let severityColor: string;
-                    if (score <= 4) { severityLevel = "الحد الأدنى"; severityColor = "#22C55E"; }
-                    else if (score <= 9) { severityLevel = "خفيف"; severityColor = "#EAB308"; }
-                    else if (score <= 14) { severityLevel = "متوسط"; severityColor = "#F97316"; }
-                    else { severityLevel = "شديد"; severityColor = "#DC2626"; }
+                    const isAr = settings.language === "ar";
+                    if (score <= 4) { severityLevel = isAr ? "الحد الأدنى" : "Minimal"; severityColor = "#22C55E"; }
+                    else if (score <= 9) { severityLevel = isAr ? "خفيف" : "Mild"; severityColor = "#EAB308"; }
+                    else if (score <= 14) { severityLevel = isAr ? "متوسط" : "Moderate"; severityColor = "#F97316"; }
+                    else { severityLevel = isAr ? "شديد" : "Severe"; severityColor = "#DC2626"; }
 
                     setMentalHealthResults({
                       type: 'gad7',
@@ -699,8 +701,8 @@ export default function AssessmentScreen() {
                       severityColor,
                       evidenceSummary: stripJson(fullText),
                       recommendation: score >= 10
-                        ? "ننصح بمراجعة متخصص في الصحة النفسية"
-                        : "استمر في مراقبة حالتك النفسية",
+                        ? t("We recommend consulting a mental health specialist", "ننصح بمراجعة متخصص في الصحة النفسية")
+                        : t("Continue monitoring your mental health", "استمر في مراقبة حالتك النفسية"),
                     });
                   }
                 }
@@ -809,7 +811,9 @@ export default function AssessmentScreen() {
     if (pendingMentalHealthStartRef.current && !isLoading && messages.length > 0) {
       const mhMode = pendingMentalHealthStartRef.current;
       pendingMentalHealthStartRef.current = null;
-      const startText = mhMode === 'gad7' ? "ابدأ فحص GAD-7" : "ابدأ فحص PHQ-9";
+      const startText = mhMode === 'gad7'
+        ? t("Start GAD-7 screening", "ابدأ فحص GAD-7")
+        : t("Start PHQ-9 screening", "ابدأ فحص PHQ-9");
       quickReplyRef.current = startText;
       setInputText(startText);
       setQuickReplies([]);
@@ -1228,14 +1232,6 @@ export default function AssessmentScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        {isLoading && !streamingMessage && (
-          <View style={styles.analysisOverlay} accessibilityRole="progressbar" accessibilityLabel="جارٍ التحليل">
-            <ActivityIndicator size="large" color={Colors.light.primary} />
-            <Text style={styles.analysisOverlayText}>
-              {t("Analyzing...", "جارٍ التحليل...")}
-            </Text>
-          </View>
-        )}
         <FlatList
           ref={flatListRef}
           data={reversedMessages}
@@ -1257,7 +1253,11 @@ export default function AssessmentScreen() {
           onContentSizeChange={(_w, h) => { contentSizeRef.current = h; }}
           onLayout={(e) => { viewportHeightRef.current = e.nativeEvent.layout.height; }}
           ListHeaderComponent={
-            mentalHealthResults ? (
+            <>
+              {isLoading && !streamingMessage && (
+                <AnimatedTypingIndicator />
+              )}
+              {mentalHealthResults ? (
               <MentalHealthResultsCard
                 results={mentalHealthResults}
                 onStartNew={() => {
@@ -1282,7 +1282,7 @@ export default function AssessmentScreen() {
                   setMentalHealthCrisis(false);
                   setMentalHealthMode('gad7');
                   setExistingAssessmentId(null);
-                  chiefComplaintRef.current = "فحص القلق GAD-7";
+                  chiefComplaintRef.current = t("GAD-7 anxiety screening", "فحص القلق GAD-7");
                   pendingMentalHealthStartRef.current = 'gad7';
                 }}
               />
@@ -1321,7 +1321,8 @@ export default function AssessmentScreen() {
                   }}
                 />
               </View>
-            ) : null
+            ) : null}
+            </>
           }
         />
 
@@ -1371,7 +1372,7 @@ export default function AssessmentScreen() {
               onPress={showAttachMenu}
               hitSlop={8}
               testID="attach-button"
-              accessibilityLabel="Attach image"
+              accessibilityLabel={t("Attach image", "إرفاق صورة")}
             >
               <Ionicons name="add" size={20} color={Colors.light.primary} />
             </Pressable>
@@ -1398,7 +1399,7 @@ export default function AssessmentScreen() {
               onPress={() => sendMessage()}
               disabled={(!inputText.trim() && !pendingImage) || isLoading}
               testID="send-button"
-              accessibilityLabel="Send message"
+              accessibilityLabel={t("Send message", "إرسال رسالة")}
             >
               {isLoading ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -1496,24 +1497,6 @@ const styles = StyleSheet.create({
   },
   chatArea: {
     flex: 1,
-  },
-  analysisOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(248, 250, 251, 0.85)",
-    gap: 12,
-  },
-  analysisOverlayText: {
-    fontSize: 16,
-    fontFamily: "DMSans_600SemiBold",
-    color: Colors.light.primary,
-    textAlign: "center",
   },
   messagesList: {
     paddingVertical: 16,

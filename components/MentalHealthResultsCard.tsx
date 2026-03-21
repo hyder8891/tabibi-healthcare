@@ -62,7 +62,7 @@ export function MentalHealthResultsCard({ results, onStartNew, onStartGAD7 }: Me
       <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
         <Ionicons name="information-circle" size={16} color="#9CA3AF" />
         <Text style={[styles.disclaimerText, isRTL && { textAlign: "right" }]}>
-          هذا الفحص للتوعية فقط وليس تشخيصاً طبياً
+          {t("This screening is for awareness only and is not a medical diagnosis", "هذا الفحص للتوعية فقط وليس تشخيصاً طبياً")}
         </Text>
       </View>
 
