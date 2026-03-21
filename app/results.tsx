@@ -156,7 +156,7 @@ export default function ResultsScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.headerButton}>
           <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={24} color={Colors.light.text} />
         </Pressable>

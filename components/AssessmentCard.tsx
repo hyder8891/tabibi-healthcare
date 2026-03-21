@@ -61,17 +61,17 @@ export function AssessmentCard({
         onPress();
       }}
     >
-      <View style={styles.topRow}>
+      <View style={[styles.topRow, isRTL && { flexDirection: "row-reverse" }]}>
         <View style={[styles.indicator, { backgroundColor: severityColor }]} />
         <View style={styles.content}>
-          <Text style={styles.complaint} numberOfLines={1}>
+          <Text style={[styles.complaint, isRTL && { textAlign: "right" }]} numberOfLines={1}>
             {assessment.chiefComplaint || t("Health Assessment", "تقييم صحي")}
           </Text>
-          <Text style={styles.dateText}>
+          <Text style={[styles.dateText, isRTL && { textAlign: "right" }]}>
             {formattedDate} {t("at", "في")} {formattedTime}
           </Text>
           {assessment.forWhom?.name ? (
-            <View style={styles.forWhomBadge}>
+            <View style={[styles.forWhomBadge, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={styles.forWhomBadgeText}>
                 {t(`For: ${assessment.forWhom.name}`, `لـ: ${assessment.forWhom.name}`)}
               </Text>
@@ -101,15 +101,16 @@ export function AssessmentCard({
         />
       </View>
       {assessment.result?.assessment && (
-        <View style={styles.resultRow}>
+        <View style={[styles.resultRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Text style={styles.resultCondition} numberOfLines={1}>
             {assessment.result.assessment.condition || t("Assessment", "تقييم")}
           </Text>
-          <View style={styles.badgeRow}>
+          <View style={[styles.badgeRow, isRTL && { flexDirection: "row-reverse" }]}>
             {triage && (
               <View
                 style={[
                   styles.triageBadge,
+                  isRTL && { flexDirection: "row-reverse" },
                   { backgroundColor: triage.bg },
                 ]}
               >
@@ -142,7 +143,7 @@ export function AssessmentCard({
         </View>
       )}
       {assessment.emergency && (
-        <View style={styles.emergencyRow}>
+        <View style={[styles.emergencyRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="warning" size={14} color={Colors.light.emergency} />
           <Text style={styles.emergencyText}>
             {t("Emergency:", "طوارئ:")} {assessment.emergency.condition}
@@ -153,6 +154,7 @@ export function AssessmentCard({
         <Pressable
           style={({ pressed }) => [
             styles.continueButton,
+            isRTL && { flexDirection: "row-reverse" },
             pressed && { opacity: 0.8 },
           ]}
           onPress={(e) => {
@@ -162,7 +164,7 @@ export function AssessmentCard({
           }}
         >
           <Ionicons name="chatbubble-outline" size={14} color={Colors.light.primary} />
-          <Text style={styles.continueText}>
+          <Text style={[styles.continueText, isRTL && { textAlign: "right" }]}>
             {t("Continue Chat", "متابعة المحادثة")}
           </Text>
         </Pressable>

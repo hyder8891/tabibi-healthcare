@@ -344,7 +344,7 @@ export default function HomeScreen() {
               <View style={styles.heroLogoWrap}>
                 <Image source={require("@/assets/images/logo.png")} style={styles.heroLogo} />
               </View>
-              <View style={styles.heroStatusPill}>
+              <View style={[styles.heroStatusPill, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={styles.heroStatusDot} />
                 <Text style={styles.heroStatusText}>{t("Ready", "جاهز")}</Text>
               </View>
@@ -385,7 +385,7 @@ export default function HomeScreen() {
               <View style={styles.ctaIconWrap}>
                 <Ionicons name="chatbubbles" size={26} color={Colors.light.primary} />
               </View>
-              <View style={styles.ctaChip}>
+              <View style={[styles.ctaChip, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={styles.ctaChipDot} />
                 <Text style={styles.ctaChipText}>{t("AI-Powered", "بالذكاء الاصطناعي")}</Text>
               </View>
@@ -412,7 +412,7 @@ export default function HomeScreen() {
         <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Quick Actions", "إجراءات سريعة")}</Text>
 
         <View style={styles.quickActionsGrid}>
-          <View style={styles.quickActionsRow}>
+          <View style={[styles.quickActionsRow, isRTL && { flexDirection: "row-reverse" }]}>
             <Pressable
               style={({ pressed }) => [
                 styles.actionCard,
@@ -464,7 +464,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.quickActionsRow}>
+          <View style={[styles.quickActionsRow, isRTL && { flexDirection: "row-reverse" }]}>
             <Pressable
               style={({ pressed }) => [
                 styles.actionCard,
@@ -508,7 +508,7 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View style={styles.quickActionsRow}>
+          <View style={[styles.quickActionsRow, isRTL && { flexDirection: "row-reverse" }]}>
             <Pressable
               style={({ pressed }) => [
                 styles.actionCard,
@@ -534,7 +534,7 @@ export default function HomeScreen() {
         {insightCards.length > 0 && (
           <>
             <View style={[styles.avicennaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-              <View style={styles.avicennaHeaderLeft}>
+              <View style={[styles.avicennaHeaderLeft, isRTL && { flexDirection: "row-reverse" }]}>
                 <LinearGradient
                   colors={["#7C3AED", "#A78BFA"]}
                   style={styles.avicennaIconGradient}
@@ -596,13 +596,13 @@ export default function HomeScreen() {
               style={styles.healthSummaryGradient}
             >
               <View style={[styles.healthSummaryHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
-                <View style={styles.healthSummaryHeaderLeft}>
+                <View style={[styles.healthSummaryHeaderLeft, isRTL && { flexDirection: "row-reverse" }]}>
                   <Ionicons name="analytics" size={18} color={Colors.light.primary} />
                   <Text style={styles.healthSummaryTitle}>
                     {t("Your Health Profile", "ملفك الصحي")}
                   </Text>
                 </View>
-                <View style={[styles.riskBadge, {
+                <View style={[styles.riskBadge, isRTL && { flexDirection: "row-reverse" }, {
                   backgroundColor:
                     insights.healthSummary.riskLevel === "high" ? Colors.light.emergencyLight :
                     insights.healthSummary.riskLevel === "moderate" ? Colors.light.warningLight :
@@ -630,7 +630,7 @@ export default function HomeScreen() {
                 </View>
               </View>
 
-              <View style={styles.healthStatsRow}>
+              <View style={[styles.healthStatsRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <View style={styles.healthStat}>
                   <Text style={styles.healthStatValue}>{insights.healthSummary.totalAssessments}</Text>
                   <Text style={styles.healthStatLabel}>{t("Assessments", "تقييمات")}</Text>
@@ -648,7 +648,7 @@ export default function HomeScreen() {
               </View>
 
               {insights.healthSummary.recentConditions.length > 0 && (
-                <View style={styles.recentConditionsRow}>
+                <View style={[styles.recentConditionsRow, isRTL && { flexDirection: "row-reverse" }]}>
                   {insights.healthSummary.recentConditions.slice(0, 3).map((condition, idx) => (
                     <View key={idx} style={styles.conditionChip}>
                       <Text style={styles.conditionChipText} numberOfLines={1}>{condition}</Text>

@@ -14,7 +14,7 @@ interface EmergencyOverlayProps {
 
 export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
 
   const callEmergency = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -36,7 +36,7 @@ export function EmergencyOverlay({ alert, onDismiss }: EmergencyOverlayProps) {
 
         <Pressable
           style={({ pressed }) => [
-            styles.emergencyButton,
+            styles.emergencyButton, isRTL && { flexDirection: "row-reverse" },
             pressed && styles.buttonPressed,
           ]}
           onPress={callEmergency}

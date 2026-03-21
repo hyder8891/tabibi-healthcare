@@ -11,7 +11,7 @@ interface MentalHealthCrisisOverlayProps {
 
 export function MentalHealthCrisisOverlay({ onDismiss }: MentalHealthCrisisOverlayProps) {
   const insets = useSafeAreaInsets();
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
 
   const callHotline = (number: string) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -41,26 +41,26 @@ export function MentalHealthCrisisOverlay({ onDismiss }: MentalHealthCrisisOverl
           </Text>
 
           <Pressable
-            style={({ pressed }) => [styles.hotlineButton, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [styles.hotlineButton, isRTL && { flexDirection: "row-reverse" }, pressed && styles.buttonPressed]}
             onPress={() => callHotline("07901988007")}
           >
             <Ionicons name="call" size={20} color="#fff" />
             <View style={styles.hotlineTextWrap}>
-              <Text style={styles.hotlineNumber}>07901988007</Text>
-              <Text style={styles.hotlineDesc}>
+              <Text style={[styles.hotlineNumber, isRTL && { textAlign: "right" }]}>07901988007</Text>
+              <Text style={[styles.hotlineDesc, isRTL && { textAlign: "right" }]}>
                 {t("Mental Health Helpline", "خط مساعدة الصحة النفسية")}
               </Text>
             </View>
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.hotlineButton, pressed && styles.buttonPressed]}
+            style={({ pressed }) => [styles.hotlineButton, isRTL && { flexDirection: "row-reverse" }, pressed && styles.buttonPressed]}
             onPress={() => callHotline("116")}
           >
             <Ionicons name="call" size={20} color="#fff" />
             <View style={styles.hotlineTextWrap}>
-              <Text style={styles.hotlineNumber}>116</Text>
-              <Text style={styles.hotlineDesc}>
+              <Text style={[styles.hotlineNumber, isRTL && { textAlign: "right" }]}>116</Text>
+              <Text style={[styles.hotlineDesc, isRTL && { textAlign: "right" }]}>
                 {t("Emergency Services", "خدمات الطوارئ")}
               </Text>
             </View>
@@ -68,7 +68,7 @@ export function MentalHealthCrisisOverlay({ onDismiss }: MentalHealthCrisisOverl
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.trustButton, pressed && styles.buttonPressed]}
+          style={({ pressed }) => [styles.trustButton, isRTL && { flexDirection: "row-reverse" }, pressed && styles.buttonPressed]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             if (Platform.OS === "ios") {

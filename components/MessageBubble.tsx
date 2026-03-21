@@ -71,9 +71,10 @@ export function MessageBubble({ message, isStreaming, onRetry }: MessageBubblePr
 }
 
 export function TypingIndicator() {
+  const { isRTL } = useSettings();
   return (
-    <View style={[styles.container, styles.aiContainer]}>
-      <View style={styles.avatar}>
+    <View style={[styles.container, styles.aiContainer, isRTL && { flexDirection: "row-reverse" }]}>
+      <View style={[styles.avatar, isRTL && { marginRight: 0, marginLeft: 8 }]}>
         <Image source={require("@/assets/images/logo.png")} style={styles.avatarImage} />
       </View>
       <View style={[styles.bubble, styles.aiBubble, styles.typingBubble]}>

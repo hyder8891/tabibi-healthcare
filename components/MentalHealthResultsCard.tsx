@@ -20,7 +20,7 @@ export function MentalHealthResultsCard({ results, onStartNew, onStartGAD7 }: Me
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
+      <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
         <View style={[styles.iconWrap, { backgroundColor: results.severityColor + "20" }]}>
           <Ionicons name="clipboard" size={24} color={results.severityColor} />
         </View>
@@ -36,7 +36,7 @@ export function MentalHealthResultsCard({ results, onStartNew, onStartGAD7 }: Me
         </Text>
       </View>
 
-      <View style={[styles.severityBadge, { backgroundColor: results.severityColor + "18" }]}>
+      <View style={[styles.severityBadge, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: results.severityColor + "18" }]}>
         <View style={[styles.severityDot, { backgroundColor: results.severityColor }]} />
         <Text style={[styles.severityText, { color: results.severityColor }]}>
           {results.severityLevel}
@@ -59,7 +59,7 @@ export function MentalHealthResultsCard({ results, onStartNew, onStartGAD7 }: Me
         {results.recommendation}
       </Text>
 
-      <View style={styles.disclaimer}>
+      <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
         <Ionicons name="information-circle" size={16} color="#9CA3AF" />
         <Text style={[styles.disclaimerText, isRTL && { textAlign: "right" }]}>
           هذا الفحص للتوعية فقط وليس تشخيصاً طبياً
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "500" as const,
     color: "#9CA3AF",
-    marginLeft: 4,
+    marginStart: 4,
   },
   severityBadge: {
     flexDirection: "row",

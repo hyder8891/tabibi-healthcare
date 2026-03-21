@@ -25,7 +25,7 @@ const facilityColors: Record<string, string> = {
 };
 
 export function FacilityCard({ facility }: FacilityCardProps) {
-  const { t } = useSettings();
+  const { t, isRTL } = useSettings();
   const iconName = facilityIcons[facility.type] || "location";
   const color = facilityColors[facility.type] || Colors.light.primary;
 
@@ -65,19 +65,19 @@ export function FacilityCard({ facility }: FacilityCardProps) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.topRow}>
-        <View style={[styles.iconContainer, { backgroundColor: color + "15" }]}>
+      <View style={[styles.topRow, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.iconContainer, { backgroundColor: color + "15" }, isRTL && { marginRight: 0, marginLeft: 12 }]}>
           <Ionicons name={iconName as any} size={22} color={color} />
         </View>
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text style={[styles.name, isRTL && { textAlign: "right" }]} numberOfLines={1}>
             {facility.name}
           </Text>
-          <Text style={styles.address} numberOfLines={2}>
+          <Text style={[styles.address, isRTL && { textAlign: "right" }]} numberOfLines={2}>
             {facility.address}
           </Text>
         </View>
-        <View style={styles.distanceBadge}>
+        <View style={[styles.distanceBadge, isRTL && { marginLeft: 0, marginRight: 8 }]}>
           <Text style={styles.distance}>
             {facility.distance < 1
               ? `${Math.round(facility.distance * 1000)}m`
@@ -86,8 +86,8 @@ export function FacilityCard({ facility }: FacilityCardProps) {
         </View>
       </View>
 
-      <View style={styles.metaRow}>
-        <View style={styles.ratingContainer}>
+      <View style={[styles.metaRow, isRTL && { flexDirection: "row-reverse" }]}>
+        <View style={[styles.ratingContainer, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="star" size={14} color="#F59E0B" />
           <Text style={styles.rating}>{facility.rating.toFixed(1)}</Text>
           {facility.totalRatings ? (
@@ -96,7 +96,7 @@ export function FacilityCard({ facility }: FacilityCardProps) {
         </View>
         <View
           style={[
-            styles.statusBadge,
+            styles.statusBadge, isRTL && { flexDirection: "row-reverse" },
             {
               backgroundColor: facility.isOpen
                 ? Colors.light.successLight
@@ -130,21 +130,22 @@ export function FacilityCard({ facility }: FacilityCardProps) {
       </View>
 
       {phoneNumber ? (
-        <View style={styles.phoneRow}>
+        <View style={[styles.phoneRow, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="call-outline" size={15} color={Colors.light.textSecondary} />
           <Text style={styles.phoneText}>{phoneNumber}</Text>
         </View>
       ) : null}
 
-      <View style={styles.actions}>
+      <View style={[styles.actions, isRTL && { flexDirection: "row-reverse" }]}>
         <Pressable
           style={({ pressed }) => [
             styles.navButton,
+            isRTL && { flexDirection: "row-reverse" },
             pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
           ]}
           onPress={openNavigation}
         >
-          <Ionicons name="navigate" size={18} color="#fff" />
+          <Ionicons name="navigate" size={18} color="#fff" style={isRTL ? { transform: [{ scaleX: -1 }] } : undefined} />
           <Text style={styles.navButtonText}>{t("Navigate", "\u0627\u0646\u062a\u0642\u0644")}</Text>
         </Pressable>
 

@@ -925,7 +925,7 @@ export default function AssessmentScreen() {
               {t("Attach Image", "\u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629")}
             </Text>
             <Pressable
-              style={({ pressed }) => [styles.modalOption, pressed && { backgroundColor: Colors.light.borderLight }]}
+              style={({ pressed }) => [styles.modalOption, isRTL && { flexDirection: "row-reverse" }, pressed && { backgroundColor: Colors.light.borderLight }]}
               onPress={() => { setShowAttachModal(false); pickImage("camera"); }}
             >
               <Ionicons name="camera-outline" size={22} color={Colors.light.primary} />
@@ -933,7 +933,7 @@ export default function AssessmentScreen() {
             </Pressable>
             <View style={styles.modalDivider} />
             <Pressable
-              style={({ pressed }) => [styles.modalOption, pressed && { backgroundColor: Colors.light.borderLight }]}
+              style={({ pressed }) => [styles.modalOption, isRTL && { flexDirection: "row-reverse" }, pressed && { backgroundColor: Colors.light.borderLight }]}
               onPress={() => { setShowAttachModal(false); pickImage("gallery"); }}
             >
               <Ionicons name="images-outline" size={22} color={Colors.light.primary} />
@@ -964,7 +964,7 @@ export default function AssessmentScreen() {
                   {t("Who is this assessment for?", "\u0644\u0645\u0646 \u0647\u0630\u0627 \u0627\u0644\u062a\u0642\u064a\u064a\u0645\u061f")}
                 </Text>
                 <Pressable
-                  style={({ pressed }) => [styles.forWhomOption, pressed && { backgroundColor: Colors.light.primarySurface }]}
+                  style={({ pressed }) => [styles.forWhomOption, isRTL && { flexDirection: "row-reverse" }, pressed && { backgroundColor: Colors.light.primarySurface }]}
                   onPress={() => {
                     setForWhom(null);
                     setShowForWhomModal(false);
@@ -974,28 +974,28 @@ export default function AssessmentScreen() {
                     <Ionicons name="person" size={22} color={Colors.light.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.forWhomOptionTitle}>{t("Myself", "\u0644\u0646\u0641\u0633\u064a")}</Text>
-                    <Text style={styles.forWhomOptionDesc}>{t("I'm the patient", "\u0623\u0646\u0627 \u0627\u0644\u0645\u0631\u064a\u0636")}</Text>
+                    <Text style={[styles.forWhomOptionTitle, isRTL && { textAlign: "right" }]}>{t("Myself", "\u0644\u0646\u0641\u0633\u064a")}</Text>
+                    <Text style={[styles.forWhomOptionDesc, isRTL && { textAlign: "right" }]}>{t("I'm the patient", "\u0623\u0646\u0627 \u0627\u0644\u0645\u0631\u064a\u0636")}</Text>
                   </View>
                   <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.light.textTertiary} />
                 </Pressable>
                 <Pressable
-                  style={({ pressed }) => [styles.forWhomOption, pressed && { backgroundColor: Colors.light.primarySurface }]}
+                  style={({ pressed }) => [styles.forWhomOption, isRTL && { flexDirection: "row-reverse" }, pressed && { backgroundColor: Colors.light.primarySurface }]}
                   onPress={() => setForWhomStep("details")}
                 >
                   <View style={styles.forWhomIconCircle}>
                     <Ionicons name="people" size={22} color={Colors.light.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.forWhomOptionTitle}>{t("Someone else", "\u0634\u062e\u0635 \u0622\u062e\u0631")}</Text>
-                    <Text style={styles.forWhomOptionDesc}>{t("Family member or dependent", "\u0641\u0631\u062f \u0645\u0646 \u0627\u0644\u0639\u0627\u0626\u0644\u0629")}</Text>
+                    <Text style={[styles.forWhomOptionTitle, isRTL && { textAlign: "right" }]}>{t("Someone else", "\u0634\u062e\u0635 \u0622\u062e\u0631")}</Text>
+                    <Text style={[styles.forWhomOptionDesc, isRTL && { textAlign: "right" }]}>{t("Family member or dependent", "\u0641\u0631\u062f \u0645\u0646 \u0627\u0644\u0639\u0627\u0626\u0644\u0629")}</Text>
                   </View>
                   <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={20} color={Colors.light.textTertiary} />
                 </Pressable>
               </>
             ) : (
               <>
-                <View style={styles.forWhomDetailsHeader}>
+                <View style={[styles.forWhomDetailsHeader, isRTL && { flexDirection: "row-reverse" }]}>
                   <Pressable onPress={() => setForWhomStep("choose")} hitSlop={12}>
                     <Ionicons name={isRTL ? "arrow-forward" : "arrow-back"} size={22} color={Colors.light.text} />
                   </Pressable>
@@ -1007,7 +1007,7 @@ export default function AssessmentScreen() {
                 <View style={styles.forWhomForm}>
                   {savedFamilyMembers.length > 0 && (
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-                      <View style={styles.forWhomChips}>
+                      <View style={[styles.forWhomChips, isRTL && { flexDirection: "row-reverse" }]}>
                         {savedFamilyMembers.map((member) => (
                           <Pressable
                             key={member.id}
@@ -1036,7 +1036,7 @@ export default function AssessmentScreen() {
                       </View>
                     </ScrollView>
                   )}
-                  <Text style={styles.forWhomLabel}>{t("Name", "\u0627\u0644\u0627\u0633\u0645")}</Text>
+                  <Text style={[styles.forWhomLabel, isRTL && { textAlign: "right" }]}>{t("Name", "\u0627\u0644\u0627\u0633\u0645")}</Text>
                   <TextInput
                     style={[styles.forWhomInput, isRTL && { textAlign: "right" }]}
                     value={forWhomName}
@@ -1044,9 +1044,9 @@ export default function AssessmentScreen() {
                     placeholder={t("Patient's name", "\u0627\u0633\u0645 \u0627\u0644\u0645\u0631\u064a\u0636")}
                     placeholderTextColor={Colors.light.textTertiary}
                   />
-                  <Text style={styles.forWhomLabel}>{t("Relationship", "\u0635\u0644\u0629 \u0627\u0644\u0642\u0631\u0627\u0628\u0629")}</Text>
+                  <Text style={[styles.forWhomLabel, isRTL && { textAlign: "right" }]}>{t("Relationship", "\u0635\u0644\u0629 \u0627\u0644\u0642\u0631\u0627\u0628\u0629")}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.forWhomChipsScroll}>
-                    <View style={styles.forWhomChips}>
+                    <View style={[styles.forWhomChips, isRTL && { flexDirection: "row-reverse" }]}>
                       {[
                         { en: "Parent", ar: "\u0623\u062d\u062f \u0627\u0644\u0648\u0627\u0644\u062f\u064a\u0646" },
                         { en: "Child", ar: "\u0637\u0641\u0644" },
@@ -1075,7 +1075,7 @@ export default function AssessmentScreen() {
                       ))}
                     </View>
                   </ScrollView>
-                  <Text style={styles.forWhomLabel}>{t("Age (optional)", "\u0627\u0644\u0639\u0645\u0631 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)")}</Text>
+                  <Text style={[styles.forWhomLabel, isRTL && { textAlign: "right" }]}>{t("Age (optional)", "\u0627\u0644\u0639\u0645\u0631 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)")}</Text>
                   <TextInput
                     style={[styles.forWhomInput, isRTL && { textAlign: "right" }, { width: 100 }]}
                     value={forWhomAge}
@@ -1087,13 +1087,13 @@ export default function AssessmentScreen() {
                   />
                   {!selectedFamilyMemberId && (
                     <Pressable
-                      style={styles.saveProfileRow}
+                      style={[styles.saveProfileRow, isRTL && { flexDirection: "row-reverse" }]}
                       onPress={() => setSaveProfileChecked(!saveProfileChecked)}
                     >
                       <View style={[styles.saveProfileCheckbox, saveProfileChecked && styles.saveProfileCheckboxActive]}>
                         {saveProfileChecked && <Ionicons name="checkmark" size={14} color="#fff" />}
                       </View>
-                      <Text style={styles.saveProfileText}>
+                      <Text style={[styles.saveProfileText, isRTL && { textAlign: "right" }]}>
                         {t("Save this profile for next time", "\u0627\u062d\u0641\u0638 \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0644\u0644\u0645\u0631\u0629 \u0627\u0644\u0642\u0627\u062f\u0645\u0629")}
                       </Text>
                     </Pressable>
@@ -1134,7 +1134,7 @@ export default function AssessmentScreen() {
       </Modal>
 
       <View
-        style={styles.header}
+        style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}
         onLayout={(e) => {
           headerHeightRef.current = e.nativeEvent.layout.height;
         }}
@@ -1146,7 +1146,7 @@ export default function AssessmentScreen() {
         >
           <Ionicons name="close" size={24} color={Colors.light.text} />
         </Pressable>
-        <View style={styles.headerCenter}>
+        <View style={[styles.headerCenter, isRTL && { flexDirection: "row-reverse" }]}>
           <View style={styles.headerDotRing}>
             <View style={styles.headerDot} />
           </View>
@@ -1165,7 +1165,7 @@ export default function AssessmentScreen() {
 
       {forWhom && (
         <Pressable
-          style={styles.forWhomBanner}
+          style={[styles.forWhomBanner, isRTL && { flexDirection: "row-reverse" }]}
           onPress={() => { getFamilyMembers().then(setSavedFamilyMembers); setSaveProfileChecked(false); setSelectedFamilyMemberId(null); setShowForWhomModal(true); setForWhomStep("choose"); }}
         >
           <Ionicons name="people" size={16} color={Colors.light.primary} />
@@ -1194,7 +1194,7 @@ export default function AssessmentScreen() {
         if (isComplete && assessmentId) return null;
         return (
           <View
-            style={styles.progressContainer}
+            style={[styles.progressContainer, isRTL && { flexDirection: "row-reverse" }]}
             onLayout={(e) => { progressHeightRef.current = e.nativeEvent.layout.height; }}
           >
             <View style={styles.progressBarBg}>
@@ -1327,7 +1327,7 @@ export default function AssessmentScreen() {
 
         <View style={styles.bottomBar}>
           {pendingImage && (
-            <View style={styles.imagePreviewContainer}>
+            <View style={[styles.imagePreviewContainer, isRTL && { flexDirection: "row-reverse" }]}>
               <Image source={{ uri: pendingImage.uri }} style={styles.imagePreview} />
               <Pressable
                 style={styles.removeImageButton}
@@ -1365,7 +1365,7 @@ export default function AssessmentScreen() {
           <View
             style={[styles.inputContainer, { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12) }]}
           >
-          <View style={styles.inputWrapper}>
+          <View style={[styles.inputWrapper, isRTL && { flexDirection: "row-reverse" }]}>
             <Pressable
               style={styles.attachButton}
               onPress={showAttachMenu}
@@ -1536,8 +1536,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   removeImageButton: {
-    marginLeft: -10,
     marginTop: -26,
+    marginStart: -10,
   },
   inputContainer: {
     paddingHorizontal: 16,
@@ -1552,8 +1552,7 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: Colors.light.inputBg,
     borderRadius: 28,
-    paddingLeft: 10,
-    paddingRight: 6,
+    paddingHorizontal: 8,
     paddingVertical: 6,
     minHeight: 52,
     borderWidth: 1,

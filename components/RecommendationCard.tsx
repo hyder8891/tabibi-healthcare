@@ -97,7 +97,7 @@ export function RecommendationCard({
     <View style={styles.container}>
       <View style={[styles.header, isRTL && { flexDirection: "row-reverse" }]}>
         <View style={[styles.badgeRow, isRTL && { flexDirection: "row-reverse" }]}>
-          <View style={[styles.severityBadge, { backgroundColor: severityBg }]}>
+          <View style={[styles.severityBadge, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: severityBg }]}>
             <View style={[styles.severityDot, { backgroundColor: severityColor }]} />
             <Text style={[styles.severityText, { color: severityColor }]}>
               {isRTL
@@ -106,7 +106,7 @@ export function RecommendationCard({
             </Text>
           </View>
           {triageCfg && (
-            <View style={[styles.triageBadge, { backgroundColor: triageCfg.bg }]}>
+            <View style={[styles.triageBadge, isRTL && { flexDirection: "row-reverse" }, { backgroundColor: triageCfg.bg }]}>
               <Ionicons name="timer-outline" size={12} color={triageCfg.color} />
               <Text style={[styles.triageText, { color: triageCfg.color }]}>
                 {isRTL ? triageCfg.labelAr : triageCfg.labelEn}
@@ -360,7 +360,7 @@ export function RecommendationCard({
                 <Text style={[styles.testReason, isRTL && { textAlign: "right" }]}>{test.reason}</Text>
 
                 {(test.estimatedCost || test.availableAt) && (
-                  <View style={styles.testMetaRow}>
+                  <View style={[styles.testMetaRow, isRTL && { flexDirection: "row-reverse" }]}>
                     {test.estimatedCost && (
                       <View style={[styles.testMetaBadge, isRTL && { flexDirection: "row-reverse" }]}>
                         <MaterialCommunityIcons name="cash" size={13} color={Colors.light.textSecondary} />
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: Colors.light.text,
     flex: 1,
-    marginRight: 8,
+    marginEnd: 8,
   },
   diffLikelihoodBadge: {
     backgroundColor: Colors.light.primaryMuted,
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.light.accent,
     lineHeight: 17,
-    paddingLeft: 20,
+    paddingStart: 20,
   },
   orderAllBtn: {
     flexDirection: "row",

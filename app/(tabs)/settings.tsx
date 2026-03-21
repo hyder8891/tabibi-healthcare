@@ -217,7 +217,7 @@ export default function SettingsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, isRTL && { flexDirection: "row-reverse" }]}>
           <LinearGradient
             colors={[Colors.light.primary, "#14B8A6"]}
             style={styles.avatarGradient}
@@ -288,7 +288,7 @@ export default function SettingsScreen() {
               <Ionicons name="male-female-outline" size={17} color={Colors.light.primary} />
             </View>
             <Text style={styles.fieldLabel}>{t("Gender", "\u0627\u0644\u062c\u0646\u0633")}</Text>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, isRTL && { flexDirection: "row-reverse" }]}>
               {[{ key: "male", en: "Male", ar: "\u0630\u0643\u0631" }, { key: "female", en: "Female", ar: "\u0623\u0646\u062b\u0649" }].map((g) => (
                 <Pressable
                   key={g.key}
@@ -318,9 +318,9 @@ export default function SettingsScreen() {
             <View style={styles.fieldIconWrap}>
               <Ionicons name="water-outline" size={17} color={Colors.light.primary} />
             </View>
-            <Text style={[styles.fieldLabel, { marginRight: 12 }]}>{t("Blood Type", "\u0641\u0635\u064a\u0644\u0629 \u0627\u0644\u062f\u0645")}</Text>
+            <Text style={[styles.fieldLabel, { marginEnd: 12 }]}>{t("Blood Type", "\u0641\u0635\u064a\u0644\u0629 \u0627\u0644\u062f\u0645")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              <View style={styles.bloodTypeRow}>
+              <View style={[styles.bloodTypeRow, isRTL && { flexDirection: "row-reverse" }]}>
                 {BLOOD_TYPES.map((bt) => (
                   <Pressable
                     key={bt}
@@ -396,7 +396,7 @@ export default function SettingsScreen() {
                 <MaterialCommunityIcons name="weight-kilogram" size={17} color={Colors.light.primary} />
               </View>
               <Text style={styles.measureLabel}>{t("Weight", "\u0627\u0644\u0648\u0632\u0646")}</Text>
-              <View style={styles.unitInputWrap}>
+              <View style={[styles.unitInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
                 <TextInput
                   style={[styles.fieldInput, styles.fieldInputSmall]}
                   value={profile.weight != null && !isNaN(profile.weight) ? profile.weight.toString() : ""}
@@ -417,7 +417,7 @@ export default function SettingsScreen() {
                 <MaterialCommunityIcons name="human-male-height" size={17} color={Colors.light.primary} />
               </View>
               <Text style={styles.measureLabel}>{t("Height", "\u0627\u0644\u0637\u0648\u0644")}</Text>
-              <View style={styles.unitInputWrap}>
+              <View style={[styles.unitInputWrap, isRTL && { flexDirection: "row-reverse" }]}>
                 <TextInput
                   style={[styles.fieldInput, styles.fieldInputSmall]}
                   value={profile.height != null && !isNaN(profile.height) ? profile.height.toString() : ""}
@@ -460,7 +460,7 @@ export default function SettingsScreen() {
           {(profile.conditions || []).length > 0 ? (
             <View style={styles.tagsWrap}>
               {(profile.conditions || []).map((c, i) => (
-                <View key={i} style={styles.tag}>
+                <View key={i} style={[styles.tag, isRTL && { flexDirection: "row-reverse" }]}>
                   <Ionicons name="medical" size={13} color={Colors.light.primary} />
                   <Text style={styles.tagText}>{c}</Text>
                   <Pressable onPress={() => removeCondition(i)} hitSlop={8} style={styles.tagRemove}>
@@ -475,7 +475,7 @@ export default function SettingsScreen() {
               <Text style={styles.emptyHintText}>{t("No conditions added", "\u0644\u0627 \u064a\u0648\u062c\u062f")}</Text>
             </View>
           )}
-          <View style={styles.addRow}>
+          <View style={[styles.addRow, isRTL && { flexDirection: "row-reverse" }]}>
             <TextInput
               style={[styles.addInput, isRTL && { textAlign: "right" }]}
               value={newCondition}
@@ -500,7 +500,7 @@ export default function SettingsScreen() {
           {(profile.allergies || []).length > 0 ? (
             <View style={styles.tagsWrap}>
               {(profile.allergies || []).map((a, i) => (
-                <View key={i} style={[styles.tag, styles.tagWarn]}>
+                <View key={i} style={[styles.tag, styles.tagWarn, isRTL && { flexDirection: "row-reverse" }]}>
                   <Ionicons name="warning" size={13} color={Colors.light.accent} />
                   <Text style={[styles.tagText, { color: "#92400E" }]}>{a}</Text>
                   <Pressable onPress={() => removeAllergy(i)} hitSlop={8} style={styles.tagRemove}>
@@ -515,7 +515,7 @@ export default function SettingsScreen() {
               <Text style={styles.emptyHintText}>{t("No allergies added", "\u0644\u0627 \u064a\u0648\u062c\u062f")}</Text>
             </View>
           )}
-          <View style={styles.addRow}>
+          <View style={[styles.addRow, isRTL && { flexDirection: "row-reverse" }]}>
             <TextInput
               style={[styles.addInput, isRTL && { textAlign: "right" }]}
               value={newAllergy}
@@ -577,9 +577,9 @@ export default function SettingsScreen() {
             <View style={[styles.fieldIconWrap, { backgroundColor: Colors.light.emergencyLight }]}>
               <Ionicons name="people-outline" size={17} color={Colors.light.emergency} />
             </View>
-            <Text style={[styles.fieldLabel, { marginRight: 8 }]}>{t("Relationship", "\u0627\u0644\u0639\u0644\u0627\u0642\u0629")}</Text>
+            <Text style={[styles.fieldLabel, { marginEnd: 8 }]}>{t("Relationship", "\u0627\u0644\u0639\u0644\u0627\u0642\u0629")}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-              <View style={styles.chipRow}>
+              <View style={[styles.chipRow, isRTL && { flexDirection: "row-reverse" }]}>
                 {RELATIONSHIPS.map((r) => (
                   <Pressable
                     key={r.key}
@@ -646,7 +646,7 @@ export default function SettingsScreen() {
                   </View>
                 </View>
                 {user.authProvider && user.authProvider !== "password" && (
-                  <View style={styles.providerBadge}>
+                  <View style={[styles.providerBadge, isRTL && { flexDirection: "row-reverse" }]}>
                     <MaterialCommunityIcons
                       name={user.authProvider === "google.com" ? "google" : "shield-check"}
                       size={14}
@@ -706,7 +706,7 @@ export default function SettingsScreen() {
                         {t("Change Password", "\u062a\u063a\u064a\u064a\u0631 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631")}
                       </Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={18} color={Colors.light.textTertiary} />
+                    <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color={Colors.light.textTertiary} />
                   </Pressable>
                 </>
               )}
@@ -736,12 +736,12 @@ export default function SettingsScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Ionicons name={showLinkEmail ? "chevron-up" : "chevron-forward"} size={18} color={Colors.light.textTertiary} />
+                    <Ionicons name={showLinkEmail ? "chevron-up" : (isRTL ? "chevron-back" : "chevron-forward")} size={18} color={Colors.light.textTertiary} />
                   </Pressable>
                   {showLinkEmail && (
                     <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
-                      <View style={[styles.linkInputWrapper, { marginBottom: 10 }]}>
-                        <Ionicons name="mail-outline" size={18} color={Colors.light.textTertiary} style={{ marginRight: 8 }} />
+                      <View style={[styles.linkInputWrapper, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 10 }]}>
+                        <Ionicons name="mail-outline" size={18} color={Colors.light.textTertiary} style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }} />
                         <TextInput
                           style={styles.linkInput}
                           value={linkEmail}
@@ -752,8 +752,8 @@ export default function SettingsScreen() {
                           autoCapitalize="none"
                         />
                       </View>
-                      <View style={[styles.linkInputWrapper, { marginBottom: 12 }]}>
-                        <Ionicons name="lock-closed-outline" size={18} color={Colors.light.textTertiary} style={{ marginRight: 8 }} />
+                      <View style={[styles.linkInputWrapper, isRTL && { flexDirection: "row-reverse" }, { marginBottom: 12 }]}>
+                        <Ionicons name="lock-closed-outline" size={18} color={Colors.light.textTertiary} style={isRTL ? { marginLeft: 8 } : { marginRight: 8 }} />
                         <TextInput
                           style={styles.linkInput}
                           value={linkPassword}
@@ -764,13 +764,13 @@ export default function SettingsScreen() {
                         />
                       </View>
                       {linkError ? (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10, backgroundColor: Colors.light.emergencyLight, padding: 10, borderRadius: 10 }}>
+                        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 10, backgroundColor: Colors.light.emergencyLight, padding: 10, borderRadius: 10 }}>
                           <Ionicons name="alert-circle" size={14} color={Colors.light.emergency} />
-                          <Text style={{ flex: 1, fontSize: 12, fontFamily: "DMSans_500Medium", color: Colors.light.emergency }}>{linkError}</Text>
+                          <Text style={{ flex: 1, fontSize: 12, fontFamily: "DMSans_500Medium", color: Colors.light.emergency, textAlign: isRTL ? "right" : "left" }}>{linkError}</Text>
                         </View>
                       ) : null}
                       {linkSuccess ? (
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 10, backgroundColor: Colors.light.successLight, padding: 10, borderRadius: 10 }}>
+                        <View style={{ flexDirection: isRTL ? "row-reverse" : "row", alignItems: "center", gap: 6, marginBottom: 10, backgroundColor: Colors.light.successLight, padding: 10, borderRadius: 10 }}>
                           <Ionicons name="checkmark-circle" size={14} color={Colors.light.success} />
                           <Text style={{ flex: 1, fontSize: 12, fontFamily: "DMSans_500Medium", color: Colors.light.success }}>
                             {t("Email linked! Verification email sent.", "\u062a\u0645 \u0631\u0628\u0637 \u0627\u0644\u0628\u0631\u064a\u062f! \u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0631\u0627\u0628\u0637 \u0627\u0644\u062a\u062d\u0642\u0642.")}
@@ -824,7 +824,7 @@ export default function SettingsScreen() {
                 </Text>
               </View>
             </View>
-            <View style={styles.chipRow}>
+            <View style={[styles.chipRow, isRTL && { flexDirection: "row-reverse" }]}>
               {(["en", "ar"] as const).map((lang) => (
                 <Pressable
                   key={lang}
@@ -939,6 +939,7 @@ export default function SettingsScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.logoutButton,
+            isRTL && { flexDirection: "row-reverse" },
             pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
           ]}
           onPress={async () => {
@@ -971,7 +972,7 @@ export default function SettingsScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+            <View style={[styles.modalHeader, isRTL && { flexDirection: "row-reverse" }]}>
               <Text style={[styles.modalTitle, isRTL && { textAlign: "right" }]}>
                 {t("Change Password", "\u062a\u063a\u064a\u064a\u0631 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631")}
               </Text>
@@ -1023,14 +1024,14 @@ export default function SettingsScreen() {
             </View>
 
             {passwordError ? (
-              <View style={styles.errorRow}>
+              <View style={[styles.errorRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="alert-circle" size={16} color={Colors.light.emergency} />
-                <Text style={styles.errorText}>{passwordError}</Text>
+                <Text style={[styles.errorText, isRTL && { textAlign: "right" }]}>{passwordError}</Text>
               </View>
             ) : null}
 
             {passwordSuccess ? (
-              <View style={styles.successRow}>
+              <View style={[styles.successRow, isRTL && { flexDirection: "row-reverse" }]}>
                 <Ionicons name="checkmark-circle" size={16} color={Colors.light.success} />
                 <Text style={styles.successText}>
                   {t("Password changed successfully", "\u062a\u0645 \u062a\u063a\u064a\u064a\u0631 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0628\u0646\u062c\u0627\u062d")}
@@ -1114,7 +1115,7 @@ const styles = StyleSheet.create({
     textTransform: "uppercase" as const,
     letterSpacing: 0.8,
     marginBottom: 8,
-    marginLeft: 4,
+    marginHorizontal: 4,
     marginTop: 4,
   },
   subSectionLabel: {
@@ -1292,7 +1293,7 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   tagRemove: {
-    marginLeft: 2,
+    marginStart: 2,
   },
   emptyHint: {
     flexDirection: "row",
