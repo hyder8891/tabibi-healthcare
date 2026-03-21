@@ -254,32 +254,45 @@ export default function AssessmentScreen() {
     }
   };
 
-  const sendMessage = useCallback(async () => {
-    const text = inputText.trim();
-    const imageAttachment = pendingImage;
-    if ((!text && !imageAttachment) || isLoading || isSubmittingRef.current) {
+  const sendMessage = useCallback(async (retryMessages?: ChatMessage[]) => {
+    const isRetry = !!retryMessages;
+    const text = isRetry ? "" : inputText.trim();
+    const imageAttachment = isRetry ? null : pendingImage;
+    if (isSubmittingRef.current || isLoading) {
+      return;
+    }
+    if (!isRetry && !text && !imageAttachment) {
       return;
     }
 
     isSubmittingRef.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (!chiefComplaintRef.current && text) {
-      chiefComplaintRef.current = text;
+    let updatedMessages: ChatMessage[];
+    let userMessage: ChatMessage | undefined;
+
+    if (isRetry) {
+      updatedMessages = retryMessages;
+      setMessages(updatedMessages);
+    } else {
+      if (!chiefComplaintRef.current && text) {
+        chiefComplaintRef.current = text;
+      }
+
+      userMessage = {
+        id: Crypto.randomUUID(),
+        role: "user",
+        content: text || t("Attached an image for analysis", "\u062a\u0645 \u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629 \u0644\u0644\u062a\u062d\u0644\u064a\u0644"),
+        timestamp: Date.now(),
+        imageUri: imageAttachment?.uri,
+      };
+
+      updatedMessages = [...messages, userMessage];
+      setMessages(updatedMessages);
+      setInputText("");
+      setPendingImage(null);
     }
 
-    const userMessage: ChatMessage = {
-      id: Crypto.randomUUID(),
-      role: "user",
-      content: text || t("Attached an image for analysis", "\u062a\u0645 \u0625\u0631\u0641\u0627\u0642 \u0635\u0648\u0631\u0629 \u0644\u0644\u062a\u062d\u0644\u064a\u0644"),
-      timestamp: Date.now(),
-      imageUri: imageAttachment?.uri,
-    };
-
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
-    setInputText("");
-    setPendingImage(null);
     setIsLoading(true);
     setStreamingMessage("");
     setQuickReplies([]);
@@ -294,7 +307,7 @@ export default function AssessmentScreen() {
         .filter((m) => m.id !== "welcome" && !m.content.includes(t("Welcome back!", "\u0645\u0631\u062d\u0628\u0627\u064b \u0645\u062c\u062f\u062f\u0627\u064b!")))
         .map((m) => {
           const msg: any = { role: m.role, content: m.content };
-          if (m === userMessage && imageAttachment) {
+          if (userMessage && m === userMessage && imageAttachment) {
             msg.imageData = imageAttachment.base64;
             msg.mimeType = imageAttachment.mimeType;
           }
@@ -310,6 +323,7 @@ export default function AssessmentScreen() {
         },
         ...(forWhom ? { forWhom } : {}),
         ...(mentalHealthMode ? { mentalHealthMode } : {}),
+        language: settings.language || "ar",
       });
 
       let response = await fetch(url.toString(), {
@@ -756,15 +770,25 @@ export default function AssessmentScreen() {
         setExistingAssessmentId(newId);
       }
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      const isNetworkError = (error instanceof TypeError && 
+        /network request failed|fetch failed|network error|aborted/i.test(errorMsg)) ||
+        /network request failed|fetch failed|network error|no internet|net::ERR_/i.test(errorMsg);
       const errorMessage: ChatMessage = {
         id: Crypto.randomUUID(),
         role: "assistant",
-        content: t(
-          "I'm having trouble connecting. Please check your connection and try again.",
-          "\u0623\u0648\u0627\u062c\u0647 \u0645\u0634\u0643\u0644\u0629 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
-        ),
+        content: isNetworkError
+          ? t(
+              "No internet connection. Check your connection and try again.",
+              "\u0644\u0627 \u064a\u0648\u062c\u062f \u0627\u062a\u0635\u0627\u0644 \u0628\u0627\u0644\u0625\u0646\u062a\u0631\u0646\u062a. \u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0648\u062d\u0627\u0648\u0644 \u0645\u062c\u062f\u062f\u0627\u064b",
+            )
+          : t(
+              "I'm having trouble connecting. Please check your connection and try again.",
+              "\u0623\u0648\u0627\u062c\u0647 \u0645\u0634\u0643\u0644\u0629 \u0641\u064a \u0627\u0644\u0627\u062a\u0635\u0627\u0644. \u064a\u0631\u062c\u0649 \u0627\u0644\u062a\u062d\u0642\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643 \u0648\u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649.",
+            ),
         timestamp: Date.now(),
         isError: true,
+        ...(isNetworkError ? { isNetworkError: true } : {}),
       };
       setMessages((prev) => [...prev, errorMessage]);
       setStreamingMessage("");
@@ -1206,6 +1230,10 @@ export default function AssessmentScreen() {
             <MessageBubble
               message={item}
               isStreaming={item.id === "streaming"}
+              onRetry={item.isNetworkError ? () => {
+                const cleanMessages = messages.filter((m) => m.id !== item.id);
+                sendMessage(cleanMessages);
+              } : undefined}
             />
           )}
           inverted
@@ -1347,7 +1375,7 @@ export default function AssessmentScreen() {
               multiline
               maxLength={1000}
               editable={!isLoading}
-              onSubmitEditing={sendMessage}
+              onSubmitEditing={() => sendMessage()}
               blurOnSubmit={false}
             />
             <Pressable
@@ -1355,7 +1383,7 @@ export default function AssessmentScreen() {
                 styles.sendButton,
                 ((!inputText.trim() && !pendingImage) || isLoading) && styles.sendButtonDisabled,
               ]}
-              onPress={sendMessage}
+              onPress={() => sendMessage()}
               disabled={(!inputText.trim() && !pendingImage) || isLoading}
               testID="send-button"
               accessibilityLabel="Send message"

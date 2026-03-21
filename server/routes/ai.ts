@@ -247,6 +247,7 @@ const assessmentSchema = z.object({
   patientProfile: patientProfileSchema,
   forWhom: forWhomSchema,
   mentalHealthMode: z.enum(["phq9", "gad7"]).optional(),
+  language: z.enum(["en", "ar"]).optional().default("ar"),
 });
 
 const PHQ9_SYSTEM_PROMPT = `You are Tabibi, a compassionate mental health screening assistant. You are administering the PHQ-9 (Patient Health Questionnaire-9) depression screening in Arabic.
@@ -791,7 +792,7 @@ export function registerAiRoutes(app: Express): void {
       if (!validation.success) {
         return res.status(400).json({ error: "Invalid request data", details: validation.error.issues.map(i => i.message) });
       }
-      const { messages, patientProfile, forWhom, mentalHealthMode } = validation.data;
+      const { messages, patientProfile, forWhom, mentalHealthMode, language } = validation.data;
 
       let systemContext = MEDICAL_SYSTEM_PROMPT;
       let medsDisclosed = false;
@@ -800,6 +801,10 @@ export function registerAiRoutes(app: Express): void {
         systemContext = PHQ9_SYSTEM_PROMPT;
       } else if (mentalHealthMode === 'gad7') {
         systemContext = GAD7_SYSTEM_PROMPT;
+      }
+
+      if (language === 'ar') {
+        systemContext = `IMPORTANT: Always respond in Arabic (العربية) unless the user explicitly writes in another language. All text in your responses and any JSON values must be in Arabic, except for medicine activeIngredient names.\n\n` + systemContext;
       }
 
       if (forWhom) {
