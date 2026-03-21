@@ -100,16 +100,7 @@ export default function AssessmentScreen() {
     if (assessmentResult && flatListRef.current) {
       const scrollDelay = Platform.OS === "web" ? 600 : 400;
       const doScroll = () => {
-        const contentH = contentSizeRef.current;
-        const viewportH = viewportHeightRef.current;
-        if (contentH > 0 && viewportH > 0) {
-          const cardTopPadding = 40;
-          const maxOffset = Math.max(0, contentH - viewportH);
-          const targetOffset = Math.max(0, maxOffset - cardTopPadding);
-          flatListRef.current?.scrollToOffset({ offset: targetOffset, animated: true });
-        } else {
-          flatListRef.current?.scrollToEnd({ animated: true });
-        }
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
       };
       setTimeout(doScroll, scrollDelay);
       setTimeout(doScroll, scrollDelay + 500);
