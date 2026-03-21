@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Share,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -29,6 +30,71 @@ export default function ResultsScreen() {
   const [showChat, setShowChat] = useState(false);
   const [outcomeTracked, setOutcomeTracked] = useState(false);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+
+  const composeShareText = (): string => {
+    if (!assessment?.result) return "";
+    const lines: string[] = [];
+    const r = assessment.result;
+
+    const condition = r.assessment?.condition ?? (isRTL ? "غير محدد" : "Unknown");
+    const severity = r.assessment?.severity ?? (isRTL ? "غير محدد" : "Unknown");
+
+    if (isRTL) {
+      lines.push("تقرير طبيبي");
+      lines.push("");
+      lines.push(`الشكوى: ${assessment.chiefComplaint || "تقييم صحي"}`);
+      lines.push(`التاريخ: ${new Date(assessment.date).toLocaleDateString("ar-SA", { year: "numeric", month: "long", day: "numeric" })}`);
+      lines.push("");
+      lines.push(`الحالة: ${condition}`);
+      lines.push(`الشدة: ${severity}`);
+    } else {
+      lines.push("تقرير طبيبي");
+      lines.push("My Medical Report");
+      lines.push("");
+      lines.push(`Complaint: ${assessment.chiefComplaint || "Health Assessment"}`);
+      lines.push(`Date: ${new Date(assessment.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}`);
+      lines.push("");
+      lines.push(`Condition: ${condition}`);
+      lines.push(`Severity: ${severity}`);
+    }
+
+    const medicines = r.recommendations?.pathwayA?.medicines;
+    if (medicines && medicines.length > 0) {
+      lines.push("");
+      lines.push(isRTL ? "الأدوية:" : "Medicines:");
+      medicines.forEach((m) => {
+        const brand = m.localBrand ? ` (${m.localBrand})` : "";
+        lines.push(`• ${m.name}${brand} — ${m.dosage}, ${m.frequency}`);
+      });
+    }
+
+    const tests = r.recommendations?.pathwayB?.tests;
+    if (tests && tests.length > 0) {
+      lines.push("");
+      lines.push(isRTL ? "الفحوصات:" : "Tests:");
+      tests.forEach((test) => {
+        lines.push(`• ${test.name}`);
+      });
+    }
+
+    return lines.join("\n");
+  };
+
+  const handleShare = async () => {
+    const message = composeShareText();
+    if (!message) return;
+    try {
+      if (Platform.OS === "web") {
+        if (typeof navigator !== "undefined" && navigator.share) {
+          await navigator.share({ text: message });
+        } else if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(message);
+        }
+      } else {
+        await Share.share({ message });
+      }
+    } catch (_) {}
+  };
 
   useEffect(() => {
     if (assessmentId) {
@@ -97,7 +163,16 @@ export default function ResultsScreen() {
         <Text style={styles.headerTitle}>
           {t("Assessment Results", "\u0646\u062a\u0627\u0626\u062c \u0627\u0644\u062a\u0642\u064a\u064a\u0645")}
         </Text>
-        <View style={styles.headerButton} />
+        <Pressable
+          onPress={handleShare}
+          hitSlop={12}
+          style={styles.headerButton}
+          accessibilityLabel={t("Share", "مشاركة")}
+        >
+          {assessment?.result && (
+            <Ionicons name="share-outline" size={22} color={Colors.light.text} />
+          )}
+        </Pressable>
       </View>
 
       <ScrollView
