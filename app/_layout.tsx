@@ -9,6 +9,7 @@ import { queryClient } from "@/lib/query-client";
 import { SettingsProvider } from "@/contexts/SettingsContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { AvicennaProvider } from "@/contexts/AvicennaContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getProfile } from "@/lib/storage";
 import {
   useFonts,
@@ -26,18 +27,31 @@ import Feather from "@expo/vector-icons/Feather";
 
 SplashScreen.preventAutoHideAsync();
 
-const PUBLIC_ROUTES = ["privacy", "terms"];
+const PUBLIC_ROUTES = ["privacy", "terms", "consent"];
 
 function RootLayoutNav() {
   const { user, isLoading, needsEmailVerification } = useAuth();
   const [checkedOnboarding, setCheckedOnboarding] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const segments = useSegments();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (isLoading) return;
+    AsyncStorage.getItem("consent_accepted").then((val) => {
+      setConsentAccepted(val === "true");
+      setConsentChecked(true);
+    });
+  }, [segments]);
+
+  useEffect(() => {
+    if (isLoading || !consentChecked) return;
     const firstSegment = segments[0] as string | undefined;
     if (firstSegment && PUBLIC_ROUTES.includes(firstSegment)) {
+      return;
+    }
+    if (!consentAccepted) {
+      router.replace("/consent");
       return;
     }
     if (!user) {
@@ -58,9 +72,9 @@ function RootLayoutNav() {
       }
       setCheckedOnboarding(true);
     });
-  }, [user, isLoading, needsEmailVerification]);
+  }, [user, isLoading, needsEmailVerification, consentChecked, consentAccepted, segments, pathname]);
 
-  if (isLoading) {
+  if (isLoading || !consentChecked) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.light.background }}>
         <ActivityIndicator size="large" color={Colors.light.primary} />
@@ -139,6 +153,13 @@ function RootLayoutNav() {
           headerShown: false,
           presentation: "modal",
           animation: "slide_from_bottom",
+        }}
+      />
+      <Stack.Screen
+        name="consent"
+        options={{
+          headerShown: false,
+          animation: "fade",
         }}
       />
       <Stack.Screen

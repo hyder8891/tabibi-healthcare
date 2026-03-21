@@ -11,12 +11,14 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { useSettings } from "@/contexts/SettingsContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -829,6 +831,90 @@ export default function SettingsScreen() {
         </CollapsibleSection>
 
         <CollapsibleSection
+          title={t("Legal", "قانوني")}
+          icon={<Ionicons name="document-text-outline" size={20} color={Colors.light.textSecondary} />}
+          summary={t("Privacy, Terms & Data", "الخصوصية والشروط والبيانات")}
+          isRTL={isRTL}
+          testID="section-legal"
+        >
+        <Pressable
+          style={({ pressed }) => [
+            styles.legalRow,
+            isRTL && { flexDirection: "row-reverse" },
+            pressed && { opacity: 0.7 },
+          ]}
+          onPress={() => Linking.openURL("https://tabibi.clinic/privacy")}
+          testID="privacy-policy-link"
+        >
+          <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.prefIconWrap, { backgroundColor: Colors.light.primarySurface }]}>
+              <Ionicons name="shield-checkmark-outline" size={18} color={Colors.light.primary} />
+            </View>
+            <Text style={styles.prefLabel}>{t("Privacy Policy", "سياسة الخصوصية")}</Text>
+          </View>
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color={Colors.light.textTertiary} />
+        </Pressable>
+        <View style={styles.divider} />
+        <Pressable
+          style={({ pressed }) => [
+            styles.legalRow,
+            isRTL && { flexDirection: "row-reverse" },
+            pressed && { opacity: 0.7 },
+          ]}
+          onPress={() => Linking.openURL("https://tabibi.clinic/terms")}
+          testID="terms-of-service-link"
+        >
+          <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.prefIconWrap, { backgroundColor: "#EFF6FF" }]}>
+              <Ionicons name="document-text-outline" size={18} color="#3B82F6" />
+            </View>
+            <Text style={styles.prefLabel}>{t("Terms of Service", "شروط الاستخدام")}</Text>
+          </View>
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color={Colors.light.textTertiary} />
+        </Pressable>
+        <View style={styles.divider} />
+        <Pressable
+          style={({ pressed }) => [
+            styles.legalRow,
+            isRTL && { flexDirection: "row-reverse" },
+            pressed && { opacity: 0.7 },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            Alert.alert(
+              t("Delete My Data", "حذف بياناتي"),
+              t(
+                "This will permanently delete all your data and reset the app. This action cannot be undone.",
+                "سيؤدي هذا إلى حذف جميع بياناتك نهائيًا وإعادة تعيين التطبيق. لا يمكن التراجع عن هذا الإجراء."
+              ),
+              [
+                { text: t("Cancel", "إلغاء"), style: "cancel" },
+                {
+                  text: t("Delete", "حذف"),
+                  style: "destructive",
+                  onPress: async () => {
+                    await AsyncStorage.clear();
+                    router.replace("/consent");
+                  },
+                },
+              ]
+            );
+          }}
+          testID="delete-my-data"
+        >
+          <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.prefIconWrap, { backgroundColor: Colors.light.emergencyLight }]}>
+              <Ionicons name="trash-outline" size={18} color={Colors.light.emergency} />
+            </View>
+            <Text style={[styles.prefLabel, { color: Colors.light.emergency }]}>
+              {t("Delete My Data", "حذف بياناتي")}
+            </Text>
+          </View>
+          <Ionicons name={isRTL ? "chevron-back" : "chevron-forward"} size={18} color={Colors.light.textTertiary} />
+        </Pressable>
+        </CollapsibleSection>
+
+        <CollapsibleSection
           title={t("Danger Zone", "\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062e\u0637\u0631")}
           icon={<Ionicons name="warning-outline" size={20} color={Colors.light.emergency} />}
           summary={t("Log out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
@@ -1297,6 +1383,13 @@ const styles = StyleSheet.create({
   },
   unverifiedBadgeText: {
     color: Colors.light.warning,
+  },
+  legalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    paddingHorizontal: 4,
   },
   logoutButton: {
     flexDirection: "row",

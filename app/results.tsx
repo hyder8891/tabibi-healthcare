@@ -287,6 +287,13 @@ export default function ResultsScreen() {
               ))}
           </View>
         )}
+
+        <Text style={styles.medicalDisclaimer}>
+          {t(
+            "This is not a medical diagnosis. Consult a doctor for professional advice.",
+            "هذا ليس تشخيصًا طبيًا. استشر طبيبك للحصول على رأي متخصص."
+          )}
+        </Text>
       </ScrollView>
     </View>
   );
@@ -429,5 +436,15 @@ const styles = StyleSheet.create({
   chatContainer: {
     marginTop: 12,
     paddingBottom: 20,
+  },
+  medicalDisclaimer: {
+    fontSize: 12,
+    fontFamily: "DMSans_400Regular",
+    color: "#888888",
+    textAlign: "center",
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
+    lineHeight: 18,
   },
 });
