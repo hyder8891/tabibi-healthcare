@@ -28,7 +28,7 @@ export function MessageBubble({ message, isStreaming, onRetry }: MessageBubblePr
           <Image source={require("@/assets/images/logo.png")} style={styles.avatarImage} />
         </View>
       )}
-      <View>
+      <View style={{ flexShrink: 1 }}>
         <View
           style={[styles.bubble, isUser ? styles.userBubble : styles.aiBubble,
             isRTL && isUser && { borderBottomRightRadius: 22, borderBottomLeftRadius: 8 },
