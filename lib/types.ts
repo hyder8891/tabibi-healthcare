@@ -117,6 +117,15 @@ export interface ForWhom {
   age?: number;
 }
 
+export interface MentalHealthResults {
+  type: 'phq9' | 'gad7';
+  totalScore: number;
+  severityLevel: string;
+  severityColor: string;
+  evidenceSummary: string;
+  recommendation: string;
+}
+
 export interface Assessment {
   id: string;
   date: number;
@@ -127,6 +136,9 @@ export interface Assessment {
   medications: ScannedMedication[];
   patientProfile: PatientProfile;
   forWhom?: ForWhom;
+  mentalHealthMode?: 'phq9' | 'gad7';
+  mentalHealthCrisis?: boolean;
+  mentalHealthResults?: MentalHealthResults;
 }
 
 export interface MedicineOrder {

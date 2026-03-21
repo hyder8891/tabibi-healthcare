@@ -409,6 +409,53 @@ export default function HomeScreen() {
           </LinearGradient>
         </Pressable>
 
+        <Pressable
+          style={({ pressed }) => [
+            styles.mainCTA,
+            pressed && { opacity: 0.95, transform: [{ scale: 0.97 }] },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/assessment?mode=mentalHealth");
+          }}
+        >
+          <LinearGradient
+            colors={["#7C3AED", "#DB2777"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.ctaGradient}
+          >
+            <View style={styles.ctaDecoArc} />
+            <View style={styles.ctaDecoGlow} />
+
+            <View style={[styles.ctaHeader, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <View style={[styles.ctaIconWrap, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+                <MaterialCommunityIcons name="brain" size={26} color="#fff" />
+              </View>
+              <View style={[styles.ctaChip, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+                <View style={[styles.ctaChipDot, { backgroundColor: "#E9D5FF" }]} />
+                <Text style={[styles.ctaChipText, { color: "#fff" }]}>{t("Validated Screening", "فحص معتمد")}</Text>
+              </View>
+            </View>
+
+            <View style={[styles.ctaTextBlock, isRTL && { alignItems: "flex-end" }]}>
+              <Text style={[styles.ctaTitle, { color: "#fff" }, isRTL && { textAlign: "right" }]}>
+                {t("Mental Health Check", "فحص الصحة النفسية")}
+              </Text>
+              <Text style={[styles.ctaSubtitle, { color: "rgba(255,255,255,0.85)" }, isRTL && { textAlign: "right" }]}>
+                {t("PHQ-9 & GAD-7 depression and anxiety screening", "فحص الاكتئاب والقلق PHQ-9 و GAD-7")}
+              </Text>
+            </View>
+
+            <View style={[styles.ctaAction, { flexDirection: isRTL ? "row-reverse" : "row" }]}>
+              <Text style={[styles.ctaActionText, { color: "#fff" }]}>{t("Begin Screening", "ابدأ الفحص")}</Text>
+              <View style={[styles.ctaArrow, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+                <Ionicons name={isRTL ? "arrow-back" : "arrow-forward"} size={18} color="#fff" />
+              </View>
+            </View>
+          </LinearGradient>
+        </Pressable>
+
         <Text style={[styles.sectionTitle, isRTL && { textAlign: "right" }]}>{t("Quick Actions", "إجراءات سريعة")}</Text>
 
         <View style={styles.quickActionsGrid}>

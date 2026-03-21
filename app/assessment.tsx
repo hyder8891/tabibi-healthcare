@@ -43,11 +43,13 @@ async function uriToBase64(uri: string): Promise<string> {
 import Colors from "@/constants/colors";
 import { MessageBubble, TypingIndicator } from "@/components/MessageBubble";
 import { EmergencyOverlay } from "@/components/EmergencyOverlay";
+import { MentalHealthCrisisOverlay } from "@/components/MentalHealthCrisisOverlay";
+import { MentalHealthResultsCard } from "@/components/MentalHealthResultsCard";
 import { RecommendationCard } from "@/components/RecommendationCard";
 import { getApiUrl, getAuthHeaders } from "@/lib/query-client";
 import { saveAssessment, getProfile, getAssessment, updateAssessment } from "@/lib/storage";
 import { useSettings } from "@/contexts/SettingsContext";
-import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment, ForWhom } from "@/lib/types";
+import type { ChatMessage, EmergencyAlert, AssessmentResult, Assessment, ForWhom, MentalHealthResults } from "@/lib/types";
 
 function AnimatedTypingIndicator() {
   return <TypingIndicator />;
@@ -56,7 +58,7 @@ function AnimatedTypingIndicator() {
 export default function AssessmentScreen() {
   const insets = useSafeAreaInsets();
   const { settings, t, isRTL } = useSettings();
-  const { assessmentId } = useLocalSearchParams<{ assessmentId?: string }>();
+  const { assessmentId, mode } = useLocalSearchParams<{ assessmentId?: string; mode?: string }>();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +70,9 @@ export default function AssessmentScreen() {
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
   const [isGeneratingRecommendation, setIsGeneratingRecommendation] = useState(false);
+  const [mentalHealthMode, setMentalHealthMode] = useState<'phq9' | 'gad7' | null>(null);
+  const [mentalHealthCrisis, setMentalHealthCrisis] = useState(false);
+  const [mentalHealthResults, setMentalHealthResults] = useState<MentalHealthResults | null>(null);
   const [forWhom, setForWhom] = useState<ForWhom | null>(null);
   const [showForWhomModal, setShowForWhomModal] = useState(false);
   const [forWhomName, setForWhomName] = useState("");
@@ -78,6 +83,7 @@ export default function AssessmentScreen() {
   const chiefComplaintRef = useRef<string>("");
   const lockedTotalRef = useRef<number | null>(null);
   const isSubmittingRef = useRef(false);
+  const pendingMentalHealthStartRef = useRef<'phq9' | 'gad7' | null>(null);
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const initializedRef = useRef(false);
 
@@ -112,6 +118,20 @@ export default function AssessmentScreen() {
     
     if (assessmentId) {
       loadExistingAssessment(assessmentId);
+    } else if (mode === "mentalHealth") {
+      setMentalHealthMode('phq9');
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content: settings.language === "ar"
+            ? "مرحباً! سنبدأ فحص الصحة النفسية. سأطرح عليك بعض الأسئلة البسيطة."
+            : "Hello! We'll begin a mental health screening. I'll ask you some simple questions.",
+          timestamp: Date.now(),
+        },
+      ]);
+      chiefComplaintRef.current = "فحص الصحة النفسية";
+      pendingMentalHealthStartRef.current = 'phq9';
     } else {
       setShowForWhomModal(true);
       setForWhomStep("choose");
@@ -283,6 +303,7 @@ export default function AssessmentScreen() {
           isPediatric: settings.pediatricMode,
         },
         ...(forWhom ? { forWhom } : {}),
+        ...(mentalHealthMode ? { mentalHealthMode } : {}),
       });
 
       let response = await fetch(url.toString(), {
@@ -428,7 +449,10 @@ export default function AssessmentScreen() {
           .replace(/```[\s\S]*?```/g, "")
           .replace(/\{"emergency"\s*:\s*true[^}]*\}/g, "")
           .replace(/\{"quickReplies"\s*:\s*\[.*?\]\}/gs, "")
-          .replace(/\[ASSESSMENT_READY\]/g, "");
+          .replace(/\[ASSESSMENT_READY\]/g, "")
+          .replace(/\{"phq9_q9_crisis"\s*:\s*true\}/g, "")
+          .replace(/\{"phq9_complete"\s*:\s*true[^}]*\}/g, "")
+          .replace(/\{"gad7_complete"\s*:\s*true[^}]*\}/g, "");
 
         const removeBalancedJson = (str: string): string => {
           let result = "";
@@ -523,6 +547,14 @@ export default function AssessmentScreen() {
                 fullText += data.content;
                 const cleanStreaming = stripJson(fullText, true);
                 setStreamingMessage(cleanStreaming);
+
+                if (mentalHealthMode && !mentalHealthCrisis) {
+                  const crisisInStream = fullText.match(/\{"phq9_q9_crisis"\s*:\s*true\}/);
+                  if (crisisInStream) {
+                    setMentalHealthCrisis(true);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                  }
+                }
               }
               if (data.validatedAssessment) {
                 try {
@@ -595,6 +627,60 @@ export default function AssessmentScreen() {
                     },
                   };
                   setAssessmentResult(parsedResult);
+                }
+
+                if (mentalHealthMode) {
+                  const crisisMatch = fullText.match(/\{"phq9_q9_crisis"\s*:\s*true\}/);
+                  if (crisisMatch) {
+                    setMentalHealthCrisis(true);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+                  }
+
+                  const phq9CompleteMatch = fullText.match(/\{"phq9_complete"\s*:\s*true\s*,\s*"totalScore"\s*:\s*(\d+).*?\}/s);
+                  const gad7CompleteMatch = fullText.match(/\{"gad7_complete"\s*:\s*true\s*,\s*"totalScore"\s*:\s*(\d+).*?\}/s);
+
+                  if (phq9CompleteMatch) {
+                    const score = parseInt(phq9CompleteMatch[1], 10);
+                    let severityLevel: string;
+                    let severityColor: string;
+                    if (score <= 4) { severityLevel = "الحد الأدنى"; severityColor = "#22C55E"; }
+                    else if (score <= 9) { severityLevel = "خفيف"; severityColor = "#EAB308"; }
+                    else if (score <= 14) { severityLevel = "متوسط"; severityColor = "#F97316"; }
+                    else if (score <= 19) { severityLevel = "متوسط الشدة"; severityColor = "#EF4444"; }
+                    else { severityLevel = "شديد"; severityColor = "#DC2626"; }
+
+                    setMentalHealthResults({
+                      type: 'phq9',
+                      totalScore: score,
+                      severityLevel,
+                      severityColor,
+                      evidenceSummary: stripJson(fullText),
+                      recommendation: score >= 10
+                        ? "ننصح بمراجعة متخصص في الصحة النفسية"
+                        : "استمر في مراقبة حالتك النفسية",
+                    });
+                  }
+
+                  if (gad7CompleteMatch) {
+                    const score = parseInt(gad7CompleteMatch[1], 10);
+                    let severityLevel: string;
+                    let severityColor: string;
+                    if (score <= 4) { severityLevel = "الحد الأدنى"; severityColor = "#22C55E"; }
+                    else if (score <= 9) { severityLevel = "خفيف"; severityColor = "#EAB308"; }
+                    else if (score <= 14) { severityLevel = "متوسط"; severityColor = "#F97316"; }
+                    else { severityLevel = "شديد"; severityColor = "#DC2626"; }
+
+                    setMentalHealthResults({
+                      type: 'gad7',
+                      totalScore: score,
+                      severityLevel,
+                      severityColor,
+                      evidenceSummary: stripJson(fullText),
+                      recommendation: score >= 10
+                        ? "ننصح بمراجعة متخصص في الصحة النفسية"
+                        : "استمر في مراقبة حالتك النفسية",
+                    });
+                  }
                 }
 
                 const replies = extractQuickReplies(fullText);
@@ -681,7 +767,18 @@ export default function AssessmentScreen() {
       setIsLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [inputText, messages, isLoading, settings, pendingImage, existingAssessmentId, forWhom]);
+  }, [inputText, messages, isLoading, settings, pendingImage, existingAssessmentId, forWhom, mentalHealthMode, mentalHealthCrisis]);
+
+  useEffect(() => {
+    if (pendingMentalHealthStartRef.current && !isLoading && messages.length > 0) {
+      const mhMode = pendingMentalHealthStartRef.current;
+      pendingMentalHealthStartRef.current = null;
+      const startText = mhMode === 'gad7' ? "ابدأ فحص GAD-7" : "ابدأ فحص PHQ-9";
+      quickReplyRef.current = startText;
+      setInputText(startText);
+      setQuickReplies([]);
+    }
+  }, [messages, isLoading]);
 
   const finishAssessment = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -766,10 +863,16 @@ export default function AssessmentScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
-      {emergency && (
+      {emergency && !mentalHealthMode && (
         <EmergencyOverlay
           alert={emergency}
           onDismiss={() => setEmergency(null)}
+        />
+      )}
+
+      {mentalHealthCrisis && (
+        <MentalHealthCrisisOverlay
+          onDismiss={() => setMentalHealthCrisis(false)}
         />
       )}
 
@@ -1054,6 +1157,35 @@ export default function AssessmentScreen() {
           ListHeaderComponent={
             isLoading && !streamingMessage ? (
               <AnimatedTypingIndicator />
+            ) : mentalHealthResults ? (
+              <MentalHealthResultsCard
+                results={mentalHealthResults}
+                onStartNew={() => {
+                  setMessages([]);
+                  setMentalHealthResults(null);
+                  setMentalHealthCrisis(false);
+                  setMentalHealthMode('phq9');
+                  setExistingAssessmentId(null);
+                  initializedRef.current = false;
+                  router.replace("/assessment?mode=mentalHealth");
+                }}
+                onStartGAD7={() => {
+                  setMessages([{
+                    id: "welcome-gad7",
+                    role: "assistant",
+                    content: settings.language === "ar"
+                      ? "سنبدأ الآن فحص القلق GAD-7."
+                      : "Now we'll begin the GAD-7 anxiety screening.",
+                    timestamp: Date.now(),
+                  }]);
+                  setMentalHealthResults(null);
+                  setMentalHealthCrisis(false);
+                  setMentalHealthMode('gad7');
+                  setExistingAssessmentId(null);
+                  chiefComplaintRef.current = "فحص القلق GAD-7";
+                  pendingMentalHealthStartRef.current = 'gad7';
+                }}
+              />
             ) : assessmentResult ? (
               <View style={styles.inlineResultCard}>
                 <RecommendationCard
