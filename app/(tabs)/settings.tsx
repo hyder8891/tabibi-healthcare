@@ -338,8 +338,42 @@ export default function SettingsScreen() {
               </View>
             </ScrollView>
           </View>
+          <View style={styles.divider} />
+          <View style={[styles.fieldRow, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={styles.fieldIconWrap}>
+              <Ionicons name="heart-outline" size={17} color="#EF4444" />
+            </View>
+            <Text style={styles.fieldLabel}>{t("Last Heart Rate", "آخر قراءة نبض")}</Text>
+            <Text style={[styles.fieldInput, { color: profile.lastBpm && profile.lastBpmDate ? Colors.light.text : Colors.light.textTertiary }, isRTL && { textAlign: "right" }]}>
+              {profile.lastBpm && profile.lastBpmDate
+                ? `${profile.lastBpm} bpm — ${new Date(profile.lastBpmDate).toLocaleDateString(isRTL ? "ar-EG" : "en-US", { day: "numeric", month: "long", year: "numeric" })}`
+                : t("Not measured yet", "لم يتم قياسه بعد")}
+            </Text>
+          </View>
         </View>
         </CollapsibleSection>
+
+        <View style={styles.card}>
+          <View style={[styles.prefRow, isRTL && { flexDirection: "row-reverse" }]}>
+            <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
+              <View style={[styles.prefIconWrap, { backgroundColor: "#ECFDF5" }]}>
+                <MaterialCommunityIcons name="baby-face-outline" size={18} color={Colors.light.primary} />
+              </View>
+              <View style={isRTL ? { alignItems: "flex-end" } : undefined}>
+                <Text style={styles.prefLabel}>{t("Pediatric Mode", "\u0648\u0636\u0639 \u0627\u0644\u0623\u0637\u0641\u0627\u0644")}</Text>
+                <Text style={[styles.prefDesc, isRTL && { textAlign: "right" }]}>
+                  {t("Weight-based dosage", "\u062d\u0633\u0627\u0628\u0627\u062a \u0627\u0644\u062c\u0631\u0639\u0629 \u062d\u0633\u0628 \u0627\u0644\u0648\u0632\u0646")}
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={settings.pediatricMode}
+              onValueChange={(v) => updateSettings({ pediatricMode: v })}
+              trackColor={{ false: Colors.light.borderLight, true: Colors.light.primaryLight }}
+              thumbColor={settings.pediatricMode ? Colors.light.primary : "#f4f3f4"}
+            />
+          </View>
+        </View>
 
         <CollapsibleSection
           title={t("Body Measurements", "\u0627\u0644\u0642\u064a\u0627\u0633\u0627\u062a \u0627\u0644\u062c\u0633\u062f\u064a\u0629")}
@@ -778,26 +812,6 @@ export default function SettingsScreen() {
           testID="section-app-preferences"
         >
         <View style={styles.card}>
-          <View style={[styles.prefRow, isRTL && { flexDirection: "row-reverse" }]}>
-            <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
-              <View style={[styles.prefIconWrap, { backgroundColor: "#ECFDF5" }]}>
-                <MaterialCommunityIcons name="baby-face-outline" size={18} color={Colors.light.primary} />
-              </View>
-              <View style={isRTL ? { alignItems: "flex-end" } : undefined}>
-                <Text style={styles.prefLabel}>{t("Pediatric Mode", "\u0648\u0636\u0639 \u0627\u0644\u0623\u0637\u0641\u0627\u0644")}</Text>
-                <Text style={[styles.prefDesc, isRTL && { textAlign: "right" }]}>
-                  {t("Weight-based dosage", "\u062d\u0633\u0627\u0628\u0627\u062a \u0627\u0644\u062c\u0631\u0639\u0629 \u062d\u0633\u0628 \u0627\u0644\u0648\u0632\u0646")}
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={settings.pediatricMode}
-              onValueChange={(v) => updateSettings({ pediatricMode: v })}
-              trackColor={{ false: Colors.light.borderLight, true: Colors.light.primaryLight }}
-              thumbColor={settings.pediatricMode ? Colors.light.primary : "#f4f3f4"}
-            />
-          </View>
-          <View style={styles.divider} />
           <View style={[styles.prefRow, isRTL && { flexDirection: "row-reverse" }]}>
             <View style={[styles.prefLeft, isRTL && { flexDirection: "row-reverse" }]}>
               <View style={[styles.prefIconWrap, { backgroundColor: "#EFF6FF" }]}>
