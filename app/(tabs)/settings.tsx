@@ -929,12 +929,12 @@ export default function SettingsScreen() {
         </CollapsibleSection>
 
         <CollapsibleSection
-          title={t("Danger Zone", "\u0645\u0646\u0637\u0642\u0629 \u0627\u0644\u062e\u0637\u0631")}
-          icon={<Ionicons name="warning-outline" size={20} color={Colors.light.emergency} />}
+          title={t("Log Out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
+          icon={<Ionicons name="log-out-outline" size={20} color={Colors.light.emergency} />}
           summary={t("Log out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
           isRTL={isRTL}
           titleColor={Colors.light.emergency}
-          testID="section-danger-zone"
+          testID="section-logout"
         >
         <Pressable
           style={({ pressed }) => [
