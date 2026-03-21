@@ -928,14 +928,6 @@ export default function SettingsScreen() {
         </Pressable>
         </CollapsibleSection>
 
-        <CollapsibleSection
-          title={t("Log Out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
-          icon={<Ionicons name="log-out-outline" size={20} color={Colors.light.emergency} />}
-          summary={t("Log out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}
-          isRTL={isRTL}
-          titleColor={Colors.light.emergency}
-          testID="section-logout"
-        >
         <Pressable
           style={({ pressed }) => [
             styles.logoutButton,
@@ -947,11 +939,11 @@ export default function SettingsScreen() {
             await logout();
             router.replace("/auth");
           }}
+          testID="section-logout"
         >
           <Ionicons name="log-out-outline" size={18} color={Colors.light.emergency} />
           <Text style={styles.logoutText}>{t("Log Out", "\u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062e\u0631\u0648\u062c")}</Text>
         </Pressable>
-        </CollapsibleSection>
 
         <View style={[styles.disclaimer, isRTL && { flexDirection: "row-reverse" }]}>
           <Ionicons name="information-circle" size={15} color={Colors.light.textTertiary} />
