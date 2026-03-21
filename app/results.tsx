@@ -294,6 +294,15 @@ export default function ResultsScreen() {
             "هذا ليس تشخيصًا طبيًا. استشر طبيبك للحصول على رأي متخصص."
           )}
         </Text>
+
+        <Pressable
+          style={styles.newAssessmentButton}
+          onPress={() => router.push("/assessment")}
+        >
+          <Text style={styles.newAssessmentButtonText}>
+            {t("Start New Assessment", "تقييم جديد")}
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   );
@@ -446,5 +455,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 8,
     lineHeight: 18,
+  },
+  newAssessmentButton: {
+    backgroundColor: Colors.light.primary,
+    paddingVertical: 16,
+    borderRadius: 14,
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
+    alignItems: "center" as const,
+  },
+  newAssessmentButtonText: {
+    fontSize: 16,
+    fontFamily: "DMSans_700Bold",
+    color: "#fff",
   },
 });
