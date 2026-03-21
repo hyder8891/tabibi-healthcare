@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Linking,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -541,14 +542,11 @@ export default function AuthScreen() {
 
   const renderHeader = () => (
     <View style={styles.headerSection}>
-      <LinearGradient
-        colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.logoBg}
-      >
-        <MaterialCommunityIcons name="stethoscope" size={40} color="#fff" />
-      </LinearGradient>
+      <Image
+        source={require("@/assets/images/logo-nobg.png")}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
     </View>
   );
 
@@ -869,14 +867,11 @@ export default function AuthScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.headerSection}>
-            <LinearGradient
-              colors={[Colors.light.cardGradientStart, Colors.light.cardGradientEnd]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.logoBg}
-            >
-              <MaterialCommunityIcons name="stethoscope" size={40} color="#fff" />
-            </LinearGradient>
+            <Image
+              source={require("@/assets/images/logo-nobg.png")}
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
             <Text style={[styles.appTitle, isRTL && { textAlign: "right" }]}>
               {t("Tabibi", "\u0637\u0628\u064a\u0628\u064a")}
             </Text>
@@ -1159,6 +1154,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 16,
+  },
+  logoImage: {
+    width: 90,
+    height: 90,
     marginBottom: 16,
   },
   appTitle: {
