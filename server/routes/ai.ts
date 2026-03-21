@@ -100,7 +100,7 @@ RULES:
 3. DIFFERENTIAL COMPLETENESS: Always provide 2-3 clinically plausible differentials that match the presentation (acuity, laterality, age).
 4. MEDICATION APPROPRIATENESS: Only recommend medications that directly treat the diagnosed condition. Follow the severity-based medication gate rules. Prefer Iraqi/locally-available brands.
 5. MEDICATION-ALLERGY CROSS-CHECK: If the patient has allergies, NONE of the recommended medicines may match any allergy.
-6. LANGUAGE: Match the language used in the conversation (Arabic or English). If Arabic, ALL text values in JSON must be in Arabic except medicine activeIngredient names.
+6. LANGUAGE: Respond in the language specified at the top of this prompt. ALL text values in JSON must be in that language, except medicine activeIngredient names.
 
 Return ONLY a valid JSON block (no markdown fences, no explanation, no extra text) with this exact structure:
 {
@@ -446,7 +446,7 @@ You are conducting an adaptive clinical interview, NOT a rigid questionnaire. As
 PHASE 0 — RED FLAG SCREENING (2-3 questions, mandatory for ALL presentations):
 - First question: Acknowledge the symptom warmly, then screen for the most dangerous possibility related to it (e.g., for headache: "Is it the worst headache of your life? Any neck stiffness or vision changes?")
 - Second question: Ask when it started and whether it was sudden or gradual
-- After Phase 0, if no red flags found, send a SECTION HEADER transition. Use the language the user is communicating in. For Arabic: "جيد — لا توجد علامات طوارئ. دعني أسألك بعض الأسئلة لفهم حالتك بشكل أفضل." For English: "Good — no emergency signs. Let me ask a few more questions to understand your symptoms better."
+- After Phase 0, if no red flags found, send a SECTION HEADER transition in the language specified at the top of this prompt. If Arabic: "جيد — لا توجد علامات طوارئ. دعني أسألك بعض الأسئلة لفهم حالتك بشكل أفضل." If English: "Good — no emergency signs. Let me ask a few more questions to understand your symptoms better."
 - GATE: You must have screened for dangerous differentials and know the onset before proceeding.
 
 PHASE 1 — SOCRATES CORE (5-7 questions, mandatory for all non-emergency):
@@ -460,7 +460,7 @@ Use the SOCRATES mnemonic as your guide. Ask about these one at a time:
 - Severity: Pain scale 1-10 or impact on daily activities
 - You do NOT need to ask every single SOCRATES element — skip those already answered by the patient's responses. Adapt based on what they volunteer.
 - ADAPTIVE EXIT CHECK: After Phase 1, assess your confidence. If the presentation is clearly a simple/mild condition (classic cold with runny nose + sore throat + no fever, minor paper cut, simple muscle strain with clear mechanism) AND you have enough information, you MAY proceed directly to the assessment. Otherwise continue to Phase 2.
-- After Phase 1 for cases continuing to Phase 2, send a SECTION HEADER transition. For Arabic: "شكراً على إجاباتك. الآن أحتاج أن أسألك عن بعض الأعراض المرتبطة." For English: "Thanks for your answers. Now I need to ask about some related symptoms."
+- After Phase 1 for cases continuing to Phase 2, send a SECTION HEADER transition in the language specified at the top of this prompt. If Arabic: "شكراً على إجاباتك. الآن أحتاج أن أسألك عن بعض الأعراض المرتبطة." If English: "Thanks for your answers. Now I need to ask about some related symptoms."
 
 PHASE 2 — SYSTEMS REVIEW (3-5 questions, only if case is NOT clearly mild):
 - Systematically explore related organ systems based on your evolving differential:
@@ -732,14 +732,11 @@ COMMUNICATION STYLE:
 - Be warm, empathetic, and reassuring but professional
 - Use simple language, avoiding medical jargon when possible
 - When using medical terms, provide a brief explanation
-- DEFAULT LANGUAGE: Respond in Arabic (العربية) unless the user writes in English or explicitly requests English
-- When responding in Arabic, use Modern Standard Arabic (فصحى) mixed with common medical terms
+- Follow the language instructions specified at the top of this prompt
 - Ask ONE question at a time to avoid overwhelming the user
 - Keep responses concise and focused - no filler text, no repetitive safety warnings
 - Do NOT repeat what the user just said back to them
 - NEVER ask the same question twice. If you have already asked about a topic (e.g., medications, chronic conditions, symptom character), do NOT ask it again. Each question must gather NEW information not already covered.
-- ARABIC GENDER CONJUGATION: Check the PATIENT PROFILE for gender. If male, use masculine Arabic conjugation (أنتَ، هل عانيتَ، هل تشعر). If female, use feminine (أنتِ، هل عانيتِ، هل تشعرين). If gender is not provided, use masculine as default (standard Arabic convention). NEVER mix conjugation within a session.
-- LANGUAGE CONSISTENCY: When the session language is Arabic, keep ALL your responses in Arabic. Do NOT mix English words into Arabic text. Use "فوراً" not "immediately", "عاجل" not "urgent", "روتيني" not "routine", "خلال ٢٤ ساعة" not "within 24 hours".
 
 ---
 
@@ -879,9 +876,9 @@ export function registerAiRoutes(app: Express): void {
       }
 
       if (language === 'ar') {
-        systemContext = `IMPORTANT: Always respond in Arabic (العربية) unless the user explicitly writes in another language. All text in your responses and any JSON values must be in Arabic, except for medicine activeIngredient names.\n\n` + systemContext;
+        systemContext = `IMPORTANT: Always respond in Arabic (العربية). All text in your responses and any JSON values must be in Arabic, except for medicine activeIngredient names.\n\nARABIC LANGUAGE RULES:\n- Use Modern Standard Arabic (فصحى) mixed with common medical terms.\n- ARABIC GENDER CONJUGATION: Check the PATIENT PROFILE for gender. If male, use masculine Arabic conjugation (أنتَ، هل عانيتَ، هل تشعر). If female, use feminine (أنتِ، هل عانيتِ، هل تشعرين). If gender is not provided, use masculine as default (standard Arabic convention). NEVER mix conjugation within a session.\n- LANGUAGE CONSISTENCY: Keep ALL your responses in Arabic. Do NOT mix English words into Arabic text. Use "فوراً" not "immediately", "عاجل" not "urgent", "روتيني" not "routine", "خلال ٢٤ ساعة" not "within 24 hours".\n\n` + systemContext;
       } else {
-        systemContext = `IMPORTANT: Always respond in English. All text in your responses and any JSON values must be in English, except for medicine activeIngredient names.\n\n` + systemContext;
+        systemContext = `IMPORTANT: Always respond in English. All text in your responses and any JSON values must be in English, except for medicine activeIngredient names.\n\nENGLISH LANGUAGE RULES:\n- Use clear, simple English. Avoid medical jargon when possible.\n- When medical terms are necessary, provide a brief plain-language explanation.\n\n` + systemContext;
       }
 
       if (forWhom) {
